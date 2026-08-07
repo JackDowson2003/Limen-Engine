@@ -14,6 +14,7 @@ file(GLOB_RECURSE LIMEN_ENGINE_HEADERS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
 )
 
+
 #add_library(LimenEngine STATIC
 #        ${LIMEN_ENGINE_SOURCES}
 #        ${LIMEN_ENGINE_HEADERS}
@@ -31,6 +32,13 @@ add_library(LimenEngine
         ${LIMEN_ENGINE_SOURCES}
         ${LIMEN_ENGINE_HEADERS}
 )
+
+# lmpch.h 是仅供 LimenEngine 编译使用的预编译头，不是公开 API。
+target_precompile_headers(LimenEngine
+        PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/Limen/lmpch.h"
+)
+
 if(WIN32)
     target_compile_definitions(LimenEngine
             PUBLIC
@@ -52,6 +60,7 @@ endif()
 target_include_directories(LimenEngine
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/Limen
         # spdlog 是随项目提交的 header-only 第三方库。Log.h 暴露了 spdlog 类型，
         # 因此使用 LimenEngine 的目标也需要能够找到它的头文件。
         SYSTEM PUBLIC

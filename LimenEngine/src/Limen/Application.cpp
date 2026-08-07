@@ -1,13 +1,12 @@
 //
 // Created by chenlong on 2026/8/5.
 //
-#include "Limen/Application.h"
+#include "Application.h"
 
-#include "Limen/Events/ApplicationEvent.h"
-#include "Limen/Log.h"
+#include "Events/ApplicationEvent.h"
+#include "Log.h"
 
-#include <chrono>
-#include <thread>
+
 
 namespace Limen
 {

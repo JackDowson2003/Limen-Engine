@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Event.h"
-#include <sstream>
 namespace Limen {
 
 	class LIMEN_API MouseMovedEvent : public Event
