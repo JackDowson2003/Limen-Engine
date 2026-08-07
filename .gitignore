@@ -2,3 +2,5 @@ out/
 
 
 
+/LimenEngine/vendor/spdlog/
+/LimenEngine/vendor/glfw

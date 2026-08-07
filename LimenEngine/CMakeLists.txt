@@ -35,9 +35,36 @@ add_library(LimenEngine
 
 # lmpch.h 是仅供 LimenEngine 编译使用的预编译头，不是公开 API。
 target_precompile_headers(LimenEngine
-        PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/Limen/lmpch.h"
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/Limen/lmpch.h
 )
+
+add_library(glad STATIC
+        vendor/glad/src/gl.c
+)
+
+target_include_directories(glad
+        PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/glad/include"
+)
+
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
+
+add_subdirectory(vendor/glfw EXCLUDE_FROM_ALL)
+
+
+
+target_link_libraries(LimenEngine
+        PRIVATE
+        glfw
+        glad
+)
+
+
 
 if(WIN32)
     target_compile_definitions(LimenEngine
@@ -80,5 +107,8 @@ else()
             LIMEN_ENGINE_STATIC
     )
 endif()
-
+target_compile_definitions(LimenEngine
+        PUBLIC
+        $<$<CONFIG:Debug>:LM_ENABLE_ASSERTS>
+)
 limen_configure_target(LimenEngine)

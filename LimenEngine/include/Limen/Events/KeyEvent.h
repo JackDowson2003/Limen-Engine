@@ -22,9 +22,9 @@ namespace Limen {
 		KeyPressedEvent(const int keycode, const int repeatCount = 0)
 			: KeyEvent(keycode), m_RepeatCount(repeatCount) {}
 
-		bool IsRepeat() const { return m_RepeatCount; }
+		[[nodiscard]] bool IsRepeat() const { return m_RepeatCount; }
 
-		std::string ToString() const override
+		[[nodiscard]] std::string ToString() const override
 		{
 			std::stringstream ss;
 			ss << "KeyPressedEvent: " << m_KeyCode << " (repeatCount = " << m_RepeatCount << ")";
@@ -58,7 +58,7 @@ namespace Limen {
 		KeyTypedEvent(const int keycode)
 			: KeyEvent(keycode) {}
 
-		std::string ToString() const override
+		[[nodiscard]] std::string ToString() const override
 		{
 			std::stringstream ss;
 			ss << "KeyTypedEvent: " << m_KeyCode;

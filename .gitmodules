@@ -2,3 +2,7 @@
 	path = LimenEngine/vendor/spdlog
 	url = https://github.com/gabime/spdlog.git
 	branch = v1.x
+[submodule "LimenEngine/vendor/glfw"]
+	path = LimenEngine/vendor/glfw
+	url = https://github.com/JackDowson2003/GLFW.git
+	branch = main
