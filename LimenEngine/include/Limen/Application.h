@@ -6,7 +6,7 @@
 #include "Core.h"
 #include "Window.h"
 #include "Events/ApplicationEvent.h"
-
+#include "LayerStack.h"
 namespace Limen
 {
     class LIMEN_API Application //静态链接不需要写__declspec(dllexport)
@@ -17,13 +17,15 @@ namespace Limen
         virtual ~Application(); //交给sandbox去实现
 
         void Run();
+        void PushLayer(Layer* layer);
+        void PushOverlay(Layer* layer);
 
         void OnEvent(Event& e);
 
     private:
         bool OnWindowClose(WindowCloseEvent& e);
 
-
+        LayerStack m_LayerStack;
         std::unique_ptr<Window> m_Window;
         bool m_Running = true;
     };

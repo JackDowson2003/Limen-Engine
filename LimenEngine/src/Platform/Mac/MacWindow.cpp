@@ -1,14 +1,13 @@
 //
 // Created by chenlong on 2026/8/7.
 //
-
+#include <glad/gl.h> //glad要在glfw钱
 #include "Paltform/Mac/MacWindow.h"
 
 #include "Log.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
-
 namespace Limen
 {
     static bool s_GLFWInitialized = false;
@@ -66,12 +65,28 @@ namespace Limen
             s_GLFWInitialized = true;
         }
 
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4); //opengl 4
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1); //opengl 3
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); //core mode只用核心功能，不使用兼容的
+
+#if defined(LIMEN_PLATFORM_MACOS)
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE); //我连核心模式里暂时残留的、未来会删除的东西也不用，直接当它们不存在
+#endif
+
         m_Window = glfwCreateWindow(static_cast<int>(props.Width), static_cast<int>(props.Height),
                                     props.Title.c_str(),
                                     nullptr, nullptr);
 
         glfwMakeContextCurrent(m_Window); //创建上下文
+        //获取opengl的函数
 
+        const int status = gladLoadGL(glfwGetProcAddress);
+        LM_CORE_ASSERT(status, "Failed to initialize GLAD!");
+        if (!status)
+        {
+            Shutdown();
+            return;
+        }
         glfwSetWindowUserPointer(m_Window, &m_Data);
         SetVSync(true); //垂直同步
 

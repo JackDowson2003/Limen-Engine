@@ -1,10 +1,31 @@
+#include "Layer.h"
 #include "Limen.h"
+
+class ExampleLayer : public Limen::Layer
+{
+public:
+    ExampleLayer()
+        :Layer("example layer")
+    {}
+
+    void OnUpdate() override
+    {
+        LM_INFO("ExampleLayer::OnUpdate");
+    }
+
+    void OnEvent(Limen::Event &e) override
+    {
+        LM_INFO("ExampleLayer::OnEvent");
+    }
+};
+
 
 class SandBoxApp : public Limen::Application
 {
 public:
     SandBoxApp()
     {
+        PushLayer(new ExampleLayer());
     }
 
     ~SandBoxApp()

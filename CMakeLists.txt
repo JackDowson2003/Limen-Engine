@@ -4,6 +4,13 @@ project(LimenEngine
         VERSION 0.1.0
         LANGUAGES C CXX
 )
+if(MSVC)
+    # Debug: /MDd
+    # Release / RelWithDebInfo / MinSizeRel: /MD
+    set(CMAKE_MSVC_RUNTIME_LIBRARY
+            "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>"
+    )
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) #要求编译器必须支持 C++20
