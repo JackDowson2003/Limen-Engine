@@ -2,8 +2,6 @@
 // Created by chenlong on 2026/8/5.
 //
 
-#ifndef LIMENENGINE_APPLICATION_H
-#define LIMENENGINE_APPLICATION_H
 #pragma once
 #include "Core.h"
 
@@ -16,11 +14,10 @@ namespace  Limen
         Application();
         virtual ~Application(); //交给sandbox去实现
 
-        void Run();
+         void Run();
     };
 
     //To be defined in CLIENT
     Application* CreateApplication();
 
 }
-#endif //LIMENENGINE_APPLICATION_H

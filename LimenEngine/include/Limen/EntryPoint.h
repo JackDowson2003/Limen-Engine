@@ -4,17 +4,23 @@
 
 #pragma once
 #include "Application.h"
-#if !defined(LM_PLATFORM_WINDOWS) && \
-    !defined(LM_PLATFORM_MACOS) && \
-    !defined(LM_PLATFORM_LINUX)
+#include "Log.h"
+#if !defined(LIMEN_PLATFORM_WINDOWS) && \
+    !defined(LIMEN_PLATFORM_MACOS) && \
+    !defined(LIMEN_PLATFORM_LINUX)
 
 #error "LimenEngine does not support this platform"
 
 #else
+
 int main(int argc, char **argv)
 {
-    printf("Running Application\n");
-    auto *app = Limen::CreateApplication();
+
+    Limen::Log::Init();
+    LM_CORE_WARN("Initializing LIMEN");
+    LM_INFO("Initializing var={0}",5);
+
+    auto* app = Limen::CreateApplication();
     app->Run();
     delete app;
     return 0;

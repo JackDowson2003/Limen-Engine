@@ -5,9 +5,10 @@
 #pragma once
 
 //For use by Limen Applications
-#include <stdio.h>
 #include "Limen/Application.h"
+#include "Limen/Log.h"
 
 //------Entry Point
 #include "Limen/EntryPoint.h"
 //---------------------------
+

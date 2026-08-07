@@ -13,7 +13,7 @@
         #else
             #define LIMEN_API __declspec(dllimport)
         #endif
-    #elif defined(LM_PLATFORM_MACOS) || defined(LM_PLATFORM_LINUX)
+    #elif defined(LIMEN_PLATFORM_MACOS) || defined(LIMEN_PLATFORM_LINUX)
         #define LIMEN_API __attribute__((visibility("default")))
     #else
         #error "Platform not supported linux and other platform"
@@ -23,3 +23,5 @@
 #else
     #error "Error!!! Unknown Type for platform!"
 #endif
+
+#define BIT(x) (1 << x)

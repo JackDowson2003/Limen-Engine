@@ -19,6 +19,18 @@
       }
     },
     {
+      "name": "ninja-shared-debug",
+      "displayName": "Shared Debug (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/cmake-build-shared-debug-clang++",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "LIMEN_ENGINE_SHARED": "ON",
+        "LIMEN_WARNINGS_AS_ERRORS": "OFF",
+        "LIMEN_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
       "name": "ninja-release",
       "displayName": "Release (Ninja)",
       "generator": "Ninja",
@@ -36,6 +48,14 @@
       "name": "build-debug",
       "displayName": "Build Debug",
       "configurePreset": "ninja-debug",
+      "targets": [
+        "LimenSandBox"
+      ]
+    },
+    {
+      "name": "build-shared-debug",
+      "displayName": "Build Shared Debug",
+      "configurePreset": "ninja-shared-debug",
       "targets": [
         "LimenSandBox"
       ]
