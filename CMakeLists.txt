@@ -59,6 +59,7 @@ function(limen_configure_target target_name)
                 -Wundef
                 -Wnon-virtual-dtor
                 -Wold-style-cast
+                -Werror=return-type
                 -Woverloaded-virtual
                 -Wimplicit-fallthrough
                 -Wnull-dereference

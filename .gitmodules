@@ -6,3 +6,7 @@
 	path = LimenEngine/vendor/glfw
 	url = https://github.com/JackDowson2003/GLFW.git
 	branch = main
+[submodule "LimenEngine/vendor/imgui"]
+	path = LimenEngine/vendor/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking

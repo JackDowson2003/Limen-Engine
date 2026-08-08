@@ -1,4 +1,3 @@
-#include "Layer.h"
 #include "Limen.h"
 
 class ExampleLayer : public Limen::Layer
@@ -11,6 +10,7 @@ public:
     void OnUpdate() override
     {
         LM_INFO("ExampleLayer::OnUpdate");
+
     }
 
     void OnEvent(Limen::Event &e) override
@@ -26,6 +26,7 @@ public:
     SandBoxApp()
     {
         PushLayer(new ExampleLayer());
+        PushOverlay(new Limen::ImGUILayer());
     }
 
     ~SandBoxApp()

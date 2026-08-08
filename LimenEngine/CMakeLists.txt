@@ -42,6 +42,7 @@ add_library(glad STATIC
         vendor/glad/src/gl.c
 )
 
+#glad
 target_include_directories(glad
         PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/glad/include"
@@ -54,7 +55,25 @@ set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 add_subdirectory(vendor/glfw EXCLUDE_FROM_ALL)
+#imgui
+add_library(imgui STATIC
+        vendor/imgui/imgui.cpp
+        vendor/imgui/imgui_draw.cpp
+        vendor/imgui/imgui_tables.cpp
+        vendor/imgui/imgui_widgets.cpp
 
+        vendor/imgui/backends/imgui_impl_glfw.cpp
+        vendor/imgui/backends/imgui_impl_opengl3.cpp
+
+        #vendor/imgui/imgui_demo.cpp #test
+)
+#imgui
+target_include_directories(imgui
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends
+)
 
 
 target_link_libraries(LimenEngine
@@ -63,7 +82,10 @@ target_link_libraries(LimenEngine
         glad
 )
 
-
+target_link_libraries(LimenEngine
+        PRIVATE
+        imgui
+)
 
 if(WIN32)
     target_compile_definitions(LimenEngine
@@ -83,10 +105,15 @@ elseif(UNIX)
 else()
     message(FATAL_ERROR "LimenEngine does not support this platform")
 endif()
+
+#headers
 target_include_directories(LimenEngine
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/include/Limen
+        PRIVATE
+        # 平台适配器（例如 GLFWKeyCodes.h）只允许引擎自身源文件包含。
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
         # spdlog 是随项目提交的 header-only 第三方库。Log.h 暴露了 spdlog 类型，
         # 因此使用 LimenEngine 的目标也需要能够找到它的头文件。
         SYSTEM PUBLIC
@@ -106,8 +133,10 @@ else()
             LIMEN_ENGINE_STATIC
     )
 endif()
+
 target_compile_definitions(LimenEngine
         PUBLIC
         $<$<CONFIG:Debug>:LM_ENABLE_ASSERTS>
 )
+
 limen_configure_target(LimenEngine)

@@ -1,70 +1,84 @@
 #pragma once
 
 #include "Event.h"
-namespace Limen {
+#include "KeyCodes.h"
 
-	class LIMEN_API KeyEvent : public Event
-	{
-	public:
-		inline int GetKeyCode() const { return m_KeyCode; }
+#include <cstdint>
 
-		EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
-	protected:
-		KeyEvent(const int keycode)
-			: m_KeyCode(keycode) {}
+namespace Limen
+{
+    class LIMEN_API KeyEvent : public Event
+    {
+    public:
+        [[nodiscard]] KeyCode GetKeyCode() const { return m_KeyCode; }
 
-		int m_KeyCode;
-	};
+        EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
 
-	class LIMEN_API KeyPressedEvent : public KeyEvent
-	{
-	public:
-		KeyPressedEvent(const int keycode, const int repeatCount = 0)
-			: KeyEvent(keycode), m_RepeatCount(repeatCount) {}
+    protected:
+        explicit KeyEvent(const KeyCode keyCode)
+            : m_KeyCode(keyCode) {}
 
-		[[nodiscard]] bool IsRepeat() const { return m_RepeatCount; }
+        KeyCode m_KeyCode;
+    };
 
-		[[nodiscard]] std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyPressedEvent: " << m_KeyCode << " (repeatCount = " << m_RepeatCount << ")";
-			return ss.str();
-		}
+    class LIMEN_API KeyPressedEvent : public KeyEvent
+    {
+    public:
+        KeyPressedEvent(const KeyCode keyCode, const int repeatCount = 0)
+            : KeyEvent(keyCode), m_RepeatCount(repeatCount) {}
 
-		EVENT_CLASS_TYPE(KeyPressed)
-	private:
-		int m_RepeatCount;
-	};
+        [[nodiscard]] bool IsRepeat() const { return m_RepeatCount > 0; }
 
-	class LIMEN_API KeyReleasedEvent : public KeyEvent
-	{
-	public:
-		KeyReleasedEvent(const int keycode)
-			: KeyEvent(keycode) {}
+        [[nodiscard]] std::string ToString() const override
+        {
+            std::stringstream stream;
+            stream << "KeyPressedEvent: " << static_cast<int>(m_KeyCode)
+                   << " (repeatCount = " << m_RepeatCount << ')';
+            return stream.str();
+        }
 
-		std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyReleasedEvent: " << m_KeyCode;
-			return ss.str();
-		}
+        EVENT_CLASS_TYPE(KeyPressed)
 
-		EVENT_CLASS_TYPE(KeyReleased)
-	};
+    private:
+        int m_RepeatCount;
+    };
 
-	class LIMEN_API KeyTypedEvent : public KeyEvent
-	{
-	public:
-		KeyTypedEvent(const int keycode)
-			: KeyEvent(keycode) {}
+    class LIMEN_API KeyReleasedEvent : public KeyEvent
+    {
+    public:
+        explicit KeyReleasedEvent(const KeyCode keyCode)
+            : KeyEvent(keyCode) {}
 
-		[[nodiscard]] std::string ToString() const override
-		{
-			std::stringstream ss;
-			ss << "KeyTypedEvent: " << m_KeyCode;
-			return ss.str();
-		}
+        [[nodiscard]] std::string ToString() const override
+        {
+            std::stringstream stream;
+            stream << "KeyReleasedEvent: " << static_cast<int>(m_KeyCode);
+            return stream.str();
+        }
 
-		EVENT_CLASS_TYPE(KeyTyped)
-	};
+        EVENT_CLASS_TYPE(KeyReleased)
+    };
+
+    // 文本输入事件：保存的是 Unicode 码点，而不是某个物理按键。
+    class LIMEN_API KeyTypedEvent : public Event
+    {
+    public:
+        explicit KeyTypedEvent(const char32_t codepoint)
+            : m_Codepoint(codepoint) {}
+
+        [[nodiscard]] char32_t GetCodepoint() const { return m_Codepoint; }
+
+        [[nodiscard]] std::string ToString() const override
+        {
+            std::stringstream stream;
+            stream << "KeyTypedEvent: " << static_cast<std::uint32_t>(m_Codepoint);
+            return stream.str();
+        }
+
+        EVENT_CLASS_TYPE(KeyTyped)
+        EVENT_CLASS_CATEGORY(EventCategoryKeyboard | EventCategoryInput)
+
+    private:
+        char32_t m_Codepoint;
+    };
 }

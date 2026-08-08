@@ -2,12 +2,13 @@
 // Created by chenlong on 2026/8/7.
 //
 #include <glad/gl.h> //glad要在glfw钱
-#include "Paltform/Mac/MacWindow.h"
+#include "Platform/Mac/MacWindow.h"
 
 #include "Log.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
+#include "Platform/GLFW/GLFWKeyCodes.h"
 namespace Limen
 {
     static bool s_GLFWInitialized = false;
@@ -16,6 +17,7 @@ namespace Limen
     {
         LM_CORE_ERROR("GLFW Error: {0} {1}",error_code, description);
     }
+
 
 
     MacWindow::MacWindow(const WindowProps &props)
@@ -90,6 +92,14 @@ namespace Limen
         glfwSetWindowUserPointer(m_Window, &m_Data);
         SetVSync(true); //垂直同步
 
+
+        glfwSetCharCallback(m_Window, [](GLFWwindow *window, unsigned int codepoint)
+        {
+            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            KeyTypedEvent event(static_cast<char32_t>(codepoint));
+            data.EventCallBack(event);
+        });
+
         //Set GLFW Callbacks
         glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
         {
@@ -112,23 +122,27 @@ namespace Limen
         glfwSetKeyCallback(m_Window, [](GLFWwindow *window, int key, int scancode, int action, int mods)
         {
             WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            const KeyCode keyCode = KeyCodeFromGLFW(key);
+            if (keyCode == KeyCode::Unknown)
+                return;
+
             switch (action)
             {
                 case GLFW_PRESS:
                 {
-                    KeyPressedEvent event(key, 0);
+                    KeyPressedEvent event(keyCode, 0);
                     data.EventCallBack(event);
                     break;
                 }
                 case GLFW_RELEASE:
                 {
-                    KeyReleasedEvent event(key);
+                    KeyReleasedEvent event(keyCode);
                     data.EventCallBack(event);
                     break;
                 }
                 case GLFW_REPEAT:
                 {
-                    KeyPressedEvent event(key, 1);
+                    KeyPressedEvent event(keyCode, 1);
                     data.EventCallBack(event);
                     break;
                 }
@@ -190,5 +204,6 @@ namespace Limen
     void MacWindow::Shutdown()
     {
         glfwDestroyWindow(m_Window);
+        glfwTerminate();
     }
 }

@@ -4,3 +4,6 @@ out/
 
 /LimenEngine/vendor/spdlog/
 /LimenEngine/vendor/glfw
+.idea/
+
+.DS_Store

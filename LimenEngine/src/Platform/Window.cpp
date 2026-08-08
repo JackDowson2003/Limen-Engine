@@ -2,7 +2,7 @@
 // Created by chenlong on 2026/8/7.
 //
 #include "Window.h"
-#include "Paltform/Mac/MacWindow.h"
+#include "Platform/Mac/MacWindow.h"
 
 namespace Limen
 {

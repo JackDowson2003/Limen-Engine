@@ -1,17 +1,21 @@
 //
 // Created by chenlong on 2026/8/5.
 //
+#include <glad/gl.h>
 #include "Application.h"
 
 #include "Events/ApplicationEvent.h"
 #include "Log.h"
 
-#include <GLFW/glfw3.h>
 
 namespace Limen
 {
+    Application* Application::s_Instance = nullptr;
+
     Application::Application()
     {
+        LM_CORE_ASSERT(!s_Instance, "Application already initialized!");
+        s_Instance = this;
         m_Window = std::unique_ptr<Window>(Window::Create());
         //发生Events的时候，就调用这个匿名函数,也就是OnEvent()
         m_Window->SetEventCallback([this](Event& e)
@@ -26,9 +30,12 @@ namespace Limen
         dispatcher.Dispatch<WindowCloseEvent>([this](WindowCloseEvent& e){
            return OnWindowClose(e);
         });
-        for (auto*& layer: m_LayerStack)
+        for (auto it = m_LayerStack.rbegin(); it != m_LayerStack.rend(); ++it)
         {
-            layer->OnEvent(e);
+            if (e.IsHandled())
+                break;
+
+            (*it)->OnEvent(e);
         }
         LM_CORE_TRACE("{0}",e.ToString());
     }
@@ -44,9 +51,13 @@ namespace Limen
 
     void Application::Run()
     {
-        WindowResizeEvent e(1280, 720);
         while (m_Running)
         {
+            glClearColor(0.1F, 0.1F, 0.1F, 1.0F);
+            glClear(GL_COLOR_BUFFER_BIT);
+            // Application.cpp
+            for (Layer* layer : m_LayerStack)
+                layer->OnUpdate();
             m_Window->OnUpdate();
         }
     }
@@ -59,7 +70,7 @@ namespace Limen
 
     void Application::PushOverlay(Layer *layer)
     {
-        m_LayerStack.PopOverlay(layer);
+        m_LayerStack.PushOverlay(layer);
         layer->OnAttach();
     }
 }

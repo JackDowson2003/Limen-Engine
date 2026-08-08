@@ -44,6 +44,10 @@ namespace Limen {
 		virtual const char* GetName() const = 0;
 		virtual int GetCategoryFlags() const = 0;
 		virtual std::string ToString() const { return GetName(); }
+		[[nodiscard]] bool IsHandled() const
+		{
+			return m_Handled;
+		}
 
 		[[nodiscard]] bool IsInCategory(const EventCategory category) const
 		{
