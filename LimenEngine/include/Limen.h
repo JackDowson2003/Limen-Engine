@@ -6,6 +6,7 @@
 
 //For use by Limen Applications
 #include "Limen/Application.h"
+#include "Limen/Input.h"
 #include "Limen/KeyCodes.h"
 #include "Limen/Log.h"
 #include "Limen/Layer.h"

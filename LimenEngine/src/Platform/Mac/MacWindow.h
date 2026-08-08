@@ -10,24 +10,28 @@ namespace Limen
     class MacWindow final : public Window
     {
     public:
-        explicit MacWindow(const WindowProps& props);
+        explicit MacWindow(const WindowProps &props);
+
         ~MacWindow() override;
 
         void OnUpdate() override;
 
-        [[nodiscard]] void* GetNativeWindow() const override { return m_Window; }
-        [[nodiscard]] unsigned int GetWidth() const override { return m_Data.Width; }
-        [[nodiscard]] unsigned int GetHeight() const override { return m_Data.Height; }
+        [[nodiscard]] inline void *GetNativeWindow() const override { return m_Window; }
+        [[nodiscard]] inline unsigned int GetWidth() const override { return m_Data.Width; }
+        [[nodiscard]] inline unsigned int GetHeight() const override { return m_Data.Height; }
 
-        void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallBack = callback; }
-        void SetVSync(bool enabled) override;
+        inline void SetEventCallback(const EventCallbackFn &callback) override { m_Data.EventCallBack = callback; }
+
+        inline void SetVSync(bool enabled) override;
+
         [[nodiscard]] bool IsVSync() const override;
 
     private:
-        void Init(const WindowProps& props);
+        void Init(const WindowProps &props);
+
         void Shutdown();
 
-        GLFWwindow* m_Window = nullptr;
+        GLFWwindow *m_Window = nullptr;
 
         struct WindowData
         {

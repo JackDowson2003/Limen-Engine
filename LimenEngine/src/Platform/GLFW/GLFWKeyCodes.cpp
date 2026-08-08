@@ -69,4 +69,70 @@ namespace Limen
             default: return KeyCode::Unknown;
         }
     }
+
+    int GLFWKeyFromKeyCode(const KeyCode keyCode)
+    {
+        if (keyCode >= KeyCode::D0 && keyCode <= KeyCode::D9)
+            return GLFW_KEY_0 + static_cast<int>(keyCode) - static_cast<int>(KeyCode::D0);
+
+        if (keyCode >= KeyCode::A && keyCode <= KeyCode::Z)
+            return GLFW_KEY_A + static_cast<int>(keyCode) - static_cast<int>(KeyCode::A);
+
+        if (keyCode >= KeyCode::F1 && keyCode <= KeyCode::F25)
+            return GLFW_KEY_F1 + static_cast<int>(keyCode) - static_cast<int>(KeyCode::F1);
+
+        if (keyCode >= KeyCode::Keypad0 && keyCode <= KeyCode::Keypad9)
+            return GLFW_KEY_KP_0 + static_cast<int>(keyCode) - static_cast<int>(KeyCode::Keypad0);
+
+        switch (keyCode)
+        {
+            case KeyCode::Space: return GLFW_KEY_SPACE;
+            case KeyCode::Apostrophe: return GLFW_KEY_APOSTROPHE;
+            case KeyCode::Comma: return GLFW_KEY_COMMA;
+            case KeyCode::Minus: return GLFW_KEY_MINUS;
+            case KeyCode::Period: return GLFW_KEY_PERIOD;
+            case KeyCode::Slash: return GLFW_KEY_SLASH;
+            case KeyCode::Semicolon: return GLFW_KEY_SEMICOLON;
+            case KeyCode::Equal: return GLFW_KEY_EQUAL;
+            case KeyCode::LeftBracket: return GLFW_KEY_LEFT_BRACKET;
+            case KeyCode::Backslash: return GLFW_KEY_BACKSLASH;
+            case KeyCode::RightBracket: return GLFW_KEY_RIGHT_BRACKET;
+            case KeyCode::GraveAccent: return GLFW_KEY_GRAVE_ACCENT;
+            case KeyCode::Escape: return GLFW_KEY_ESCAPE;
+            case KeyCode::Enter: return GLFW_KEY_ENTER;
+            case KeyCode::Tab: return GLFW_KEY_TAB;
+            case KeyCode::Backspace: return GLFW_KEY_BACKSPACE;
+            case KeyCode::Delete: return GLFW_KEY_DELETE;
+            case KeyCode::Right: return GLFW_KEY_RIGHT;
+            case KeyCode::Left: return GLFW_KEY_LEFT;
+            case KeyCode::Down: return GLFW_KEY_DOWN;
+            case KeyCode::Up: return GLFW_KEY_UP;
+            case KeyCode::PageUp: return GLFW_KEY_PAGE_UP;
+            case KeyCode::PageDown: return GLFW_KEY_PAGE_DOWN;
+            case KeyCode::Home: return GLFW_KEY_HOME;
+            case KeyCode::End: return GLFW_KEY_END;
+            case KeyCode::CapsLock: return GLFW_KEY_CAPS_LOCK;
+            case KeyCode::ScrollLock: return GLFW_KEY_SCROLL_LOCK;
+            case KeyCode::NumLock: return GLFW_KEY_NUM_LOCK;
+            case KeyCode::PrintScreen: return GLFW_KEY_PRINT_SCREEN;
+            case KeyCode::Pause: return GLFW_KEY_PAUSE;
+            case KeyCode::KeypadDecimal: return GLFW_KEY_KP_DECIMAL;
+            case KeyCode::KeypadDivide: return GLFW_KEY_KP_DIVIDE;
+            case KeyCode::KeypadMultiply: return GLFW_KEY_KP_MULTIPLY;
+            case KeyCode::KeypadSubtract: return GLFW_KEY_KP_SUBTRACT;
+            case KeyCode::KeypadAdd: return GLFW_KEY_KP_ADD;
+            case KeyCode::KeypadEnter: return GLFW_KEY_KP_ENTER;
+            case KeyCode::KeypadEqual: return GLFW_KEY_KP_EQUAL;
+            case KeyCode::LeftShift: return GLFW_KEY_LEFT_SHIFT;
+            case KeyCode::LeftControl: return GLFW_KEY_LEFT_CONTROL;
+            case KeyCode::LeftAlt: return GLFW_KEY_LEFT_ALT;
+            case KeyCode::LeftSuper: return GLFW_KEY_LEFT_SUPER;
+            case KeyCode::RightShift: return GLFW_KEY_RIGHT_SHIFT;
+            case KeyCode::RightControl: return GLFW_KEY_RIGHT_CONTROL;
+            case KeyCode::RightAlt: return GLFW_KEY_RIGHT_ALT;
+            case KeyCode::RightSuper: return GLFW_KEY_RIGHT_SUPER;
+            case KeyCode::Menu: return GLFW_KEY_MENU;
+            default: return GLFW_KEY_UNKNOWN;
+        }
+    }
 }

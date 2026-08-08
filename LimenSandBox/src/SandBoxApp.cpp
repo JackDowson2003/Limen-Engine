@@ -9,8 +9,8 @@ public:
 
     void OnUpdate() override
     {
-        LM_INFO("ExampleLayer::OnUpdate");
-
+        if (Limen::Input::IsKeyPressed(Limen::KeyCode::Space))
+            LM_INFO("space key pressed");
     }
 
     void OnEvent(Limen::Event &e) override

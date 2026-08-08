@@ -35,11 +35,11 @@ namespace Limen
         [[nodiscard]] virtual uint32_t GetHeight() const = 0;
 
         // Window attributes
-        virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
-        virtual void SetVSync(bool enabled) = 0;
-        [[nodiscard]] virtual bool IsVSync() const = 0;
+        inline virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
+        inline virtual void SetVSync(bool enabled) = 0;
+        [[nodiscard]] inline virtual bool IsVSync() const = 0;
 
-        [[nodiscard]] virtual void* GetNativeWindow() const = 0;
+        [[nodiscard]] inline virtual void* GetNativeWindow() const = 0;
 
         static Window* Create(const WindowProps& props = WindowProps());
     };

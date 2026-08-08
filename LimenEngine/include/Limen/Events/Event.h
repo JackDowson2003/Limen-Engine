@@ -2,6 +2,8 @@
 
 #include "Core.h"
 
+#include <cstdint>
+
 namespace Limen {
 
 	// Events in Limen are currently blocking, meaning when an event occurs it
@@ -18,7 +20,7 @@ namespace Limen {
 		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
 	};
 
-	enum  EventCategory
+	enum class   EventCategory : std::uint32_t
 	{
 		None = 0,
 		EventCategoryApplication    = BIT(0), //1
@@ -28,11 +30,35 @@ namespace Limen {
 		EventCategoryMouseButton    = BIT(4) //16
 	};
 
+	// 保留 enum class 的强类型约束，同时让事件声明可以简写为
+	// EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput)。
+	using enum EventCategory;
+
+	constexpr EventCategory operator|(EventCategory lhs, EventCategory rhs)
+	{
+		return static_cast<EventCategory>(
+			static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs)
+		);
+	}
+
+	constexpr EventCategory operator&(EventCategory lhs, EventCategory rhs)
+	{
+		return static_cast<EventCategory>(
+			static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs)
+		);
+	}
+
+	constexpr EventCategory& operator|=(EventCategory& lhs, EventCategory rhs)
+	{
+		lhs = lhs | rhs;
+		return lhs;
+	}
+
 #define EVENT_CLASS_TYPE(type) static EventType GetStaticType() { return EventType::type; }\
 								virtual EventType GetEventType() const override { return GetStaticType(); }\
 								virtual const char* GetName() const override { return #type; }
-
-#define EVENT_CLASS_CATEGORY(category) virtual int GetCategoryFlags() const override { return category; }
+	using enum EventCategory;
+#define EVENT_CLASS_CATEGORY(category) EventCategory GetCategoryFlags() const override { return (category); }
 
 	class LIMEN_API Event
 	{
@@ -42,7 +68,7 @@ namespace Limen {
 
 		[[nodiscard]] virtual EventType GetEventType() const = 0;
 		virtual const char* GetName() const = 0;
-		virtual int GetCategoryFlags() const = 0;
+		[[nodiscard]] virtual EventCategory GetCategoryFlags() const = 0;
 		virtual std::string ToString() const { return GetName(); }
 		[[nodiscard]] bool IsHandled() const
 		{
@@ -51,7 +77,7 @@ namespace Limen {
 
 		[[nodiscard]] bool IsInCategory(const EventCategory category) const
 		{
-			return GetCategoryFlags() & category;
+			return (GetCategoryFlags() & category) != None;
 		}
 	protected:
 		bool m_Handled = false;
@@ -88,4 +114,3 @@ namespace Limen {
 	}
 
 }
-

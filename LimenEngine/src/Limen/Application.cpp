@@ -6,7 +6,7 @@
 
 #include "Events/ApplicationEvent.h"
 #include "Log.h"
-
+#include "Input.h"
 
 namespace Limen
 {
@@ -53,11 +53,12 @@ namespace Limen
     {
         while (m_Running)
         {
-            glClearColor(0.1F, 0.1F, 0.1F, 1.0F);
+            glClearColor(1.F, 1.F, 0.1F, 1.0F);
             glClear(GL_COLOR_BUFFER_BIT);
             // Application.cpp
             for (Layer* layer : m_LayerStack)
                 layer->OnUpdate();
+
             m_Window->OnUpdate();
         }
     }
