@@ -4,6 +4,8 @@
 
 #include <GLFW/glfw3.h>
 
+#include "Limen/Renderer/GraphicsContext.h"
+
 namespace Limen
 {
     // macOS + GLFW 的窗口实现；不属于引擎对外 API。
@@ -29,7 +31,7 @@ namespace Limen
     private:
         void Init(const WindowProps &props);
 
-        void Shutdown();
+        void Shutdown() const;
 
         GLFWwindow *m_Window = nullptr;
 
@@ -43,5 +45,8 @@ namespace Limen
         };
 
         WindowData m_Data;
+
+    private:
+        GraphicsContext* m_Context;
     };
 }

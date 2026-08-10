@@ -86,9 +86,7 @@ namespace Limen
     }
 
 
-    ImGUILayer::~ImGUILayer()
-    {
-    }
+    ImGUILayer::~ImGUILayer() = default;
 
     void ImGUILayer::OnEvent(Event &e)
     {
@@ -122,62 +120,27 @@ namespace Limen
         {
             return OnKeyTyped(e);
         });
-        dispatcher.Dispatch<WindowResizeEvent>([this](const WindowResizeEvent &e)
-        {
-            return OnWindowResizeEvent(e);
-        });
     }
 
-    void ImGUILayer::OnUpdate()
+    void ImGUILayer::Begin()
     {
-        ImGuiIO &io = ImGui::GetIO();
-        const auto &window = Application::GetApp().GetWindow();
-        io.DisplaySize = ImVec2(static_cast<float>(window.GetWidth()), static_cast<float>(window.GetHeight()));
-
-        // Start the Dear ImGui frame
+        // 启动 ImGui 帧。GLFW 后端会同步窗口大小与 DPI 缩放。
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ///config end=================================================================
 
-        ///demo
-        /*{
-            bool showDemoWindow = false;
-            ImGui::ShowDemoWindow(&showDemoWindow);
-        }*/
-        {
-            static float f = 0.0f;
-            static int counter = 0;
+        // 在主视口创建 DockSpace；所有 Layer 的 ImGui 窗口都可停靠于此。
+        ImGui::DockSpaceOverViewport(
+            ImGui::GetMainViewport()->ID,
+            ImGui::GetMainViewport(),
+            ImGuiDockNodeFlags_PassthruCentralNode
+        );
+    }
 
-            ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text."); // Display some text (you can use a format strings too)
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-
-            if (ImGui::Button("Button"))
-                // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
-        }
-
-
+    void ImGUILayer::End()
+    {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            GLFWwindow *backupContext = glfwGetCurrentContext();
-
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-
-            glfwMakeContextCurrent(backupContext);
-        }
     }
 
     bool ImGUILayer::OnMouseButtonPressedEvent(const MouseButtonPressedEvent &e)
@@ -239,16 +202,6 @@ namespace Limen
         return ImGui::GetIO().WantCaptureKeyboard;
     }
 
-    bool ImGUILayer::OnWindowResizeEvent(const WindowResizeEvent &e)
-    {
-        ImGuiIO &io = ImGui::GetIO();
-        io.DisplaySize.x = static_cast<float>(e.GetWidth());
-        io.DisplaySize.y = static_cast<float>(e.GetHeight());
-        io.DisplayFramebufferScale = ImVec2(1.0, 1.0);
-        // glViewport(0.f, 0.f, static_cast<int>(e.GetWidth()), static_cast<int>(e.GetHeight()));
-        return false;
-    }
-
     /**
      * 做好imgui的设置包括glsl_version的设置
      */
@@ -259,37 +212,24 @@ namespace Limen
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
         ImGuiIO &io = ImGui::GetIO();
-        io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+        io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; //Enable MouseCursor
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
-#if defined(LIMEN_PLATFORM_WINDOWS) || defined(LIMEN_PLATFORM_MACOS) //because mac is unstable, need to use Metal
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport
-#endif
-        // Setup scaling
-        ImGuiStyle &style = ImGui::GetStyle();
-
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // 允许 App 窗口内的面板停靠。
+        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;   // 禁止面板拖出 App 后成为原生窗口。
 #if GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3
         io.ConfigDpiScaleFonts = true;
         // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
-        io.ConfigDpiScaleViewports = true;
-        // [Experimental] Scale Dear ImGui and Platform Windows when Monitor DPI changes.
 #endif
-        // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
-            style.WindowRounding = 0.0f;
-            style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-        }
         // Setup Platform/Renderer backends
-        auto &window = Application::GetApp().GetWindow();
+        const auto &window = Application::GetApp().GetWindow();
 
         auto *glfwWindow = static_cast<GLFWwindow *>(
             window.GetNativeWindow()
         );
 
         ImGui_ImplGlfw_InitForOpenGL(glfwWindow, false);
-        const char *glsl_version = "#version 410";
+        constexpr auto glsl_version = "#version 410";
 #ifdef __EMSCRIPTEN__
         ImGui_ImplGlfw_InstallEmscriptenCallbacks(glfwWindow, "#canvas");
 #endif

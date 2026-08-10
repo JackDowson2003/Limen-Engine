@@ -6,4 +6,6 @@ out/
 /LimenEngine/vendor/glfw
 .idea/
 
+LimenEngine/vendor/glm
+LimenEngine/vendor/imgui
 .DS_Store

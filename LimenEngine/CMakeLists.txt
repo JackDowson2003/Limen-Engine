@@ -19,11 +19,11 @@ file(GLOB_RECURSE LIMEN_ENGINE_HEADERS
 #        ${LIMEN_ENGINE_SOURCES}
 #        ${LIMEN_ENGINE_HEADERS}
 #)
-if(LIMEN_ENGINE_SHARED)
+if (LIMEN_ENGINE_SHARED)
     set(LIMEN_ENGINE_LIBRARY_TYPE SHARED)
-else()
+else ()
     set(LIMEN_ENGINE_LIBRARY_TYPE STATIC)
-endif()
+endif ()
 
 
 add_library(LimenEngine
@@ -55,8 +55,11 @@ set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
 set(GLFW_LIBRARY_TYPE STATIC CACHE STRING "" FORCE)
 
 add_subdirectory(vendor/glfw EXCLUDE_FROM_ALL)
+
+add_subdirectory(vendor/glm)
+
 #imgui
-add_library(imgui STATIC
+add_library (imgui STATIC
         vendor/imgui/imgui.cpp
         vendor/imgui/imgui_draw.cpp
         vendor/imgui/imgui_tables.cpp
@@ -75,6 +78,12 @@ target_include_directories(imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends
 )
 
+# ImGui 的 GLFW/OpenGL3 后端直接依赖这两个库。
+target_link_libraries(imgui
+        PRIVATE
+        glfw
+        glad
+)
 
 target_link_libraries(LimenEngine
         PRIVATE
@@ -87,24 +96,26 @@ target_link_libraries(LimenEngine
         imgui
 )
 
-if(WIN32)
+target_link_libraries(LimenEngine PUBLIC glm::glm)
+
+if (WIN32)
     target_compile_definitions(LimenEngine
             PUBLIC
             LIMEN_PLATFORM_WINDOWS
     )
-elseif(APPLE)
+elseif (APPLE)
     target_compile_definitions(LimenEngine
             PUBLIC
             LIMEN_PLATFORM_MACOS
     )
-elseif(UNIX)
+elseif (UNIX)
     target_compile_definitions(LimenEngine
             PUBLIC
             LIMEN_PLATFORM_LINUX
     )
-else()
+else ()
     message(FATAL_ERROR "LimenEngine does not support this platform")
-endif()
+endif ()
 
 #headers
 target_include_directories(LimenEngine
@@ -120,19 +131,19 @@ target_include_directories(LimenEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/spdlog/include
 ) # 告诉编译器去这些目录查找头文件。
 
-if(LIMEN_ENGINE_SHARED)
+if (LIMEN_ENGINE_SHARED)
     target_compile_definitions(LimenEngine
             PUBLIC
-                LIMEN_ENGINE_SHARED
+            LIMEN_ENGINE_SHARED
             PRIVATE
-                LM_BUILD_DLL #这个是为了让自己才可以看到 也就是修改掉LIMEN_API
+            LM_BUILD_DLL #这个是为了让自己才可以看到 也就是修改掉LIMEN_API
     )
-else()
+else ()
     target_compile_definitions(LimenEngine
             PUBLIC
             LIMEN_ENGINE_STATIC
     )
-endif()
+endif ()
 
 target_compile_definitions(LimenEngine
         PUBLIC

@@ -5,6 +5,7 @@
 #include "Platform/Mac/MacWindow.h"
 
 #include "Log.h"
+#include "OpenGLContext.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
@@ -22,12 +23,12 @@ namespace Limen
 
     MacWindow::MacWindow(const WindowProps &props)
     {
-        MacWindow::Init(props);
+        Init(props);
     }
 
     MacWindow::~MacWindow()
     {
-        MacWindow::Shutdown();
+        Shutdown();
     }
 
     bool MacWindow::IsVSync() const
@@ -38,8 +39,9 @@ namespace Limen
     void MacWindow::OnUpdate()
     {
         glfwPollEvents(); //处理事件
+        m_Context->SwapBuffers(); ////交换前后缓冲区
         //交换前后缓冲区，开启Vsync。调用glfwSwapBuffers的时候，会阻塞等待显示器垂直刷新信号，才交换缓冲，消除画面撕裂，锁帧率。
-        glfwSwapBuffers(m_Window);
+        // glfwSwapBuffers(m_Window);
     }
 
     void MacWindow::SetVSync(const bool enabled)
@@ -56,6 +58,9 @@ namespace Limen
         m_Data.Title = props.Title;
         m_Data.Width = props.Width;
         m_Data.Height = props.Height;
+
+        LM_CORE_INFO("Create Window Title: {0}, Width: {1}, Height :{2}", props.Title, props.Width, props.Height);
+        LM_CORE_TRACE("Creating Window Now");
 
         LM_CORE_INFO("Creating window {0} {1} {2}", props.Title, props.Width, props.Height);
         if (!s_GLFWInitialized)
@@ -78,8 +83,12 @@ namespace Limen
         m_Window = glfwCreateWindow(static_cast<int>(props.Width), static_cast<int>(props.Height),
                                     props.Title.c_str(),
                                     nullptr, nullptr);
+        m_Context = new OpenGLContext(m_Window);
 
-        glfwMakeContextCurrent(m_Window); //创建上下文
+
+        m_Context->Init(); //初始化上下文
+
+        // glfwMakeContextCurrent(m_Window); //创建上下文
         //获取opengl的函数
 
         const int status = gladLoadGL(glfwGetProcAddress);
@@ -95,7 +104,7 @@ namespace Limen
 
         glfwSetCharCallback(m_Window, [](GLFWwindow *window, unsigned int codepoint)
         {
-            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             KeyTypedEvent event(static_cast<char32_t>(codepoint));
             data.EventCallBack(event);
         });
@@ -114,14 +123,14 @@ namespace Limen
 
         glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window)
         {
-            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             WindowCloseEvent event;
             data.EventCallBack(event);
         });
 
         glfwSetKeyCallback(m_Window, [](GLFWwindow *window, int key, int scancode, int action, int mods)
         {
-            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             const KeyCode keyCode = KeyCodeFromGLFW(key);
             if (keyCode == KeyCode::Unknown)
                 return;
@@ -152,7 +161,7 @@ namespace Limen
 
         glfwSetMouseButtonCallback(m_Window, [](GLFWwindow *window, int button, int action, int mods)
         {
-            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             switch (action)
             {
                 case GLFW_PRESS:
@@ -201,9 +210,10 @@ namespace Limen
         });
     }
 
-    void MacWindow::Shutdown()
+    void MacWindow::Shutdown() const
     {
-        glfwDestroyWindow(m_Window);
+        m_Context->Shutdown();
+        // glfwDestroyWindow(m_Window);
         glfwTerminate();
     }
 }

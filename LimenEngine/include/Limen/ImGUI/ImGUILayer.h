@@ -10,6 +10,14 @@
 
 namespace Limen
 {
+    /**
+    *  ImGUILayer
+    ├─ OnAttach()：创建 ImGui Context、初始化 GLFW/OpenGL backend
+    ├─ OnEvent()：把引擎事件交给 ImGui
+    ├─ Begin()：NewFrame + 创建 DockSpace
+    ├─ End()：Render + 提交 OpenGL 绘制
+    └─ OnDetach()：销毁 ImGui backend / Context
+     */
     class LIMEN_API ImGUILayer : public Layer
     {
     public:
@@ -23,7 +31,10 @@ namespace Limen
 
         virtual void OnEvent(Event &event) override;
 
-        virtual void OnUpdate() override;
+        // Begin() 与 End() 包围同一帧中所有 Layer 的 OnImGuiRender() 调用。
+        static void Begin();
+        void End();
+
 
         virtual bool OnMouseButtonPressedEvent(const MouseButtonPressedEvent &event);
 
@@ -39,8 +50,5 @@ namespace Limen
 
         virtual bool OnKeyTyped(const KeyTypedEvent &event);
 
-        virtual bool OnWindowResizeEvent(const WindowResizeEvent &event);
-    private:
-        float m_Time{};
     };
 }

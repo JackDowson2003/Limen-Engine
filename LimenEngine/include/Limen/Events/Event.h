@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include "glm/fwd.hpp"
+
 namespace Limen {
 
 	// Events in Limen are currently blocking, meaning when an event occurs it

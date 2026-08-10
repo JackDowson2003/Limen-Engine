@@ -5,6 +5,8 @@ add_executable(LimenSandBox
 target_link_libraries(LimenSandBox #把 Engine 静态库链接到 Sandbox。
         PRIVATE
             LimenEngine
+            # Sandbox 自己绘制 ImGui 面板，因此显式依赖 ImGui。
+            imgui
 )
 
 limen_configure_target(LimenSandBox)
@@ -20,4 +22,3 @@ get_filename_component(LIMEN_PROJECT_ROOT
 set_target_properties(LimenSandBox PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${LIMEN_PROJECT_ROOT}/out"
 )
-

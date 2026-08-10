@@ -2,11 +2,12 @@
 // Created by chenlong on 2026/8/5.
 //
 #include <glad/gl.h>
+
 #include "Application.h"
 
 #include "Events/ApplicationEvent.h"
+#include "ImGUI/ImGUILayer.h"
 #include "Log.h"
-#include "Input.h"
 
 namespace Limen
 {
@@ -22,6 +23,12 @@ namespace Limen
         {
             OnEvent(e);
         });
+
+#if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
+        // 编辑器 UI 由 Application 统一管理，客户端只需实现 OnImGuiRender()。
+        m_ImGUILayer = new ImGUILayer();
+        PushOverlay(m_ImGUILayer);
+#endif
     }
 
     void Application::OnEvent(Event &e)
@@ -58,6 +65,16 @@ namespace Limen
             // Application.cpp
             for (Layer* layer : m_LayerStack)
                 layer->OnUpdate();
+
+#if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
+            LM_CORE_ASSERT(m_ImGUILayer, "ImGui layer was not initialized");
+            m_ImGUILayer->Begin();
+
+            for (Layer*& layer : m_LayerStack)
+                layer->OnImGuiRender();
+
+            m_ImGUILayer->End();
+#endif
 
             m_Window->OnUpdate();
         }

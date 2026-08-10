@@ -9,6 +9,8 @@
 #include "LayerStack.h"
 namespace Limen
 {
+    class ImGUILayer;
+
     class LIMEN_API Application //静态链接不需要写__declspec(dllexport)
     {
     public:
@@ -31,6 +33,8 @@ namespace Limen
         bool OnWindowClose(WindowCloseEvent& e);
 
         std::unique_ptr<Window> m_Window;
+        // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
+        ImGUILayer* m_ImGUILayer = nullptr;
         LayerStack m_LayerStack;
         bool m_Running = true;
 

@@ -4,6 +4,7 @@
 
 namespace Limen
 {
+
     KeyCode KeyCodeFromGLFW(const int glfwKey)
     {
         if (glfwKey >= GLFW_KEY_0 && glfwKey <= GLFW_KEY_9)
@@ -135,4 +136,5 @@ namespace Limen
             default: return GLFW_KEY_UNKNOWN;
         }
     }
+
 }
