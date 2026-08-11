@@ -1,4 +1,4 @@
-#include "Platform/GLFW/GLFWKeyCodes.h"
+#include "GLFWKeyCodes.h"
 
 #include <GLFW/glfw3.h>
 

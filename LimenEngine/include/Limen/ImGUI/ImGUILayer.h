@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "Layer.h"
+#include "../Layer.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
@@ -33,7 +33,8 @@ namespace Limen
 
         // Begin() 与 End() 包围同一帧中所有 Layer 的 OnImGuiRender() 调用。
         static void Begin();
-        void End();
+
+        static void End();
 
 
         virtual bool OnMouseButtonPressedEvent(const MouseButtonPressedEvent &event);

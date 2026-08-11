@@ -7,6 +7,10 @@
 #include "Window.h"
 #include "Events/ApplicationEvent.h"
 #include "LayerStack.h"
+#include "Renderer/Shader.h"
+#include "Limen/Renderer/Buffer.h"
+#include "Renderer/VertexArray.h"
+
 namespace Limen
 {
     class ImGUILayer;
@@ -25,7 +29,7 @@ namespace Limen
 
         void OnEvent(Event& e);
 
-        inline Window& GetWindow() { return *m_Window; }
+        [[nodiscard]] inline Window& GetWindow() const { return *m_Window; }
 
         inline static  Application& GetApp() { return *s_Instance; }
 
@@ -33,10 +37,18 @@ namespace Limen
         bool OnWindowClose(WindowCloseEvent& e);
 
         std::unique_ptr<Window> m_Window;
-        // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
         ImGUILayer* m_ImGUILayer = nullptr;
+        // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
         LayerStack m_LayerStack;
         bool m_Running = true;
+
+        std::shared_ptr<Shader> m_Shader;
+        std::shared_ptr<VertexBuffer> m_VertexBuffer;
+        std::shared_ptr<IndexBuffer> m_IndexBuffer;
+        std::shared_ptr<VertexArray> m_VertexArray;
+
+        std::shared_ptr<VertexArray> m_SquareVAO;
+
 
     private:
         static Application *s_Instance;

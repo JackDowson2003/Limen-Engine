@@ -3,8 +3,6 @@
 #include "Event.h"
 #include "KeyCodes.h"
 
-#include <cstdint>
-
 namespace Limen
 {
     class LIMEN_API KeyEvent : public Event

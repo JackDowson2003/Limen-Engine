@@ -5,11 +5,11 @@
 #include "Platform/Mac/MacWindow.h"
 
 #include "Log.h"
-#include "OpenGLContext.h"
+#include "OpenGL/OpenGLContext.h"
 #include "Events/ApplicationEvent.h"
 #include "Events/KeyEvent.h"
 #include "Events/MouseEvent.h"
-#include "Platform/GLFW/GLFWKeyCodes.h"
+#include "GLFW/GLFWKeyCodes.h"
 namespace Limen
 {
     static bool s_GLFWInitialized = false;

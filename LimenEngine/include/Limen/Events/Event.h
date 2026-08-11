@@ -2,9 +2,6 @@
 
 #include "Core.h"
 
-#include <cstdint>
-
-#include "glm/fwd.hpp"
 
 namespace Limen {
 
@@ -69,9 +66,9 @@ namespace Limen {
 		virtual ~Event() = default;
 
 		[[nodiscard]] virtual EventType GetEventType() const = 0;
-		virtual const char* GetName() const = 0;
+		[[nodiscard]] virtual const char* GetName() const = 0;
 		[[nodiscard]] virtual EventCategory GetCategoryFlags() const = 0;
-		virtual std::string ToString() const { return GetName(); }
+		[[nodiscard]] virtual std::string ToString() const { return GetName(); }
 		[[nodiscard]] bool IsHandled() const
 		{
 			return m_Handled;

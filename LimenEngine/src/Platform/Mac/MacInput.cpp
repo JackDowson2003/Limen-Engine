@@ -7,7 +7,7 @@
 
 #include "Application.h"
 #include "MacWindow.h"
-#include "Platform/GLFW/GLFWKeyCodes.h"
+#include "GLFW/GLFWKeyCodes.h"
 
 namespace Limen
 {

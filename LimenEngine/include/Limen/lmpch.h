@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
+#include <cstdint>
 #if defined(LIMEN_PLATFORM_WINDOWS)
     #include <Windows.h>
 #elif defined(LIMEN_PLATFORM_MACOS) || defined(LIMEN_PLATFORM_LINUX)

@@ -17,7 +17,7 @@ public:
 
     void OnEvent(Limen::Event &e) override
     {
-        LM_INFO("ExampleLayer::OnEvent");
+        // LM_INFO("ExampleLayer::OnEvent");
     }
 
     void OnImGuiRender() override
