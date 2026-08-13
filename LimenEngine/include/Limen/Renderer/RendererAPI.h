@@ -8,7 +8,7 @@
 
 namespace Limen
 {
-    class RendererAPI
+    class LIMEN_API RendererAPI
     {
       public:
         virtual ~RendererAPI() = default;
@@ -27,7 +27,7 @@ namespace Limen
         virtual void Clear() = 0;
         virtual void SetClearColor(const glm::vec4& color) = 0;
 
-        virtual void DrawIndexed(const std::shared_ptr<VertexArray>& vertexArray) = 0;
+        virtual void DrawIndexed(const VertexArray& vertexArray) = 0;
 
         static inline API GetAPI() { return API::OPENGL; }
     private:

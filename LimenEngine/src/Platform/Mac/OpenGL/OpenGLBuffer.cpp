@@ -138,14 +138,14 @@ namespace Limen
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * count, indices,GL_STATIC_DRAW);
     }
 
-    OpenGLIndexBuffer::OpenGLIndexBuffer(OpenGLIndexBuffer &&ib)
+    OpenGLIndexBuffer::OpenGLIndexBuffer(OpenGLIndexBuffer &&ib) noexcept
         :m_RendererID(ib.m_RendererID),m_Count(ib.m_Count)
     {
         ib.m_RendererID = 0;
         ib.m_Count = 0;
     }
 
-    OpenGLIndexBuffer & OpenGLIndexBuffer::operator=(OpenGLIndexBuffer &&ib)
+    OpenGLIndexBuffer & OpenGLIndexBuffer::operator=(OpenGLIndexBuffer &&ib) noexcept
     {
         if (this == &ib)
         {

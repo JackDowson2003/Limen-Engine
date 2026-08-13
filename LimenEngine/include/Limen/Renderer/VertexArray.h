@@ -7,7 +7,7 @@
 
 namespace Limen
 {
-    class VertexArray
+    class LIMEN_API VertexArray
     {
     public:
         virtual ~VertexArray() = default;

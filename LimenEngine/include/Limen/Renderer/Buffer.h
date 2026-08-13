@@ -3,11 +3,10 @@
 //
 #pragma once
 
-#include <cstdint>
 #include <initializer_list>
-#include <string>
-#include <utility>
-#include <vector>
+
+#include "Core.h"
+
 
 namespace Limen
 {
@@ -40,7 +39,7 @@ namespace Limen
     };
 
     // 返回紧密排列时占用的总字节数，不包含 std140/std430 等额外对齐。
-    [[nodiscard]] constexpr uint32_t ShaderDataTypeSize(const ShaderDataType type) noexcept
+    [[nodiscard]] constexpr uint32_t LIMEN_API ShaderDataTypeSize(const ShaderDataType type) noexcept
     {
         switch (type)
         {
@@ -355,8 +354,6 @@ namespace Limen
         virtual ~IndexBuffer() = default;
 
         IndexBuffer() = default;
-        IndexBuffer(IndexBuffer&&);
-        IndexBuffer& operator=(IndexBuffer&&);
 
         virtual void Bind() const = 0;
         virtual void UnBind() const = 0;

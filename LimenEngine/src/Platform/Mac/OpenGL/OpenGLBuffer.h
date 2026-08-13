@@ -15,7 +15,7 @@ namespace Limen
     [[nodiscard]] GLenum  ShaderDataTypeToOpenGLType(ShaderDataType type);
 
 
-    class OpenGLVertexBuffer : public VertexBuffer
+    class LIMEN_API OpenGLVertexBuffer : public VertexBuffer
     {
     public:
         OpenGLVertexBuffer(const void *vertices, uint32_t size);
@@ -43,13 +43,13 @@ namespace Limen
         BufferLayout m_Layout;
     };
 
-    class OpenGLIndexBuffer : public IndexBuffer
+    class LIMEN_API OpenGLIndexBuffer : public IndexBuffer
     {
     public:
         OpenGLIndexBuffer(const uint32_t *indices, uint32_t count);
 
-        OpenGLIndexBuffer(OpenGLIndexBuffer&&);
-        OpenGLIndexBuffer& operator=(OpenGLIndexBuffer&&);
+        OpenGLIndexBuffer(OpenGLIndexBuffer&&) noexcept;
+        OpenGLIndexBuffer& operator=(OpenGLIndexBuffer&&) noexcept;
 
         ~OpenGLIndexBuffer() override; //不能是default
         void Bind() const override;

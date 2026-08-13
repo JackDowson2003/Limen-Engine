@@ -7,8 +7,10 @@
 #include "Window.h"
 #include "Events/ApplicationEvent.h"
 #include "LayerStack.h"
+#include "Core/DeltaTime.h"
 #include "Renderer/Shader.h"
 #include "Limen/Renderer/Buffer.h"
+#include "Renderer/OrthoGraphicCamera.h"
 #include "Renderer/VertexArray.h"
 
 namespace Limen
@@ -19,7 +21,7 @@ namespace Limen
     {
     public:
 
-        Application();
+        Application(bool isVSYNC = true);
 
         virtual ~Application(); //交给sandbox去实现
 
@@ -42,13 +44,7 @@ namespace Limen
         LayerStack m_LayerStack;
         bool m_Running = true;
 
-        std::shared_ptr<Shader> m_Shader;
-        std::shared_ptr<VertexBuffer> m_VertexBuffer;
-        std::shared_ptr<IndexBuffer> m_IndexBuffer;
-        std::shared_ptr<VertexArray> m_VertexArray;
-
-        std::shared_ptr<VertexArray> m_SquareVAO;
-
+        double m_LastFrameTime = 0.0f;
 
     private:
         static Application *s_Instance;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/DeltaTime.h"
 #include "Events/Event.h"
 
 namespace  Limen {
@@ -12,7 +13,8 @@ namespace  Limen {
 
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
-		virtual void OnUpdate() {}
+
+		virtual void OnUpdate( DeltaTime& dt){}
 		virtual void OnImGuiRender() {}
 		virtual void OnEvent(Event& event) {}
 

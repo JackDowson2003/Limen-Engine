@@ -32,9 +32,9 @@ namespace Limen
         virtual void OnEvent(Event &event) override;
 
         // Begin() 与 End() 包围同一帧中所有 Layer 的 OnImGuiRender() 调用。
-        static void Begin();
+         void Begin();
 
-        static void End();
+         void End();
 
 
         virtual bool OnMouseButtonPressedEvent(const MouseButtonPressedEvent &event);

@@ -21,10 +21,10 @@ namespace Limen
         glClearColor(color.r, color.g, color.b, color.a);
     }
 
-    inline void OpenGLRendererAPI::DrawIndexed(const std::shared_ptr<VertexArray> &vertexArray)
+    inline void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray)
     {
         glDrawElements(GL_TRIANGLES,
-                       static_cast<int>(vertexArray->GetIndexBuffer()->GetCount()),
+                       static_cast<int>(vertexArray.GetIndexBuffer()->GetCount()),
                        GL_UNSIGNED_INT,
                        nullptr);
     }

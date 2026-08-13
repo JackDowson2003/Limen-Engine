@@ -11,6 +11,16 @@
 #include "Limen/Log.h"
 #include "Limen/Layer.h"
 #include "ImGUI/ImGUILayer.h"
+#include "Renderer/Buffer.h"
+#include "Renderer/OrthoGraphicCamera.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/RendererAPI.h"
+#include "Renderer/RendererCommand.h"
+#include "Renderer/Shader.h"
+#include "Renderer/Texture.h"
+#include "Renderer/VertexArray.h"
+#include "KeyCodes.h"
+#include "Core/DeltaTime.h"
 
 //------Entry Point
 #include "Limen/EntryPoint.h"

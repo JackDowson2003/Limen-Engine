@@ -6,7 +6,7 @@
 
 namespace Limen
 {
-    class RendererCommand
+    class LIMEN_API RendererCommand
     {
     public:
         inline static void Clear()
@@ -20,9 +20,9 @@ namespace Limen
         }
 
 
-        inline static void DrawIndexed(const std::shared_ptr<VertexArray> &vao)
+        inline static void DrawIndexed(const VertexArray &vao)
         {
-            s_RendererAPI->DrawIndexed(vao);
+            s_RendererAPI->DrawIndexed(vao); //我们的API对应的方法
         }
 
         static RendererAPI *s_RendererAPI;
