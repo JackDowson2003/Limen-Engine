@@ -30,20 +30,20 @@ namespace Limen
          *
          *     1600.0f / 900.0f
          *
-         * @param nearPlane
+         * @param near
          * 近裁剪面到相机的正距离，必须大于0。
          * 它不是世界坐标中的Z值。
          * 常用值为0.1。
          *
-         * @param farPlane
+         * @param far
          * 远裁剪面到相机的正距离，必须大于nearPlane。
          * 常用值为100或1000。
          */
         PerspectiveCamera(
             float verticalFOVDegrees,
             float aspectRatio,
-            float nearPlane = 0.1f,
-            float farPlane = 100.0f
+            float near = 0.1f,
+            float far = 100.0f
         );
 
         /**
@@ -184,9 +184,9 @@ namespace Limen
         float m_AspectRatio = 16.0f / 9.0f;
 
         // 近裁剪面到相机的正距离。
-        float m_NearPlane = 0.1f;
+        float m_Near = 0.1f;
 
         // 远裁剪面到相机的正距离。
-        float m_FarPlane = 100.0f;
+        float m_Far = 100.0f;
     };
 }
