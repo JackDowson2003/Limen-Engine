@@ -14,17 +14,17 @@ namespace Limen
     public:
         static void Init();
 
-        inline static std::shared_ptr<spdlog::logger> &GetCoreLogger() { return s_CoreLogger; }
-        inline static std::shared_ptr<spdlog::logger> &GetClientLogger() { return s_ClientLogger; }
+        inline static Ref<spdlog::logger> &GetCoreLogger() { return s_CoreLogger; }
+        inline static Ref<spdlog::logger> &GetClientLogger() { return s_ClientLogger; }
 
     private:
         //分两个是为了区分业务 inline可以让我们在.cpp中不用再去定义变量
         //这行同时是声明和定义。编译器会为它提供实际的存储空间，因此不需要在 Log.cpp 再定义。
         //不加它能清楚地区分公共接口和实现，也能减少头文件承担的初始化与析构工作
-        // inline static std::shared_ptr<spdlog::logger> s_CoreLogger;
-        // inline static std::shared_ptr<spdlog::logger> s_ClientLogger;
-        static std::shared_ptr<spdlog::logger> s_CoreLogger; //给出变量的声明
-        static std::shared_ptr<spdlog::logger> s_ClientLogger;
+        // inline static Ref<spdlog::logger> s_CoreLogger;
+        // inline static Ref<spdlog::logger> s_ClientLogger;
+        static Ref<spdlog::logger> s_CoreLogger; //给出变量的声明
+        static Ref<spdlog::logger> s_ClientLogger;
     };
 }
 

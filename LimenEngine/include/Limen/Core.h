@@ -2,6 +2,7 @@
 // Created by chenlong on 2026/8/5.
 //
 #pragma once
+#include <memory>
 
 #if defined(LIMEN_ENGINE_SHARED) && defined(LIMEN_ENGINE_STATIC)
     #error "LIMEN_ENGINE_SHARED and LIMEN_ENGINE_STATIC cannot both be defined"
@@ -65,6 +66,14 @@
     #define LM_CORE_ASSERT(x, ...) ((void)0)
 #endif
 
-
-
 #define BIT(x) (1 << x)
+
+
+namespace Limen
+{
+    template <typename T>
+    using Scope = std::unique_ptr<T>;
+
+    template <typename T>
+    using Ref = std::shared_ptr<T>;
+}

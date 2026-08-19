@@ -20,7 +20,7 @@ namespace Limen
 
         //OpenGL Submit
         static void Submit(
-            const std::shared_ptr<Shader>& shader,
+            const Ref<Shader>& shader,
             const VertexArray& vertexArray,
             const glm::mat4& transform = glm::mat4(1.0f)
         );

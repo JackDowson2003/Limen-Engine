@@ -7,11 +7,7 @@
 #include "Window.h"
 #include "Events/ApplicationEvent.h"
 #include "LayerStack.h"
-#include "Core/DeltaTime.h"
-#include "Renderer/Shader.h"
-#include "Limen/Renderer/Buffer.h"
 #include "Renderer/OrthoGraphicCamera.h"
-#include "Renderer/VertexArray.h"
 
 namespace Limen
 {
@@ -38,7 +34,7 @@ namespace Limen
     private:
         bool OnWindowClose(WindowCloseEvent& e);
 
-        std::unique_ptr<Window> m_Window;
+        Scope<Window> m_Window;
         ImGUILayer* m_ImGUILayer = nullptr;
         // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
         LayerStack m_LayerStack;

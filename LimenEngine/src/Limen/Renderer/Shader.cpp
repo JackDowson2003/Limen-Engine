@@ -9,14 +9,14 @@
 
 namespace Limen
 {
-    std::unique_ptr<Shader> Shader::Create(
+    Ref<Shader> Shader::Create(
         const std::string &vertexSource,
         const std::string &fragmentSource)
     {
         switch (Renderer::GetRenderAPI())
         {
             case RendererAPI::API::OPENGL:
-                return std::make_unique<OpenGLShader>(vertexSource, fragmentSource);
+                return std::make_shared<OpenGLShader>(vertexSource, fragmentSource);
 
             case RendererAPI::API::DIRECT12:
                 LM_CORE_ERROR("Cannot create a Shader when RenderAPI is NONE");

@@ -17,7 +17,7 @@ namespace Limen
     {
         LM_CORE_ASSERT(!s_Instance, "Application already initialized!");
         s_Instance = this;
-        m_Window = std::unique_ptr<Window>(Window::Create());
+        m_Window = Scope<Window>(Window::Create());
         m_Window->SetVSync(isVSYNC);
         //发生Events的时候，就调用这个匿名函数,也就是OnEvent()
         m_Window->SetEventCallback([this](Event &e)

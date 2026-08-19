@@ -47,7 +47,7 @@ namespace Limen
     //OpenGL Submit
     //Just Get Resources to use by displaying
     void Renderer::Submit(
-        const std::shared_ptr<Shader> &shader,
+        const Ref<Shader> &shader,
         const VertexArray &vertexArray,
         const glm::mat4& transform
 

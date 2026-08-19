@@ -263,13 +263,13 @@ namespace
     private:
         Limen::OrthoGraphicCamera m_Camera;
 
-        std::shared_ptr<Limen::VertexArray> m_SquareVAO;
-        std::shared_ptr<Limen::VertexArray> m_VertexArray;
-        std::shared_ptr<Limen::Shader> m_Shader;
-        std::shared_ptr<Limen::Shader> m_BlueShader;
+        Limen::Scope<Limen::VertexArray> m_SquareVAO;
+        Limen::Scope<Limen::VertexArray> m_VertexArray;
+        Limen::Ref<Limen::Shader> m_Shader;
+        Limen::Ref<Limen::Shader> m_BlueShader;
 
-        std::shared_ptr<Limen::VertexBuffer> m_VertexBuffer;
-        std::shared_ptr<Limen::IndexBuffer> m_IndexBuffer;
+        Limen::Ref<Limen::VertexBuffer> m_VertexBuffer;
+        Limen::Ref<Limen::IndexBuffer> m_IndexBuffer;
 
         float m_MoveSpeed = 1.0f;
         float m_RotateSpeed = 360.0f;
