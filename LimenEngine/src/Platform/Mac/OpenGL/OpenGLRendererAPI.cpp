@@ -29,7 +29,10 @@ namespace Limen
 
     void OpenGLRendererAPI::SetDepthTest(const bool enabled)
     {
-        glDepthMask(enabled ? GL_TRUE : GL_FALSE);
+        if (enabled)
+            glEnable(GL_DEPTH_TEST);
+        else
+            glDisable(GL_DEPTH_TEST);
     }
 
     inline void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray)

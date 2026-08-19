@@ -1,6 +1,8 @@
 #include "Limen.h"
 #include <imgui.h>
 #include <glm/ext/matrix_transform.hpp>
+
+#include "Example3DLayer.h"
 #include "../../LimenEngine/src/Platform/Mac/OpenGL/OpenGLShader.h"
 #include "glm/gtc/type_ptr.hpp"
 
@@ -10,6 +12,7 @@ namespace Limen
     class OpenGLShader;
 }
 
+//ExampleLayer2D
 namespace
 {
     class ExampleLayer : public Limen::Layer
@@ -359,7 +362,9 @@ namespace
         SandBoxApp()
             : Application(false)
         {
-            PushLayer(new ExampleLayer());
+            // PushLayer(new ExampleLayer());
+            // 暂时只运行3D测试，先隔离验证透视和深度。
+            PushLayer(new SandBox::Example3DLayer());
         }
 
         ~SandBoxApp() override = default;

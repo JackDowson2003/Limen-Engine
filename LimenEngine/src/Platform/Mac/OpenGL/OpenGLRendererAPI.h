@@ -11,9 +11,12 @@ namespace Limen
     {
     public:
         ~OpenGLRendererAPI() override;
-         virtual void Init();
-         void Clear()  override;
-         void SetClearColor(const glm::vec4& color) override;
+
+        void Init() override;
+
+        void Clear() override;
+
+        void SetClearColor(const glm::vec4 &color) override;
 
         /**
          * @brief 开启或关闭深度测试。
@@ -27,8 +30,6 @@ namespace Limen
          */
         void SetDepthTest(bool enabled) override;
 
-         void DrawIndexed(const VertexArray& vertexArray)  override;
+        void DrawIndexed(const VertexArray &vertexArray) override;
     };
-
-
 }
