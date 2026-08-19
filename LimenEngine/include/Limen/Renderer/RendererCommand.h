@@ -24,6 +24,17 @@ namespace Limen
             s_RendererAPI->Init();
         }
 
+        /**
+         * @brief 向当前RendererAPI发送深度测试状态。
+         *
+         * @param enabled
+         * true表示开启，false表示关闭。
+         */
+        inline static void SetDepthTest(const bool enabled)
+        {
+            s_RendererAPI->SetDepthTest(enabled);
+        }
+
 
         inline static void DrawIndexed(const VertexArray &vao)
         {

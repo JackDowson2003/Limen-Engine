@@ -32,6 +32,22 @@ namespace Limen
 
         virtual void DrawIndexed(const VertexArray &vertexArray) = 0;
 
+        /**
+         * @brief 开启或关闭深度测试。
+         *
+         * 深度测试用于比较当前片元与深度缓冲中已有片元的深度，
+         * 决定当前片元是否被更近的物体遮挡。
+         *
+         * @param enabled
+         * true：开启深度测试，通常用于3D场景。
+         * false：关闭深度测试，通常用于屏幕空间2D覆盖层和UI。
+         */
+        virtual void SetDepthTest(bool enabled) = 0;
+
+        /**
+         *
+         * @return API type
+         */
         static API GetAPI()
         {
             return API::OPENGL;

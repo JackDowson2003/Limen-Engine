@@ -27,6 +27,11 @@ namespace Limen
         glClearColor(color.r, color.g, color.b, color.a);
     }
 
+    void OpenGLRendererAPI::SetDepthTest(const bool enabled)
+    {
+        glDepthMask(enabled ? GL_TRUE : GL_FALSE);
+    }
+
     inline void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray)
     {
         glDrawElements(GL_TRIANGLES,

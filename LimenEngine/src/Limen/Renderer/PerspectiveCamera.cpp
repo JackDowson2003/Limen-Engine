@@ -16,23 +16,35 @@ namespace Limen
         LM_CORE_ASSERT(near > 0.f, "Perspective camera near must be greater than 0.");
         LM_CORE_ASSERT(far > near, "Perspective camera far plane must be greater than near plane.");
 
-        RecalculateViewMatrix();
+        //顺序可变换
         RecalculateProjectionMatrix();
+        RecalculateViewMatrix();
     }
 
     void PerspectiveCamera::SetPosition(const glm::vec3 &position)
     {
         m_Position = position;
+        RecalculateViewMatrix();
     }
 
     void PerspectiveCamera::SetRotation(const glm::vec3 &rotation)
     {
         m_Rotation = rotation;
+        RecalculateViewMatrix();
     }
 
     void PerspectiveCamera::SetFOV(const float fov)
     {
+        LM_CORE_ASSERT(
+            fov > 0.0f && fov < 180.0f,
+            "Perspective camera FOV must be between 0 and 180 degrees"
+        );
+
+        if (fov <= 0.0f || fov >= 180.0f)
+            return;
+
         m_VerticalFOV = fov;
+        RecalculateProjectionMatrix();
     }
 
     void PerspectiveCamera::SetAspectRatio(const float aspectRatio)
@@ -41,9 +53,12 @@ namespace Limen
         if (aspectRatio <= 0.f)
             return;
         m_AspectRatio = aspectRatio;
-        RecalculateViewMatrix();
+        RecalculateProjectionMatrix();
     }
 
+    /**
+         * 镜头如何把3D压扁到2D屏幕上”
+         */
     void PerspectiveCamera::RecalculateProjectionMatrix()
     {
         m_ProjectionMatrix = glm::perspective(
@@ -52,19 +67,23 @@ namespace Limen
             m_Near,
             m_Far
         );
-        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix;
+        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix; //p v => MVP = P V M
     }
 
+
+    /**
+    * 镜头在哪里 朝向哪里 怎么旋转
+    */
     void PerspectiveCamera::RecalculateViewMatrix()
     {
         glm::mat4 transform = glm::translate(glm::mat4(1.0f), m_Position);
 
         //旋转顺序  yaw(Y) → pitch(X) → roll(Z)
-        transform = glm::rotate(transform,glm::radians(m_Rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+        transform = glm::rotate(transform, glm::radians(m_Rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
 
-        transform = glm::rotate(transform,glm::radians(m_Rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+        transform = glm::rotate(transform, glm::radians(m_Rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
 
-        transform = glm::rotate(transform,glm::radians(m_Rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+        transform = glm::rotate(transform, glm::radians(m_Rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
         //因为CameraTransform = Translation * Rotation; 在global world中需要inverse
         m_ViewMatrix = glm::inverse(transform);
