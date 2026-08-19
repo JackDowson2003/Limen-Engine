@@ -13,6 +13,7 @@
 #include "ImGUI/ImGUILayer.h"
 #include "Renderer/Buffer.h"
 #include "Renderer/OrthoGraphicCamera.h"
+#include "Renderer/PerspectiveCamera.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/RendererAPI.h"
 #include "Renderer/RendererCommand.h"

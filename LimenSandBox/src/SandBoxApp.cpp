@@ -17,7 +17,7 @@ namespace
     public:
         ExampleLayer()
             : Layer("example layer"),
-              m_Camera(Limen::OrthoGraphicCamera(-2.f, 2.f, -1.f, 1.f)),
+              m_Camera(Limen::OrthographicCamera(-2.f, 2.f, -1.f, 1.f)),
               m_Position(glm::vec3(0.0f)),
               m_Scale(glm::vec3(1.0f, 1.0f, 1.0f))
         {
@@ -326,7 +326,7 @@ namespace
         }
 
     private:
-        Limen::OrthoGraphicCamera m_Camera;
+        Limen::OrthographicCamera m_Camera;
 
         Limen::Scope<Limen::VertexArray> m_SquareVAO;
         Limen::Scope<Limen::VertexArray> m_VertexArray;

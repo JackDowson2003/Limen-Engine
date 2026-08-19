@@ -13,20 +13,38 @@ namespace Limen
         struct SceneData
         {
             bool IsActive = false;
-            glm::mat4 ViewProjectionMatrix;
+            glm::mat4 ViewProjection{1.0f};
+            glm::vec3 CameraPosition{0.0f};
         };
 
         SceneData s_SceneData;
     }
 
-    void Renderer::BeginScene(const OrthoGraphicCamera &camera)
+    // void Renderer::BeginScene(const OrthoGraphicCamera &camera)
+    // {
+    //     if (s_SceneData.IsActive)
+    //     {
+    //         LM_CORE_ASSERT(false, "Renderer::BeginScene cannot be called while another scene is active");
+    //         return;
+    //     }
+    //     s_SceneData.ViewProjectionMatrix = camera.GetViewProjectionMatrix();
+    //
+    //     s_SceneData.IsActive = true;
+    // }
+
+    void Renderer::BeginScene(const Camera &camera)
     {
+
         if (s_SceneData.IsActive)
         {
-            LM_CORE_ASSERT(false, "Renderer::BeginScene cannot be called while another scene is active");
+            LM_CORE_ERROR("Another scene is already active");
             return;
         }
-        s_SceneData.ViewProjectionMatrix = camera.GetViewProjectionMatrix();
+        s_SceneData.ViewProjection =
+            camera.GetViewProjectionMatrix();
+
+        s_SceneData.CameraPosition =
+            camera.GetPosition();
 
         s_SceneData.IsActive = true;
     }
@@ -66,7 +84,7 @@ namespace Limen
 
         // Submit 只借用资源，不参与 Shader 和 VertexArray 的所有权。
         shader->Bind();
-        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjectionMatrix);
+        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjection);
         std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_Transform", transform);
         vertexArray.Bind();
         //底层命令

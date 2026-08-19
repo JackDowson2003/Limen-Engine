@@ -5,7 +5,7 @@
 #include "RendererCommand.h"
 #include "Shader.h"
 #include "Core.h"
-#include "OrthoGraphicCamera.h"
+#include "Camera.h"
 
 namespace Limen
 {
@@ -14,7 +14,7 @@ namespace Limen
     public:
         // BeginScene/EndScene 定义一个逻辑上的渲染提交区间。
         // 场景开始后才能调用 Submit，且同一时间只能存在一个场景。
-        static void BeginScene(const OrthoGraphicCamera &camera);
+        static void BeginScene(const Camera& camera);
 
         static void EndScene();
 
