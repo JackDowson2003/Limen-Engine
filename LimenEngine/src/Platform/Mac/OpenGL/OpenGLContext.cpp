@@ -6,6 +6,7 @@
 #include "OpenGLContext.h"
 #include "Core.h"
 #include "Log.h"
+#include "Renderer/RendererCommand.h"
 
 namespace Limen
 {
@@ -13,6 +14,7 @@ namespace Limen
     {
         LM_CORE_ASSERT(windowHandle, "Window handle is null, cannot create context");
         m_Window = windowHandle;
+
     }
 
     OpenGLContext::~OpenGLContext()
@@ -27,6 +29,8 @@ namespace Limen
         //让 GLAD 找到并保存当前 OpenGL 驱动中各个 OpenGL 函数的地址
         const int status = gladLoadGL(glfwGetProcAddress);
         LM_CORE_ASSERT(status, "Failed to initialize OpenGL context");
+        if (!status)
+            return;
 
         const auto *vendor =reinterpret_cast<const char *>(glGetString(GL_VENDOR));
         const auto *version =reinterpret_cast<const char *>(glGetString(GL_VERSION));

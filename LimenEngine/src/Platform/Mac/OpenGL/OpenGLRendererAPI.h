@@ -11,7 +11,7 @@ namespace Limen
     {
     public:
         ~OpenGLRendererAPI() override;
-
+         virtual void Init();
          void Clear()  override;
          void SetClearColor(const glm::vec4& color) override;
 

@@ -16,7 +16,7 @@ namespace Limen
         switch (Renderer::GetRenderAPI())
         {
             case RendererAPI::API::OPENGL:
-                return std::make_shared<OpenGLShader>(vertexSource, fragmentSource);
+                return CreateRef<OpenGLShader>(vertexSource, fragmentSource);
 
             case RendererAPI::API::DIRECT12:
                 LM_CORE_ERROR("Cannot create a Shader when RenderAPI is NONE");

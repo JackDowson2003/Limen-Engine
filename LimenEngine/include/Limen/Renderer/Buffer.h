@@ -273,7 +273,7 @@ namespace Limen
         {
         }
 
-        [[nodiscard]] uint32_t GetComponentCount() const noexcept
+        [[nodiscard]] uint32_t GetComponentSize() const noexcept
         {
             return ShaderDataTypeComponentCount(Type);
         }

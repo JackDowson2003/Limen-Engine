@@ -8,6 +8,7 @@
 #include "ImGUI/ImGUILayer.h"
 #include "Log.h"
 #include "GLFW/glfw3.h"
+#include "Renderer/Renderer.h"
 
 namespace Limen
 {
@@ -24,6 +25,9 @@ namespace Limen
         {
             OnEvent(e);
         });
+
+        //初始化参数
+        Renderer::Init();
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
         // 编辑器 UI 由 Application 统一管理，客户端只需实现 OnImGuiRender()。

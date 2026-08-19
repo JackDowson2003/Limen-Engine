@@ -85,19 +85,18 @@ namespace Limen
                                     nullptr, nullptr);
         m_Context = new OpenGLContext(m_Window);
 
-
-        m_Context->Init(); //初始化上下文
-
         // glfwMakeContextCurrent(m_Window); //创建上下文
         //获取opengl的函数
 
-        const int status = gladLoadGL(glfwGetProcAddress);
-        LM_CORE_ASSERT(status, "Failed to initialize GLAD!");
-        if (!status)
-        {
-            Shutdown();
-            return;
-        }
+        // const int status = gladLoadGL(glfwGetProcAddress);
+        // LM_CORE_ASSERT(status, "Failed to initialize GLAD!");
+        // if (!status)
+        // {
+        //     Shutdown();
+        //     return;
+        // }
+        m_Context->Init(); //初始化上下文
+
         glfwSetWindowUserPointer(m_Window, &m_Data);
         SetVSync(true); //垂直同步
 

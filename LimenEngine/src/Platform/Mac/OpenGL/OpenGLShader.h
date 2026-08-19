@@ -3,15 +3,14 @@
 //
 #pragma once
 
-#include <cstdint>
 #include <string>
 
-#include "glm/detail/type_vec3.hpp"
 #include "Renderer/Shader.h"
+#include <glm/glm.hpp>
 
 namespace Limen
 {
-    class OpenGLShader final : public Shader
+    class OpenGLShader : public Shader
     {
     public :
         OpenGLShader(const std::string &vertexSource, const std::string &fragmentSource);
@@ -22,7 +21,7 @@ namespace Limen
 
         void UnBind() const override;
 
-        void UploadUniformMat3(const char *name, const glm::mat4 &val);
+        void UploadUniformMat3(const char *name, const glm::mat3 &val);
         void UploadUniformMat4(const char *name, const glm::mat4 &val);
 
         void UploadUniformInt(const char *name,  int value);
@@ -37,6 +36,6 @@ namespace Limen
 
     private:
         uint32_t m_RendererID = 0;
-        std::unordered_map<const char *, int> m_UniformLocations;
+        std::unordered_map<std::string, int> m_UniformLocations;
     };
 }

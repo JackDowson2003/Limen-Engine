@@ -44,6 +44,11 @@ namespace Limen
         s_SceneData.IsActive = false;
     }
 
+    void Renderer::Init()
+    {
+        RendererCommand::Init();
+    }
+
     //OpenGL Submit
     //Just Get Resources to use by displaying
     void Renderer::Submit(

@@ -19,6 +19,11 @@ namespace Limen
             s_RendererAPI->SetClearColor(color);
         }
 
+        static void Init()
+        {
+            s_RendererAPI->Init();
+        }
+
 
         inline static void DrawIndexed(const VertexArray &vao)
         {

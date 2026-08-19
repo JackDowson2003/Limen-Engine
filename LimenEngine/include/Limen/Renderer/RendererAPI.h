@@ -10,7 +10,7 @@ namespace Limen
 {
     class LIMEN_API RendererAPI
     {
-      public:
+    public:
         virtual ~RendererAPI() = default;
 
         enum class API
@@ -22,14 +22,21 @@ namespace Limen
             DIRECT11 = 4,
             METAL = 5,
         };
+
     public:
-
         virtual void Clear() = 0;
-        virtual void SetClearColor(const glm::vec4& color) = 0;
 
-        virtual void DrawIndexed(const VertexArray& vertexArray) = 0;
+        virtual void SetClearColor(const glm::vec4 &color) = 0;
 
-        static inline API GetAPI() { return API::OPENGL; }
+        virtual void Init() = 0;
+
+        virtual void DrawIndexed(const VertexArray &vertexArray) = 0;
+
+        static API GetAPI()
+        {
+            return API::OPENGL;
+        }
+
     private:
         static API s_API;
     };

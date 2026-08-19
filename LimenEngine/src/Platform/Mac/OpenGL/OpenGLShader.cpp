@@ -133,7 +133,7 @@ namespace Limen
 
 
 
-    void OpenGLShader::UploadUniformMat3(const char *name, const glm::mat4 &val)
+    void OpenGLShader::UploadUniformMat3(const char *name, const glm::mat3 &val)
     {
         const GLint location = GetUniformLocation(name);
         glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(val));

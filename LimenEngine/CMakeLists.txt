@@ -71,6 +71,11 @@ add_library (imgui STATIC
 
         #vendor/imgui/imgui_demo.cpp #test
 )
+
+add_library(stb_image STATIC
+    vendor/stb_image/stb_image.cpp
+)
+
 #imgui
 target_include_directories(imgui
         PUBLIC
@@ -79,7 +84,12 @@ target_include_directories(imgui
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui/backends
 )
 
-# ImGui 的 GLFW/OpenGL3 后端直接依赖这两个库。
+target_include_directories(stb_image
+        SYSTEM PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor
+)
+
+# ImGui 的 GLFW/OpenGL3 后端直接依赖这两个库。 所以需要让imgui Link上glfw glad
 target_link_libraries(imgui
         PRIVATE
         glfw
@@ -95,6 +105,11 @@ target_link_libraries(LimenEngine
 target_link_libraries(LimenEngine
         PRIVATE
         imgui
+)
+
+target_link_libraries(LimenEngine
+        PRIVATE
+        stb_image
 )
 
 target_link_libraries(LimenEngine PUBLIC glm::glm)
@@ -118,7 +133,6 @@ else ()
     message(FATAL_ERROR "LimenEngine does not support this platform")
 endif ()
 
-#headers
 target_include_directories(LimenEngine
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include

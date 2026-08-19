@@ -4,7 +4,6 @@
 #pragma once
 
 #include "Core.h"
-#include "glm/fwd.hpp"
 #include "glm/detail/type_vec4.hpp"
 
 namespace Limen

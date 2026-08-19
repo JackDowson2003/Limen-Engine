@@ -44,10 +44,10 @@ namespace Limen
         {
             glEnableVertexAttribArray(index);
             const GLenum type = ShaderDataTypeToOpenGLType(element.Type);
-            const auto &count = static_cast<int>(element.GetComponentCount());
+            const GLint &size = static_cast<int>(element.GetComponentSize()); //元素的数据类型的size
             glVertexAttribPointer(
                 index,
-                count,
+                size,
                 type,
                 element.Normalized ? GL_TRUE : GL_FALSE,
                 stride,
