@@ -18,10 +18,14 @@ namespace Limen
         static void BeginScene(const OrthoGraphicCamera& camera);
         static void EndScene();
 
+        //OpenGL Submit
         static void Submit(
-             Shader& shader,
-            const VertexArray& vertexArray
+            const std::shared_ptr<Shader>& shader,
+            const VertexArray& vertexArray,
+            const glm::mat4& transform = glm::mat4(1.0f)
         );
+
+        static void Submit(){}
 
         inline static RendererAPI::API GetRenderAPI()
         {

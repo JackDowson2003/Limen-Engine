@@ -4,6 +4,7 @@
 #include "Renderer/Renderer.h"
 
 #include "Log.h"
+#include "Platform/Mac/OpenGL/OpenGLShader.h"
 
 namespace Limen
 {
@@ -43,9 +44,14 @@ namespace Limen
         s_SceneData.IsActive = false;
     }
 
+    //OpenGL Submit
+    //Just Get Resources to use by displaying
     void Renderer::Submit(
-        Shader &shader,
-        const VertexArray &vertexArray)
+        const std::shared_ptr<Shader> &shader,
+        const VertexArray &vertexArray,
+        const glm::mat4& transform
+
+        )
     {
         if (!s_SceneData.IsActive)
         {
@@ -54,8 +60,9 @@ namespace Limen
         }
 
         // Submit 只借用资源，不参与 Shader 和 VertexArray 的所有权。
-        shader.Bind();
-        shader.UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjectionMatrix);
+        shader->Bind();
+        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjectionMatrix);
+        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_Transform", transform);
         vertexArray.Bind();
         //底层命令
         RendererCommand::DrawIndexed(vertexArray);

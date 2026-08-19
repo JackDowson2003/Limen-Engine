@@ -5,6 +5,7 @@
 
 #include "Core.h"
 #include "glm/fwd.hpp"
+#include "glm/detail/type_vec4.hpp"
 
 namespace Limen
 {
@@ -15,8 +16,6 @@ namespace Limen
 
         virtual void Bind() const = 0;
         virtual void UnBind() const = 0;
-
-        virtual void UploadUniformMat4(const char* name,const glm::mat4& matrix) = 0;
 
         // 根据当前 Renderer API 创建对应的 Shader 实现。
         [[nodiscard]] static std::unique_ptr<Shader> Create(

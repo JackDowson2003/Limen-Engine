@@ -18,6 +18,10 @@ namespace Limen
             case RendererAPI::API::OPENGL:
                 return std::make_unique<OpenGLShader>(vertexSource, fragmentSource);
 
+            case RendererAPI::API::DIRECT12:
+                LM_CORE_ERROR("Cannot create a Shader when RenderAPI is NONE");
+                return nullptr;
+
             case RendererAPI::API::NONE:
                 LM_CORE_ERROR("Cannot create a Shader when RenderAPI is NONE");
                 return nullptr;
