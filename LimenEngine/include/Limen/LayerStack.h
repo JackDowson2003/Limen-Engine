@@ -10,6 +10,13 @@ namespace Limen {
 		LayerStack() = default;
 		~LayerStack();
 
+		/**
+		 * @brief Detach并销毁当前保存的所有Layer。
+		 *
+		 * 可以重复调用；析构函数也会调用该函数。
+		 */
+		void Clear();
+
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* overlay);
 		void PopLayer(Layer* layer);

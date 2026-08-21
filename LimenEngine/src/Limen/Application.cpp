@@ -39,6 +39,15 @@ namespace Limen
 
     Application::~Application()
     {
+        // Layer中的GPU资源必须先于Renderer后端和Window/Context释放。
+        m_LayerStack.Clear();
+        m_ImGUILayer = nullptr;
+
+        Renderer::Shutdown();
+
+        // 最后销毁Context和Native Window。
+        m_Window.reset();
+        s_Instance = nullptr;
     }
 
     void Application::Run()
@@ -46,6 +55,12 @@ namespace Limen
         m_LastFrameTime = glfwGetTime();
         while (m_Running)
         {
+            // 帧首获取最新窗口、键盘和鼠标事件。
+            m_Window->PollEvents();
+
+            if (!m_Running)
+                break;
+
             const double time = glfwGetTime();
             DeltaTime deltaTime = time-m_LastFrameTime;
             m_LastFrameTime = time;
@@ -61,7 +76,8 @@ namespace Limen
             m_ImGUILayer->End();
 #endif
 
-            m_Window->OnUpdate();
+            // 所有场景和ImGui绘制完成后再Present。
+            m_Window->Present();
         }
     }
 

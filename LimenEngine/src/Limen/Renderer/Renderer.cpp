@@ -67,6 +67,11 @@ namespace Limen
         RendererCommand::Init();
     }
 
+    void Renderer::Shutdown()
+    {
+        RendererCommand::Shutdown();
+    }
+
     //OpenGL Submit
     //Just Get Resources to use by displaying
     void Renderer::Submit(

@@ -9,20 +9,29 @@ namespace Limen
     class LIMEN_API RendererCommand
     {
     public:
-        inline static void Clear()
+        static void Clear()
         {
-            s_RendererAPI->Clear();
+            if (RendererAPI* api = GetRendererAPI())
+                api->Clear();
         }
 
-        inline static void SetClearColor(const glm::vec4 &color)
+        static void SetClearColor(const glm::vec4 &color)
         {
-            s_RendererAPI->SetClearColor(color);
+            if (RendererAPI* api = GetRendererAPI())
+                api->SetClearColor(color);
         }
 
-        static void Init()
-        {
-            s_RendererAPI->Init();
-        }
+        /**
+         * @brief 根据RendererAPI::GetAPI()和当前平台创建并初始化后端。
+         */
+        static void Init();
+
+        /**
+         * @brief 释放当前RendererAPI后端。
+         *
+         * 必须在图形Context/Window销毁前调用。
+         */
+        static void Shutdown();
 
         /**
          * @brief 向当前RendererAPI发送深度测试状态。
@@ -30,17 +39,24 @@ namespace Limen
          * @param enabled
          * true表示开启，false表示关闭。
          */
-        inline static void SetDepthTest(const bool enabled)
+        static void SetDepthTest(const bool enabled)
         {
-            s_RendererAPI->SetDepthTest(enabled);
+            if (RendererAPI* api = GetRendererAPI())
+                api->SetDepthTest(enabled);
         }
 
-
-        inline static void DrawIndexed(const VertexArray &vao)
+        static void DrawIndexed(const VertexArray &vao)
         {
-            s_RendererAPI->DrawIndexed(vao); //我们的API对应的方法
+            if (RendererAPI* api = GetRendererAPI())
+                api->DrawIndexed(vao);
         }
 
-        static RendererAPI *s_RendererAPI;
+    private:
+        /**
+         * @return 已初始化的RendererAPI；未初始化时记录错误并返回nullptr。
+         */
+        static RendererAPI* GetRendererAPI() noexcept;
+
+        static Scope<RendererAPI> s_RendererAPI;
     };
 }

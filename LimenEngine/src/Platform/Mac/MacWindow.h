@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core.h"
 #include "Window.h"
 
 #include <GLFW/glfw3.h>
@@ -16,7 +17,9 @@ namespace Limen
 
         ~MacWindow() override;
 
-        void OnUpdate() override;
+        void PollEvents() override;
+
+        void Present() override;
 
         [[nodiscard]] inline void *GetNativeWindow() const override { return m_Window; }
         [[nodiscard]] inline unsigned int GetWidth() const override { return m_Data.Width; }
@@ -31,7 +34,12 @@ namespace Limen
     private:
         void Init(const WindowProps &props);
 
-        void Shutdown() const;
+        /**
+         * @brief 按照Context、Native Window、GLFW的顺序释放窗口系统资源。
+         *
+         * 函数可以安全地重复调用；已经释放的对象会被跳过。
+         */
+        void Shutdown();
 
         GLFWwindow *m_Window = nullptr;
 
@@ -47,6 +55,12 @@ namespace Limen
         WindowData m_Data;
 
     private:
-        GraphicsContext* m_Context;
+        /**
+         * @brief 当前窗口使用的图形上下文包装对象。
+         *
+         * MacWindow唯一拥有该对象；GraphicsContext只借用m_Window句柄，
+         * 不负责销毁GLFWwindow。
+         */
+        Scope<GraphicsContext> m_Context;
     };
 }

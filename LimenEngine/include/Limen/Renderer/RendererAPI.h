@@ -8,6 +8,7 @@
 
 namespace Limen
 {
+
     class LIMEN_API RendererAPI
     {
     public:
@@ -23,7 +24,6 @@ namespace Limen
             METAL = 5,
         };
 
-    public:
         virtual void Clear() = 0;
 
         virtual void SetClearColor(const glm::vec4 &color) = 0;
@@ -48,9 +48,19 @@ namespace Limen
          *
          * @return API type
          */
-        static API GetAPI()
+        static API GetAPI() noexcept
         {
-            return API::OPENGL;
+            return s_API;
+        }
+
+        /**
+         * @brief 选择本次运行使用的图形API。
+         *
+         * 必须在Renderer::Init()之前调用；Renderer初始化后不允许切换后端。
+         */
+        static void SetAPI(API api) noexcept
+        {
+            s_API = api;
         }
 
     private:

@@ -48,6 +48,14 @@ namespace Limen
 
     void OpenGLContext::Shutdown()
     {
-        glfwDestroyWindow(m_Window);
+        if (!m_Window)
+            return;
+
+        // OpenGLContext只借用窗口句柄。这里解除当前上下文，
+        // GLFWwindow的实际销毁由MacWindow负责。
+        if (glfwGetCurrentContext() == m_Window)
+            glfwMakeContextCurrent(nullptr);
+
+        m_Window = nullptr;
     }
 }

@@ -29,7 +29,20 @@ namespace Limen
 
         virtual ~Window() = default;
 
-        virtual void OnUpdate() = 0;
+        /**
+         * @brief 轮询操作系统窗口和输入事件。
+         *
+         * 每帧开始时调用，使本帧Update能够使用最新输入状态。
+         * 检测有没有输入
+         */
+        virtual void PollEvents() = 0;
+
+        /**
+         * @brief 将本帧渲染结果提交到窗口。
+         *
+         * OpenGL后端对应SwapBuffers；未来DX后端对应SwapChain::Present。
+         */
+        virtual void Present() = 0;
 
         [[nodiscard]] virtual uint32_t GetWidth() const = 0;
         [[nodiscard]] virtual uint32_t GetHeight() const = 0;

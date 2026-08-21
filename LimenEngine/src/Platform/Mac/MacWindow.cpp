@@ -36,12 +36,17 @@ namespace Limen
         return m_Data.VSync;
     }
 
-    void MacWindow::OnUpdate()
+    void MacWindow::PollEvents()
     {
-        glfwPollEvents(); //处理事件
-        m_Context->SwapBuffers(); ////交换前后缓冲区
-        //交换前后缓冲区，开启Vsync。调用glfwSwapBuffers的时候，会阻塞等待显示器垂直刷新信号，才交换缓冲，消除画面撕裂，锁帧率。
-        // glfwSwapBuffers(m_Window);
+        glfwPollEvents();
+    }
+
+    void MacWindow::Present()
+    {
+        LM_CORE_ASSERT(m_Context, "Cannot present without a GraphicsContext");
+
+        if (m_Context)
+            m_Context->SwapBuffers();
     }
 
     void MacWindow::SetVSync(const bool enabled)
@@ -83,7 +88,12 @@ namespace Limen
         m_Window = glfwCreateWindow(static_cast<int>(props.Width), static_cast<int>(props.Height),
                                     props.Title.c_str(),
                                     nullptr, nullptr);
-        m_Context = new OpenGLContext(m_Window);
+
+        LM_CORE_ASSERT(m_Window, "Failed to create GLFW window");
+        if (!m_Window)
+            return;
+
+        m_Context = CreateScope<OpenGLContext>(m_Window);
 
         // glfwMakeContextCurrent(m_Window); //创建上下文
         //获取opengl的函数
@@ -209,10 +219,23 @@ namespace Limen
         });
     }
 
-    void MacWindow::Shutdown() const
+    void MacWindow::Shutdown()
     {
-        m_Context->Shutdown();
-        // glfwDestroyWindow(m_Window);
-        glfwTerminate();
+        // 先销毁Context包装对象，使它不再引用即将销毁的GLFWwindow。
+        m_Context.reset();
+
+        // Native Window只由MacWindow销毁。
+        if (m_Window)
+        {
+            glfwDestroyWindow(m_Window);
+            m_Window = nullptr;
+        }
+
+        // 当前引擎只支持一个主窗口；多窗口阶段再改为引用计数式WindowSystem。
+        if (s_GLFWInitialized)
+        {
+            glfwTerminate();
+            s_GLFWInitialized = false;
+        }
     }
 }

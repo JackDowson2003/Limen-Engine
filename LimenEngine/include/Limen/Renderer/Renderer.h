@@ -20,6 +20,13 @@ namespace Limen
 
         static void Init();
 
+        /**
+         * @brief 释放Renderer持有的后端对象。
+         *
+         * 调用时OpenGL Context仍然必须有效。
+         */
+        static void Shutdown();
+
         //OpenGL Submit
         static void Submit(
             const Ref<Shader> &shader,
