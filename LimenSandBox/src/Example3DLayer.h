@@ -5,8 +5,8 @@
 #include "Layer.h"
 #include "Renderer/PerspectiveCamera.h"
 #include "Renderer/Shader.h"
+#include "Renderer/Texture.h"
 #include "Renderer/VertexArray.h"
-
 
 namespace SandBox
 {
@@ -27,6 +27,7 @@ namespace SandBox
     {
     public:
         Example3DLayer();
+
         ~Example3DLayer() override = default;
 
         /**
@@ -36,7 +37,7 @@ namespace SandBox
          * 当前帧与上一帧之间经过的时间。
          * 单位为秒，可以用于实现与帧率无关的旋转。
          */
-        void OnUpdate(Limen::DeltaTime& deltaTime) override;
+        void OnUpdate(Limen::DeltaTime &deltaTime) override;
 
     private:
         /**
@@ -47,7 +48,7 @@ namespace SandBox
 
         Limen::Scope<Limen::VertexArray> m_CubeVAO;
 
-        // 保存立方体8个角点的位置。
+        // 保存立方体24条顶点记录，每条记录包含Position、Normal和TexCoord。
         Limen::Ref<Limen::VertexBuffer> m_CubeVBO;
 
         // 保存立方体6个面、12个三角形的36个索引。
@@ -55,6 +56,16 @@ namespace SandBox
 
         // 负责将立方体顶点变换到裁剪空间并输出调试颜色。
         Limen::Ref<Limen::Shader> m_CubeShader;
+
+        /**
+         * @brief 立方体材质使用的Albedo纹理。
+         *
+         * Albedo描述物体表面的基础颜色。
+         * Fragment Shader会采样它，并把采样结果作为Blinn-Phong中的k_d。
+         *
+         * Ref表示该纹理资源可以被多个物体或材质共享。
+         */
+        Limen::Ref<Limen::Texture2D> m_AlbedoTexture;
 
         // 当前立方体旋转角度，单位为度。
         float m_CubeRotationDegrees = 0.0f;
