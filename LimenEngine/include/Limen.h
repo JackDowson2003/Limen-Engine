@@ -22,6 +22,7 @@
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"
+#include "Limen/RHI/UniformBuffer.h"
 
 //------Entry Point
 #include "Limen/EntryPoint.h"

@@ -4,13 +4,15 @@ Limen Engine 是一个用于学习并逐步实现现代实时渲染架构的 C++
 
 当前可运行的平台与图形 API 组合是：
 
-| 操作系统 | 图形 API | 当前状态 |
-|---|---|---|
-| macOS | OpenGL 4.1 | 已实现，当前默认后端 |
-| macOS | Metal | 规划中 |
-| Windows | Direct3D 11 | 规划中 |
-| Windows | Direct3D 12 | 规划中 |
-| Linux | OpenGL / Vulkan | 暂未实现 |
+| 操作系统 | 图形 API        | 当前状态             |
+|----------|-----------------|----------------------|
+| macOS    | OpenGL 4.1      | 已实现，当前默认后端 |
+| macOS    | Metal           | 规划中               |
+| Windows  | Direct3D 11     | 规划中.3             |
+| Windows  | Direct3D 12     | 规划中               |
+| Linux    | OpenGL / Vulkan | 规划中               |
+| IOS      | Metal           | 规划中               |
+| Andriod  | Vulkan          | 规划中               |
 
 Windows 版本的 Limen Engine 将只支持 Direct3D 11/12，不提供 Windows OpenGL 后端。macOS 当前使用 OpenGL 完成引擎基础功能，后续再加入原生 Metal 后端。
 

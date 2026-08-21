@@ -270,9 +270,10 @@ namespace
         glm::vec3 m_Position;
         glm::vec3 m_Scale;
         glm::vec3 m_SquareColor{0.2f, 0.3f, 0.8f};
+
+
     };
 }
-
 
 namespace
 {
@@ -285,7 +286,7 @@ namespace
                 Limen::RendererAPI::API::OPENGL
             )
         {
-            PushLayer(new ExampleLayer());
+            // PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。
             // PushLayer(new SandBox::Example3DLayer());
         }

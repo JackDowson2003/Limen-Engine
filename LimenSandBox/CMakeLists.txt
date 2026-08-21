@@ -1,7 +1,5 @@
 add_executable(LimenSandBox
         src/SandBoxApp.cpp
-        src/Example3DLayer.cpp
-
 )
 
 target_link_libraries(LimenSandBox #把 Engine 静态库链接到 Sandbox。
