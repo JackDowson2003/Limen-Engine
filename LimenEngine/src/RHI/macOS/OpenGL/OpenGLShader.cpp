@@ -183,5 +183,30 @@ namespace Limen
         return location;
     }
 
+    void OpenGLShader::BindUniformBlock(
+    const char* blockName,
+    const uint32_t binding
+) const
+    {
+        const GLuint blockIndex =
+            glGetUniformBlockIndex(
+                m_RendererID,
+                blockName
+            );
 
+        LM_CORE_ASSERT(
+            blockIndex != GL_INVALID_INDEX,
+            "Uniform block '{}' was not found",
+            blockName
+        );
+
+        if (blockIndex == GL_INVALID_INDEX)
+            return;
+
+        glUniformBlockBinding(
+            m_RendererID,
+            blockIndex,
+            binding
+        );
+    }
 }

@@ -40,6 +40,8 @@ namespace Limen
         int GetUniformLocation(const char *name);
 
 
+        void BindUniformBlock(const char* blockName,uint32_t binding) const;
+
     private:
         uint32_t m_RendererID = 0;
         std::unordered_map<std::string, int> m_UniformLocations;

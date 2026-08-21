@@ -11,7 +11,12 @@ layout(location = 0) out vec4 color;
  * RGB三个分量通常位于[0, 1]范围。
  * 由CPU在绘制前上传。
  */
-uniform vec3 u_Color;
+//uniform vec3 u_Color;
+
+layout(std140) uniform MaterialData
+{
+    vec3 u_Color;
+};
 
 void main()
 {

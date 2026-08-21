@@ -87,7 +87,7 @@ namespace
             // );
 
             m_TextureShader = m_ShaderLib->Load("OpenGL/Example2D/Texture2D.vert",
-                "OpenGL/Example2D/Texture2D.frag");
+                                                "OpenGL/Example2D/Texture2D.frag");
 
             LM_CORE_ASSERT(
                 m_TextureShader,
@@ -108,9 +108,18 @@ namespace
                 "Failed to create Example2D FlatColor shader"
             );
 
+            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->BindUniformBlock("MaterialData",1);
+
             m_SquareVAO->UnBind();
             m_Camera.SetPosition({-.2f, -.2f, 0.f});
             m_Camera.SetRotation(0.f);
+
+            // std140会为vec3保留一个16字节槽，但颜色本身仍然只有RGB三个分量。
+            constexpr uint32_t std140Vec3StorageSize = 4 * sizeof(float);
+            m_UniformBuffer = Limen::UniformBuffer::Create(
+                std140Vec3StorageSize,
+                1
+            );
 
             m_Texture = Limen::Texture2D::Create("assets/textures/checkerboard.png");
             m_LogoTexture = Limen::Texture2D::Create("assets/textures/cherno.png");
@@ -192,8 +201,14 @@ namespace
             const auto scale = glm::scale(glm::mat4(1.0f), m_Scale);
             m_FlatColorShader->Bind();
             // m_FlatColorShader->Bind();
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->UploadUniformFloat3(
-                "u_Color", m_SquareColor);
+            // std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->UploadUniformFloat3(
+            //     "u_Color", m_SquareColor);
+
+            m_UniformBuffer->SetData(
+                glm::value_ptr(m_SquareColor),
+                sizeof(glm::vec3)
+            );
+
             for (int y = 0; y < 20; y++)
             {
                 for (int x = 0; x < 20; x++)
@@ -258,6 +273,8 @@ namespace
 
         Limen::Ref<Limen::Texture2D> m_Texture, m_LogoTexture;
 
+        Limen::Scope<Limen::UniformBuffer> m_UniformBuffer;
+
         Limen::Ref<Limen::VertexBuffer> m_VertexBuffer;
         Limen::Ref<Limen::VertexBuffer> m_SquareVBO;
         Limen::Ref<Limen::IndexBuffer> m_IndexBuffer;
@@ -270,8 +287,6 @@ namespace
         glm::vec3 m_Position;
         glm::vec3 m_Scale;
         glm::vec3 m_SquareColor{0.2f, 0.3f, 0.8f};
-
-
     };
 }
 
@@ -286,7 +301,7 @@ namespace
                 Limen::RendererAPI::API::OPENGL
             )
         {
-            // PushLayer(new ExampleLayer());
+            PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。
             // PushLayer(new SandBox::Example3DLayer());
         }
