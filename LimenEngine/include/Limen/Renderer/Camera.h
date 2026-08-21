@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Core.h"
+#include "Limen/Core/Core.h"
 #include <glm/glm.hpp>
 
 namespace Limen

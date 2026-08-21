@@ -1,7 +1,9 @@
 #pragma once
 
-#include "Event.h"
-#include "KeyCodes.h"
+#include <sstream>
+
+#include "Limen/Events/Event.h"
+#include "Limen/Input/KeyCodes.h"
 
 namespace Limen
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Camera.h"
+#include "Limen/Renderer/Camera.h"
 
 namespace Limen
 {

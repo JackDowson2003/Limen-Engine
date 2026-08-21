@@ -3,7 +3,7 @@
 #include <glm/ext/matrix_transform.hpp>
 
 #include "Example3DLayer.h"
-#include "../../LimenEngine/src/Platform/Mac/OpenGL/OpenGLShader.h"
+#include "../../LimenEngine/src/RHI/macOS/OpenGL/OpenGLShader.h"
 #include "glm/gtc/type_ptr.hpp"
 
 
@@ -280,7 +280,10 @@ namespace
     {
     public:
         SandBoxApp()
-            : Application(false)
+            : Application(
+                false,
+                Limen::RendererAPI::API::OPENGL
+            )
         {
             PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。

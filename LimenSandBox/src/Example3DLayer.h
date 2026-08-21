@@ -2,11 +2,11 @@
 // Created by chenlong on 2026/8/20.
 //
 #pragma once
-#include "Layer.h"
-#include "Renderer/PerspectiveCamera.h"
-#include "Renderer/Shader.h"
-#include "Renderer/Texture.h"
-#include "Renderer/VertexArray.h"
+#include "Limen/Application/Layer.h"
+#include "Limen/Renderer/PerspectiveCamera.h"
+#include "Limen/RHI/Shader.h"
+#include "Limen/RHI/Texture.h"
+#include "Limen/RHI/VertexArray.h"
 
 namespace SandBox
 {

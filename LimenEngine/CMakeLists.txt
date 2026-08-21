@@ -4,15 +4,42 @@
 #        include/LimenEngine.h
 #) #创建名称为LimenEngine的静态库
 
-file(GLOB_RECURSE LIMEN_ENGINE_SOURCES
+file(GLOB_RECURSE LIMEN_ENGINE_COMMON_SOURCES
         CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Core/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Application/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/RHI/Common/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Editor/ImGui/*.cpp"
 )
+
+set(LIMEN_ENGINE_SOURCES ${LIMEN_ENGINE_COMMON_SOURCES})
+
+if (APPLE)
+    # 当前已经落地的组合：macOS平台窗口 + GLFW输入 + OpenGL RHI后端。
+    file(GLOB_RECURSE LIMEN_ENGINE_MACOS_OPENGL_SOURCES
+            CONFIGURE_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/GLFW/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/Platform/macOS/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/RHI/macOS/OpenGL/*.cpp"
+    )
+    list(APPEND LIMEN_ENGINE_SOURCES ${LIMEN_ENGINE_MACOS_OPENGL_SOURCES})
+elseif (WIN32)
+    message(FATAL_ERROR
+            "The Windows D3D11/D3D12 backend has not been implemented yet"
+    )
+elseif (UNIX)
+    message(FATAL_ERROR
+            "The Linux OpenGL/Vulkan backend has not been implemented yet"
+    )
+endif ()
 
 file(GLOB_RECURSE LIMEN_ENGINE_HEADERS
         CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
 )
 
 
@@ -35,7 +62,7 @@ add_library(LimenEngine
 
 # lmpch.h 是仅供 LimenEngine 编译使用的预编译头，不是公开 API。
 target_precompile_headers(LimenEngine
-        PUBLIC
+        PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include/Limen/lmpch.h
 )
 
@@ -136,7 +163,6 @@ endif ()
 target_include_directories(LimenEngine
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/Limen
         PRIVATE
         # 平台适配器（例如 GLFWKeyCodes.h）只允许引擎自身源文件包含。
         ${CMAKE_CURRENT_SOURCE_DIR}/src

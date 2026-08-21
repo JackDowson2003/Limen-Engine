@@ -3,8 +3,8 @@
 //
 
 #pragma once
-#include "Application.h"
-#include "Log.h"
+#include "Limen/Application/Application.h"
+#include "Limen/Core/Log.h"
 #if !defined(LIMEN_PLATFORM_WINDOWS) && \
     !defined(LIMEN_PLATFORM_MACOS) && \
     !defined(LIMEN_PLATFORM_LINUX)

@@ -2,10 +2,10 @@
 // Created by chenlong on 2026/8/11.
 //
 #pragma once
-#include "RendererCommand.h"
-#include "Shader.h"
-#include "Core.h"
-#include "Camera.h"
+#include "Limen/Renderer/RendererCommand.h"
+#include "Limen/RHI/Shader.h"
+#include "Limen/Core/Core.h"
+#include "Limen/Renderer/Camera.h"
 
 namespace Limen
 {

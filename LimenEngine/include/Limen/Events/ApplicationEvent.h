@@ -1,6 +1,8 @@
 #pragma once
 
-#include "Event.h"
+#include <sstream>
+
+#include "Limen/Events/Event.h"
 namespace Limen {
 
 	class LIMEN_API WindowResizeEvent : public Event

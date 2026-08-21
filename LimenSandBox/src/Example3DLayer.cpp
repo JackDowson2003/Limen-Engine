@@ -4,11 +4,11 @@
 
 #include "Example3DLayer.h"
 
-#include "Renderer/Renderer.h"
+#include "Limen/Renderer/Renderer.h"
 #include "glm/glm.hpp"
 #include <glm/ext/matrix_transform.hpp>
 
-#include "Log.h"
+#include "Limen/Core/Log.h"
 
 
 namespace SandBox

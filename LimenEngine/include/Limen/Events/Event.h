@@ -1,6 +1,10 @@
 #pragma once
 
-#include "Core.h"
+#include <functional>
+#include <ostream>
+#include <string>
+
+#include "Limen/Core/Core.h"
 
 
 namespace Limen {
