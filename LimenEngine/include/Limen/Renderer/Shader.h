@@ -3,6 +3,9 @@
 //
 #pragma once
 
+#include <filesystem>
+#include <string>
+
 #include "Core.h"
 
 namespace Limen
@@ -15,8 +18,16 @@ namespace Limen
         virtual void Bind() const = 0;
         virtual void UnBind() const = 0;
 
-        // 根据当前 Renderer API 创建对应的 Shader 实现。
-        [[nodiscard]] static Ref<Shader> Create(
+        /**
+         * @brief 从内存中的源码字符串创建Shader。
+         *
+         * @param vertexSource Vertex Shader的完整源码。
+         * @param fragmentSource Fragment Shader的完整源码。
+         *
+         * @return 创建成功时返回Shader共享引用，否则返回nullptr。
+         */
+        [[nodiscard]]
+        static Ref<Shader> CreateFromSource(
             const std::string &vertexSource,
             const std::string &fragmentSource
         );
@@ -46,6 +57,23 @@ namespace Limen
         static Ref<Shader> CreateFromFiles(
             const std::filesystem::path& vertexPath,
             const std::filesystem::path& fragmentPath
+        );
+
+        /**
+         * @brief 旧的源码创建入口，仅用于过渡期兼容。
+         *
+         * @deprecated
+         * 请根据输入类型改用CreateFromSource()或CreateFromFiles()。
+         *
+         * [[deprecated]]是标准Cpp 14以上支持的，Clang、GCC和MSVC都支持。
+         */
+        [[nodiscard]]
+        [[deprecated(
+            "This function is deprecated, use Shader::CreateFromSource() or Shader::CreateFromFiles() instead"
+        )]]
+        static Ref<Shader> Create(
+            const std::string &vertexSource,
+            const std::string &fragmentSource
         );
     };
 

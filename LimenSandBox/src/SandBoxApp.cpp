@@ -89,7 +89,6 @@ namespace
                 "Failed to create Example2D Texture2D shader"
             );
 
-            // m_Shader = Limen::Shader::Create(vertexSource, fragmentSource);
             m_VertexArray->UnBind();
             /**
              * 从外部GLSL文件创建2D纯色Shader。

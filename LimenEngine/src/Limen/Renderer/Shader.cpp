@@ -25,7 +25,7 @@ namespace Limen
          */
         [[nodiscard]]
         std::string ReadTextFile(
-            const std::filesystem::path& path
+            const std::filesystem::path &path
         )
         {
             std::ifstream input(
@@ -35,7 +35,7 @@ namespace Limen
 
             if (!input.is_open())
             {
-                LM_CORE_ERROR("Failed to open shader file '{}'",path.string());
+                LM_CORE_ERROR("Failed to open shader file '{}'", path.string());
 
                 return {};
             }
@@ -58,7 +58,7 @@ namespace Limen
         }
     }
 
-    Ref<Shader> Shader::Create(
+    Ref<Shader> Shader::CreateFromSource(
         const std::string &vertexSource,
         const std::string &fragmentSource)
     {
@@ -68,7 +68,7 @@ namespace Limen
                 return CreateRef<OpenGLShader>(vertexSource, fragmentSource);
 
             case RendererAPI::API::DIRECT12:
-                LM_CORE_ERROR("Cannot create a Shader when RenderAPI is NONE");
+                LM_CORE_ERROR("DirectX 12 Shader creation is not implemented");
                 return nullptr;
 
             case RendererAPI::API::NONE:
@@ -81,16 +81,26 @@ namespace Limen
         }
     }
 
+    Ref<Shader> Shader::Create(
+        const std::string &vertexSource,
+        const std::string &fragmentSource)
+    {
+        return CreateFromSource(
+            vertexSource,
+            fragmentSource
+        );
+    }
+
     Ref<Shader> Shader::CreateFromFiles(
-    const std::filesystem::path& vertexPath,
-    const std::filesystem::path& fragmentPath
-)
+        const std::filesystem::path &vertexPath,
+        const std::filesystem::path &fragmentPath
+    )
     {
         const std::string vertexSource =
-            ReadTextFile(vertexPath);
+                ReadTextFile(vertexPath);
 
         const std::string fragmentSource =
-            ReadTextFile(fragmentPath);
+                ReadTextFile(fragmentPath);
 
         if (vertexSource.empty())
         {
@@ -122,10 +132,9 @@ namespace Limen
          * glCreateProgram
          * glLinkProgram
          */
-        return Create(
+        return CreateFromSource(
             vertexSource,
             fragmentSource
         );
     }
-
 }
