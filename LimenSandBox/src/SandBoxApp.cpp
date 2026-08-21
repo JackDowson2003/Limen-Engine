@@ -75,14 +75,19 @@ namespace
             m_IndexBuffer.reset(Limen::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t)));
             m_SquareVAO->SetIndexBuffer(m_IndexBuffer);
 
-            /**从两个GLSL文件创建2D纹理Shader Program。
-             * 第一个参数：Vertex Shader文件；
-             * 第二个参数：Fragment Shader文件。
+            /**
+             * @brief 从两个GLSL文件创建2D纹理Shader Program。
+             *
+             * 路径省略assets/shaders前缀，由Shader底层统一补全资源目录。
+             * Shader逻辑名称自动从Texture2D.vert提取为Texture2D。
              */
-            m_TextureShader = Limen::Shader::CreateFromFiles(
-                "assets/shaders/OpenGL/Example2D/Texture2D.vert",
-                "assets/shaders/OpenGL/Example2D/Texture2D.frag"
-            );
+            // m_TextureShader = Limen::Shader::CreateFromFiles(
+            //     "OpenGL/Example2D/Texture2D.vert",
+            //     "OpenGL/Example2D/Texture2D.frag"
+            // );
+
+            m_TextureShader = m_ShaderLib->Load("OpenGL/Example2D/Texture2D.vert",
+                "OpenGL/Example2D/Texture2D.frag");
 
             LM_CORE_ASSERT(
                 m_TextureShader,
@@ -93,9 +98,9 @@ namespace
             /**
              * 从外部GLSL文件创建2D纯色Shader。
              */
-            m_FlatColorShader = Limen::Shader::CreateFromFiles(
-                "assets/shaders/OpenGL/Example2D/FlatColor.vert",
-                "assets/shaders/OpenGL/Example2D/FlatColor.frag"
+            m_FlatColorShader = m_ShaderLib->Load(
+                "OpenGL/Example2D/FlatColor.vert",
+                "OpenGL/Example2D/FlatColor.frag"
             );
 
             LM_CORE_ASSERT(
@@ -244,6 +249,9 @@ namespace
     private:
         Limen::OrthographicCamera m_Camera;
 
+        // Ref默认是空指针；创建实际ShaderLibrary后才能调用Load()。
+        Limen::Ref<Limen::ShaderLibrary> m_ShaderLib = Limen::CreateRef<Limen::ShaderLibrary>();
+
         Limen::Scope<Limen::VertexArray> m_SquareVAO;
         Limen::Scope<Limen::VertexArray> m_VertexArray;
         Limen::Ref<Limen::Shader> m_FlatColorShader, m_TextureShader;
@@ -274,9 +282,9 @@ namespace
         SandBoxApp()
             : Application(false)
         {
-            // PushLayer(new ExampleLayer());
+            PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。
-            PushLayer(new SandBox::Example3DLayer());
+            // PushLayer(new SandBox::Example3DLayer());
         }
 
         ~SandBoxApp() override = default;

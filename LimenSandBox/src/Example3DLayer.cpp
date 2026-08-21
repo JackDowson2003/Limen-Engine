@@ -153,10 +153,11 @@ namespace SandBox
          *
          * 第一个参数：负责顶点变换和数据传递的Vertex Shader；
          * 第二个参数：负责纹理采样和光照计算的Fragment Shader。
+         * 路径省略assets/shaders前缀；逻辑名称自动提取为BlinnPhong。
          */
-        m_CubeShader = Limen::Shader::CreateFromFiles(
-            "assets/shaders/OpenGL/Example3D/BlinnPhong.vert",
-            "assets/shaders/OpenGL/Example3D/BlinnPhong.frag"
+        m_CubeShader = m_ShaderLib->Load(
+            "OpenGL/Example3D/BlinnPhong.vert",
+            "OpenGL/Example3D/BlinnPhong.frag"
         );
 
         LM_CORE_ASSERT(

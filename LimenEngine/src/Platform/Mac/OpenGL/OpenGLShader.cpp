@@ -56,8 +56,10 @@ namespace Limen
     }
 
     OpenGLShader::OpenGLShader(
+        const std::string &name,
         const std::string &vertexSource,
         const std::string &fragmentSource)
+            :m_Name(name)
     {
         const uint32_t vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
         const uint32_t fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);

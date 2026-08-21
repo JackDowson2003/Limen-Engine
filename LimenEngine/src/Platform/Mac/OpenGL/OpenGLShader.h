@@ -13,13 +13,19 @@ namespace Limen
     class OpenGLShader : public Shader
     {
     public :
-        OpenGLShader(const std::string &vertexSource, const std::string &fragmentSource);
+        OpenGLShader(const std::string &name,const std::string &vertexSource, const std::string &fragmentSource);
 
         ~OpenGLShader() override;
 
         void Bind() const override;
 
         void UnBind() const override;
+
+        [[nodiscard]]
+        const std::string& GetName() const noexcept override
+        {
+            return m_Name;
+        }
 
         void UploadUniformMat3(const char *name, const glm::mat3 &val);
         void UploadUniformMat4(const char *name, const glm::mat4 &val);
@@ -37,5 +43,6 @@ namespace Limen
     private:
         uint32_t m_RendererID = 0;
         std::unordered_map<std::string, int> m_UniformLocations;
+        std::string m_Name;
     };
 }

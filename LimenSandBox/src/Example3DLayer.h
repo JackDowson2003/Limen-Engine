@@ -40,6 +40,16 @@ namespace SandBox
         void OnUpdate(Limen::DeltaTime &deltaTime) override;
 
     private:
+
+        /**
+         * @brief 缓存本测试层加载的Shader。
+         *
+         * Ref声明本身只会产生空shared_ptr，因此必须同时创建实际对象，
+         * 才能在构造函数中安全调用Load()。
+         */
+        Limen::Ref<Limen::ShaderLibrary> m_ShaderLib =
+            Limen::CreateRef<Limen::ShaderLibrary>();
+
         /**
          * 透视相机
          * 默认在(0, 0, 3)
