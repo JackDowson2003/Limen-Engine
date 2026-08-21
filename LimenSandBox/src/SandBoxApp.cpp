@@ -26,8 +26,8 @@ namespace
         {
             constexpr float vertices[] = {
                 -0.5f, -0.5f, 0.0f,
-                 0.5f, -0.5f, 0.0f,
-                 0.5f, 0.5f, 0.0f,
+                0.5f, -0.5f, 0.0f,
+                0.5f, 0.5f, 0.0f,
             };
 
             //Vertex Array
@@ -49,10 +49,10 @@ namespace
             m_SquareVAO.reset(Limen::VertexArray::Create());
             constexpr float SquareVertices[] = {
                 // position              //texture
-                -0.05f, -0.05f, 0.0f,    0.f, 0.f,
-                0.05f, -0.05f, 0.0f,     1.f, 0.f,
-                0.05f, 0.05f, 0.0f,      1.f, 1.f,
-                -0.05f, 0.05f, 0.0f,     0.f, 1.f,
+                -0.05f, -0.05f, 0.0f, 0.f, 0.f,
+                0.05f, -0.05f, 0.0f, 1.f, 0.f,
+                0.05f, 0.05f, 0.0f, 1.f, 1.f,
+                -0.05f, 0.05f, 0.0f, 0.f, 1.f,
             };
             //VAO Set IBO
             m_VertexArray->SetIndexBuffer(m_IndexBuffer);
@@ -75,119 +75,34 @@ namespace
             m_IndexBuffer.reset(Limen::IndexBuffer::Create(squareIndices, sizeof(squareIndices) / sizeof(uint32_t)));
             m_SquareVAO->SetIndexBuffer(m_IndexBuffer);
 
+            /**从两个GLSL文件创建2D纹理Shader Program。
+             * 第一个参数：Vertex Shader文件；
+             * 第二个参数：Fragment Shader文件。
+             */
+            m_TextureShader = Limen::Shader::CreateFromFiles(
+                "assets/shaders/OpenGL/Example2D/Texture2D.vert",
+                "assets/shaders/OpenGL/Example2D/Texture2D.frag"
+            );
 
-            //Shader
-            const std::string vertexSource = R"(
-            #version 410 core
-
-            layout(location = 0) in vec3 a_Position;
-
-            uniform mat4 u_ViewProjection;
-            uniform mat4 u_Transform;
-
-            out vec3 v_Position;
-
-            void main()
-            {
-                v_Position = a_Position;
-                // 裁剪空间坐标的 w 必须为 1，三角形才能正常进行透视除法。proj * view * P_local 暂时没有model，view = (T * R) -1
-                gl_Position = u_ViewProjection *u_Transform* vec4(a_Position, 1.0);
-
-            }
-        )";
-
-            const std::string fragmentSource = R"(
-             #version 410 core
-
-             layout(location = 0) out vec4 color;
-
-             in vec3 v_Position;
-
-             void main()
-             {
-                 // 亮蓝色，四个分量依次是 RGBA。
-                 color = vec4(v_Position* 0.5 + 0.5, 1.0);
-             }
-         )";
-
-            const std::string flatVertexSource = R"(
-            #version 410 core
-
-            layout(location = 0) in vec3 a_Position;
-
-            uniform mat4 u_ViewProjection;
-            uniform mat4 u_Transform;
-
-            out vec3 v_Position;
-
-            void main()
-            {
-                v_Position = a_Position;
-                // 裁剪空间坐标的 w 必须为 1，三角形才能正常进行透视除法。proj * view * P_local 暂时没有model，view = (T * R) -1
-                gl_Position = u_ViewProjection *u_Transform* vec4(a_Position, 1.0);
-
-            }
-        )";
-
-            const std::string flatShaderFragmentSource = R"(
-             #version 410 core
-
-             layout(location = 0) out vec4 color;
-
-             in vec3 v_Position;
-
-             uniform vec3 u_Color;
-
-
-
-             void main()
-             {
-                 // 亮蓝色，四个分量依次是 RGBA。
-                 color = vec4( u_Color,1.0);
-             }
-         )";
-
-            const std::string textureVertexSource = R"(
-            #version 410 core
-
-            layout(location = 0) in vec3 a_Position;
-            layout(location = 1) in vec2 a_TexCoord;
-
-            uniform mat4 u_ViewProjection;
-            uniform mat4 u_Transform;
-
-            out vec2 v_TexCoord;
-
-            void main()
-            {
-                v_TexCoord = a_TexCoord;
-                // 裁剪空间坐标的 w 必须为 1，三角形才能正常进行透视除法。proj * view * P_local 暂时没有model，view = (T * R) -1
-                gl_Position = u_ViewProjection *u_Transform* vec4(a_Position, 1.0);
-
-            }
-        )";
-
-            const std::string textureShaderFragmentSource = R"(
-             #version 410 core
-
-             layout(location = 0) out vec4 color;
-
-             in vec2 v_TexCoord;
-
-             uniform sampler2D u_Texture;
-
-             void main()
-             {
-                 // 保留图片原始RGBA，尤其不能把alpha强制设为1
-                color = texture(u_Texture, v_TexCoord);
-             }
-         )";
-
-            m_TextureShader = Limen::Shader::Create(textureVertexSource, textureShaderFragmentSource);
+            LM_CORE_ASSERT(
+                m_TextureShader,
+                "Failed to create Example2D Texture2D shader"
+            );
 
             // m_Shader = Limen::Shader::Create(vertexSource, fragmentSource);
             m_VertexArray->UnBind();
-            m_BlueShader = Limen::Shader::Create(flatVertexSource, flatShaderFragmentSource);
+            /**
+             * 从外部GLSL文件创建2D纯色Shader。
+             */
+            m_FlatColorShader = Limen::Shader::CreateFromFiles(
+                "assets/shaders/OpenGL/Example2D/FlatColor.vert",
+                "assets/shaders/OpenGL/Example2D/FlatColor.frag"
+            );
+
+            LM_CORE_ASSERT(
+                m_FlatColorShader,
+                "Failed to create Example2D FlatColor shader"
+            );
 
             m_SquareVAO->UnBind();
             m_Camera.SetPosition({-.2f, -.2f, 0.f});
@@ -198,7 +113,6 @@ namespace
 
             std::dynamic_pointer_cast<Limen::OpenGLShader>(m_TextureShader)->Bind();
             std::dynamic_pointer_cast<Limen::OpenGLShader>(m_TextureShader)->UploadUniformInt("u_Texture", 0);
-
         }
 
 
@@ -272,10 +186,10 @@ namespace
             //必须先缩放 再平移  cuz T*S != S*T.
             //Excepted behaviour: scale the object locally, then translate it to target world position.
             const auto scale = glm::scale(glm::mat4(1.0f), m_Scale);
-            m_BlueShader->Bind();
-            // m_BlueShader->Bind();
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_BlueShader)->UploadUniformFloat3(
-                            "u_Color", m_SquareColor);
+            m_FlatColorShader->Bind();
+            // m_FlatColorShader->Bind();
+            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->UploadUniformFloat3(
+                "u_Color", m_SquareColor);
             for (int y = 0; y < 20; y++)
             {
                 for (int x = 0; x < 20; x++)
@@ -283,7 +197,7 @@ namespace
                     m_Position = {0.11f * static_cast<float>(x), static_cast<float>(y) * 0.11f, 0.f};
                     const auto transform = glm::translate(glm::mat4(1.0f), m_Position);
 
-                    Limen::Renderer::Submit(m_BlueShader, *m_SquareVAO, transform * scale);
+                    Limen::Renderer::Submit(m_FlatColorShader, *m_SquareVAO, transform * scale);
                 }
             }
             // std::dynamic_pointer_cast<Limen::OpenGLShader>(m_Shader)->UploadUniformMat4(
@@ -333,8 +247,7 @@ namespace
 
         Limen::Scope<Limen::VertexArray> m_SquareVAO;
         Limen::Scope<Limen::VertexArray> m_VertexArray;
-        Limen::Ref<Limen::Shader> m_Shader;
-        Limen::Ref<Limen::Shader> m_BlueShader, m_TextureShader;
+        Limen::Ref<Limen::Shader> m_FlatColorShader, m_TextureShader;
 
         Limen::Ref<Limen::Texture2D> m_Texture, m_LogoTexture;
 
@@ -362,9 +275,9 @@ namespace
         SandBoxApp()
             : Application(false)
         {
-            PushLayer(new ExampleLayer());
+            // PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。
-            // PushLayer(new SandBox::Example3DLayer());
+            PushLayer(new SandBox::Example3DLayer());
         }
 
         ~SandBoxApp() override = default;
