@@ -82,18 +82,37 @@ namespace Limen
             return;
         }
 
-        // Submit 只借用资源，不参与 Shader 和 VertexArray 的所有权。
-        shader->Bind();
-        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjection);
-        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_Transform", transform);
-        // Blinn-Phong需要从当前着色点指向相机的观察方向。
-        // BeginScene已从Camera中保存了相机世界坐标，此处上传给Shader。
-        std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformFloat3(
-            "u_CameraPosition",
-            s_SceneData.CameraPosition
-        );
-        vertexArray.Bind();
-        //底层命令
-        RendererCommand::DrawIndexed(vertexArray);
+        switch (GetRenderAPI())
+        {
+            case RendererAPI::API::OPENGL:
+            {
+                // Submit 只借用资源，不参与 Shader 和 VertexArray 的所有权。
+                shader->Bind();
+                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjection);
+                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_Transform", transform);
+                // Blinn-Phong需要从当前着色点指向相机的观察方向。
+                // BeginScene已从Camera中保存了相机世界坐标，此处上传给Shader。
+                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformFloat3(
+                    "u_CameraPosition",
+                    s_SceneData.CameraPosition
+                );
+                vertexArray.Bind();
+                //底层命令
+                RendererCommand::DrawIndexed(vertexArray);
+                break;
+            }
+            case RendererAPI::API::DIRECT12:
+            {
+                LM_CORE_ERROR("Cannot implement direct renderer temporeraly");
+                break;
+            }
+            case RendererAPI::API::NONE:
+            {
+                LM_CORE_ERROR("Not implemented");
+                break;
+            }
+            default:
+                break;
+        }
     }
 }
