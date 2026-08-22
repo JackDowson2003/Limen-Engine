@@ -8,7 +8,7 @@ Limen Engine 是一个用于学习并逐步实现现代实时渲染架构的 C++
 |----------|-----------------|----------------------|
 | macOS    | OpenGL 4.1      | 已实现，当前默认后端 |
 | macOS    | Metal           | 规划中               |
-| Windows  | Direct3D 11     | 规划中.3             |
+| Windows  | Direct3D 11     | 规划中               |
 | Windows  | Direct3D 12     | 规划中               |
 | Linux    | OpenGL / Vulkan | 规划中               |
 | IOS      | Metal           | 规划中               |
@@ -163,6 +163,37 @@ RHI（Rendering Hardware Interface）隔离不同图形 API。
 - `Texture`。
 
 工厂和公共实现位于 `src/RHI/Common`，具体 OpenGL 实现位于 `src/RHI/macOS/OpenGL`。
+
+Shader资源按照图形API分目录保存，但客户端不直接写后端目录：
+
+```cpp
+m_ShaderLibrary->Load("Example3D/BlinnPhong");
+```
+
+`ShaderLibrary`会根据当前`RendererAPI`自动解析为：
+
+```text
+assets/shaders/
+├── OpenGL/Example3D/
+│   ├── BlinnPhong.vert
+│   └── BlinnPhong.frag
+├── DirectX11/Example3D/
+│   ├── BlinnPhong.vs.hlsl
+│   └── BlinnPhong.ps.hlsl
+├── DirectX12/Example3D/
+│   ├── BlinnPhong.vs.hlsl
+│   └── BlinnPhong.ps.hlsl
+├── Metal/Example3D/
+│   ├── BlinnPhong.vert.metal
+│   └── BlinnPhong.frag.metal
+└── Vulkan/Example3D/
+    ├── BlinnPhong.vert.glsl
+    └── BlinnPhong.frag.glsl
+```
+
+单参数`Load()`接收不带后端目录、不带阶段扩展名的逻辑路径，并将
+该路径作为缓存键；原有双参数`Load(vertexPath, fragmentPath)`保留给
+需要显式文件路径的底层代码和过渡代码。
 
 例如：
 

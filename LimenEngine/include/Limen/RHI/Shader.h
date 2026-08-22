@@ -119,6 +119,24 @@ namespace Limen
         void Add(const Ref<Shader>& shader);
 
         /**
+         * @brief 根据当前RendererAPI加载图形Shader。
+         *
+         * 调用者只传不带后端目录和阶段扩展名的逻辑路径：
+         *
+         *     Load("Example3D/BlinnPhong")
+         *
+         * OpenGL会解析为OpenGL目录下的.vert和.frag文件；Direct3D 11/12
+         * 会解析为DirectX11/DirectX12目录下的.vs.hlsl和.ps.hlsl文件。
+         * Metal与Vulkan也保留各自的目录和扩展名规则。
+         *
+         * 逻辑路径同时作为缓存键，因此不同目录可以拥有同名Shader。
+         *
+         * @param logicalPath 相对于后端Shader目录的路径，不包含扩展名。
+         */
+        [[nodiscard]]
+        Ref<Shader> Load(const std::filesystem::path& logicalPath);
+
+        /**
          * @brief 从两个阶段文件加载Shader。
          *
          * Shader名称自动从vertexPath的文件主名提取；若该名称已经存在，

@@ -3,7 +3,6 @@
 //
 #pragma once
 #include "Limen/Application/Layer.h"
-#include "Limen/Renderer/PerspectiveCamera.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"

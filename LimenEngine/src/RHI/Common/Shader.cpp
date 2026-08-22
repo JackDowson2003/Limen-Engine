@@ -27,16 +27,16 @@ namespace Limen
          */
         [[nodiscard]]
         bool IsRegularFile(
-            const std::filesystem::path& path
+            const std::filesystem::path &path
         )
         {
             std::error_code error;
 
             const bool result =
-                std::filesystem::is_regular_file(
-                    path,
-                    error
-                );
+                    std::filesystem::is_regular_file(
+                        path,
+                        error
+                    );
 
             return !error && result;
         }
@@ -49,8 +49,8 @@ namespace Limen
          */
         [[nodiscard]]
         bool StartsWithDirectory(
-            const std::filesystem::path& path,
-            const std::filesystem::path& directory
+            const std::filesystem::path &path,
+            const std::filesystem::path &directory
         )
         {
             const auto firstComponent = path.begin();
@@ -74,7 +74,7 @@ namespace Limen
          */
         [[nodiscard]]
         std::filesystem::path ResolveShaderPath(
-            const std::filesystem::path& requestedPath
+            const std::filesystem::path &requestedPath
         )
         {
             if (requestedPath.empty())
@@ -82,7 +82,7 @@ namespace Limen
 
             //变成/a/b/c.txt
             const std::filesystem::path normalizedPath =
-                requestedPath.lexically_normal();
+                    requestedPath.lexically_normal();
 
             //看看是否为绝对路径
             if (normalizedPath.is_absolute())
@@ -93,18 +93,14 @@ namespace Limen
             if (StartsWithDirectory(normalizedPath, "assets"))
             {
                 assetCandidate = normalizedPath;
-            }
-            else if (StartsWithDirectory(normalizedPath, "shaders"))
+            } else if (StartsWithDirectory(normalizedPath, "shaders"))
             {
-                assetCandidate =
-                    std::filesystem::path("assets") / normalizedPath;
-            }
-            else
+                assetCandidate = std::filesystem::path("assets") / normalizedPath;
+            } else
             {
-                assetCandidate =
-                    std::filesystem::path("assets") /
-                    "shaders" /
-                    normalizedPath;
+                assetCandidate = std::filesystem::path("assets") /
+                                 "shaders" /
+                                 normalizedPath;
             }
 
             if (IsRegularFile(assetCandidate))
@@ -121,11 +117,11 @@ namespace Limen
          */
         [[nodiscard]]
         std::string ReadTextFile(
-            const std::filesystem::path& requestedPath
+            const std::filesystem::path &requestedPath
         )
         {
             const std::filesystem::path resolvedPath =
-                ResolveShaderPath(requestedPath);
+                    ResolveShaderPath(requestedPath);
 
             std::ifstream input(
                 resolvedPath,
@@ -166,10 +162,97 @@ namespace Limen
          */
         [[nodiscard]]
         std::string ExtractShaderName(
-            const std::filesystem::path& path
+            const std::filesystem::path &path
         )
         {
-            return path.stem().string();
+            std::filesystem::path stem = path.stem();
+
+            // 支持BlinnPhong.vs.hlsl和BlinnPhong.ps.hlsl这类双扩展名。
+            const std::string stageExtension = stem.extension().string();
+            if (stageExtension == ".vs" ||
+                stageExtension == ".ps" ||
+                stageExtension == ".vert" ||
+                stageExtension == ".frag")
+            {
+                stem = stem.stem();
+            }
+
+            return stem.string();
+        }
+
+        [[nodiscard]]
+        bool ContainsParentTraversal(const std::filesystem::path& path)
+        {
+            for (const auto& component : path)
+            {
+                if (component == "..")
+                    return true;
+            }
+
+            return false;
+        }
+
+        /**
+         * @brief 根据当前图形API生成Vertex/Fragment(Pixel) Shader路径。
+         */
+        [[nodiscard]]
+        bool BuildBackendGraphicsShaderPaths(
+            const std::filesystem::path& logicalPath,
+            std::filesystem::path& vertexPath,
+            std::filesystem::path& fragmentPath
+        )
+        {
+            std::filesystem::path backendDirectory;
+            std::string vertexSuffix;
+            std::string fragmentSuffix;
+
+            switch (Renderer::GetRenderAPI())
+            {
+                case RendererAPI::API::OPENGL:
+                    backendDirectory = "OpenGL";
+                    vertexSuffix = ".vert";
+                    fragmentSuffix = ".frag";
+                    break;
+
+                case RendererAPI::API::DIRECT11:
+                    backendDirectory = "DirectX11";
+                    vertexSuffix = ".vs.hlsl";
+                    fragmentSuffix = ".ps.hlsl";
+                    break;
+
+                case RendererAPI::API::DIRECT12:
+                    backendDirectory = "DirectX12";
+                    vertexSuffix = ".vs.hlsl";
+                    fragmentSuffix = ".ps.hlsl";
+                    break;
+
+                case RendererAPI::API::METAL:
+                    backendDirectory = "Metal";
+                    vertexSuffix = ".vert.metal";
+                    fragmentSuffix = ".frag.metal";
+                    break;
+
+                case RendererAPI::API::VULKAN:
+                    backendDirectory = "Vulkan";
+                    vertexSuffix = ".vert.glsl";
+                    fragmentSuffix = ".frag.glsl";
+                    break;
+
+                case RendererAPI::API::NONE:
+                    LM_CORE_ERROR("Cannot resolve Shader files when RendererAPI is NONE");
+                    return false;
+            }
+
+            const std::filesystem::path backendPath =
+                backendDirectory / logicalPath;
+
+            vertexPath = backendPath;
+            vertexPath += vertexSuffix;
+
+            fragmentPath = backendPath;
+            fragmentPath += fragmentSuffix;
+
+            return true;
         }
     }
 
@@ -182,7 +265,7 @@ namespace Limen
         switch (Renderer::GetRenderAPI())
         {
             case RendererAPI::API::OPENGL:
-                return CreateRef<OpenGLShader>(name,vertexSource, fragmentSource);
+                return CreateRef<OpenGLShader>(name, vertexSource, fragmentSource);
 
             case RendererAPI::API::DIRECT12:
                 LM_CORE_ERROR("DirectX 12 Shader creation is not implemented");
@@ -211,12 +294,12 @@ namespace Limen
     }
 
     Ref<Shader> Shader::CreateFromFiles(
-        const std::filesystem::path& vertexPath,
-        const std::filesystem::path& fragmentPath
+        const std::filesystem::path &vertexPath,
+        const std::filesystem::path &fragmentPath
     )
     {
         const std::string shaderName =
-            ExtractShaderName(vertexPath);
+                ExtractShaderName(vertexPath);
 
         if (shaderName.empty())
         {
@@ -255,10 +338,10 @@ namespace Limen
         }
 
         const std::string vertexFileName =
-            ExtractShaderName(vertexPath);
+                ExtractShaderName(vertexPath);
 
         const std::string fragmentFileName =
-            ExtractShaderName(fragmentPath);
+                ExtractShaderName(fragmentPath);
 
         if (!vertexFileName.empty() &&
             !fragmentFileName.empty() &&
@@ -325,7 +408,7 @@ namespace Limen
             return;
         }
 
-        const std::string& name = shader->GetName();
+        const std::string &name = shader->GetName();
 
         if (name.empty())
         {
@@ -334,7 +417,7 @@ namespace Limen
         }
 
         const bool inserted =
-            m_Shaders.emplace(name, shader).second;
+                m_Shaders.emplace(name, shader).second;
 
         if (!inserted)
         {
@@ -346,8 +429,58 @@ namespace Limen
     }
 
     Ref<Shader> ShaderLibrary::Load(
-        const std::filesystem::path& vertexPath,
-        const std::filesystem::path& fragmentPath
+        const std::filesystem::path& logicalPath
+    )
+    {
+        const std::filesystem::path normalizedPath =
+            logicalPath.lexically_normal();
+
+        if (normalizedPath.empty() ||
+            normalizedPath.is_absolute() ||
+            ContainsParentTraversal(normalizedPath))
+        {
+            LM_CORE_ERROR(
+                "Shader logical path must be a safe relative path: '{}'",
+                logicalPath.string()
+            );
+            return nullptr;
+        }
+
+        if (normalizedPath.has_extension())
+        {
+            LM_CORE_ERROR(
+                "Shader logical path must not contain a stage extension: '{}'. Use a path such as 'Example3D/BlinnPhong'",
+                logicalPath.string()
+            );
+            return nullptr;
+        }
+
+        const std::string shaderName =
+            normalizedPath.generic_string();
+
+        if (Exists(shaderName))
+            return Get(shaderName);
+
+        std::filesystem::path vertexPath;
+        std::filesystem::path fragmentPath;
+        if (!BuildBackendGraphicsShaderPaths(
+                normalizedPath,
+                vertexPath,
+                fragmentPath))
+        {
+            return nullptr;
+        }
+
+        return Load(
+            shaderName,
+            vertexPath,
+            fragmentPath
+        );
+    }
+
+    Ref<Shader> ShaderLibrary::Load(
+        const std::filesystem::path &vertexPath,
+        const std::filesystem::path &fragmentPath
     )
     {
         return Load(
@@ -359,8 +492,8 @@ namespace Limen
 
     Ref<Shader> ShaderLibrary::Load(
         std::string name,
-        const std::filesystem::path& vertexPath,
-        const std::filesystem::path& fragmentPath
+        const std::filesystem::path &vertexPath,
+        const std::filesystem::path &fragmentPath
     )
     {
         if (name.empty())
