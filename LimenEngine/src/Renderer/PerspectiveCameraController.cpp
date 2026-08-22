@@ -190,7 +190,7 @@ namespace Limen
 
     bool PerspectiveCameraController::OnMouseScrolled(const MouseScrolledEvent &event)
     {
-        // UE式导航中，按住右键滚轮调整飞行速度，而不是改变FOV。
+        // 按住右键滚轮调整飞行速度，而不是改变FOV。
         if (!m_MouseLookEnabled || !Input::IsMouseButtonPressed(MouseButton::Right))
             return false;
 
