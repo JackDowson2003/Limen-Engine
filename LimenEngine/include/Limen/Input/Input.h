@@ -75,6 +75,8 @@ namespace Limen
         [[nodiscard]] virtual std::pair<float, float> GetMousePosImpl() const = 0;
         [[nodiscard]] virtual float GetMouseXImpl() const = 0;
         [[nodiscard]] virtual float GetMouseYImpl() const = 0;
+
+        //Input 的后端实现接口，用于让不同平台分别实现“设置鼠标光标模式
         virtual void SetCursorModeImpl(CursorMode mode) const = 0;
 
     private:

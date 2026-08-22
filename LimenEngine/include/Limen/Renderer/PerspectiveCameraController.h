@@ -133,6 +133,7 @@ namespace Limen
         float m_MouseSensitivity = 0.1f; //鼠标灵敏度
         float m_SpeedAdjustmentStep = 0.5f; //步长
 
+        //是否允许鼠标控制相机朝向
         bool m_MouseLookEnabled = true;
 
         //用于判断右键是否刚被按下，避免第一次计算鼠标差值的时候突然跳转

@@ -30,8 +30,10 @@ namespace Limen
             Input::IsMouseButtonPressed(MouseButton::Right);
 
         /*
-         * UE风格编辑器导航：只有按住鼠标右键时，
+         * 编辑器导航：只有按住鼠标右键时，
          * 才锁定光标并响应鼠标和键盘相机控制。
+         *
+         * 没有按鼠标右键 而且是短时间内第一次点击右键
          */
         if (!isNavigating)
         {
@@ -52,7 +54,7 @@ namespace Limen
             m_WasMouseLooking = true;
             Input::SetCursorMode(CursorMode::Locked);
         }
-        else
+        else//不是刚按住右键的时候
         {
             const glm::vec2 mouseDelta = currentMousePos - m_LastMousePos;
             m_LastMousePos = currentMousePos;
@@ -78,27 +80,28 @@ namespace Limen
 
         // 使用Rodrigues公式得到旋转后的相机前向。
         const glm::vec3 forward = CalculateForwardDirection();
-        constexpr glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
-        const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+        constexpr glm::vec3 worldUp(0.0f, 1.0f, 0.0f); //现在是围绕Z轴转
+        //由于旋转后要让X轴位右侧 所以重新计算
+        const glm::vec3 rightAxisVec = glm::normalize(glm::cross(forward, worldUp));
 
         glm::vec3 movementDirection(0.0f);
 
-        // UE编辑器飞行相机：WASD前后左右，E/Q上升下降。
+        // 编辑器飞行相机：WASD前后左右，E/Q上升下降。
         if (Input::IsKeyPressed(KeyCode::W))
             movementDirection += forward;
         if (Input::IsKeyPressed(KeyCode::S))
             movementDirection -= forward;
         if (Input::IsKeyPressed(KeyCode::D))
-            movementDirection += right;
+            movementDirection += rightAxisVec;
         if (Input::IsKeyPressed(KeyCode::A))
-            movementDirection -= right;
+            movementDirection -= rightAxisVec;
 
         if (Input::IsKeyPressed(KeyCode::E))
             movementDirection += worldUp;
         if (Input::IsKeyPressed(KeyCode::Q))
             movementDirection -= worldUp;
 
-        if (glm::dot(movementDirection, movementDirection) > 0.0f)
+        if (glm::dot(movementDirection, movementDirection) > 0.0f) //只在移动后进行计算
         {
             movementDirection = glm::normalize(movementDirection);
 
@@ -112,8 +115,8 @@ namespace Limen
             glm::vec3 position = m_Camera.GetPosition();
             position += movementDirection
                 * m_TranslationSpeed
-                * speedMultiplier
-                * dt;
+                * dt
+                * speedMultiplier;
 
             m_Camera.SetPosition(position);
         }

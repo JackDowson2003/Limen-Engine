@@ -85,9 +85,25 @@ namespace Limen
             case CursorMode::Normal:
                 glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 break;
+
+            /**
+            *光标不可见。
+             鼠标位置仍按照普通桌面光标处理。
+             仍然会受到窗口或屏幕边界限制。
+             到达屏幕边缘后不能继续旋转。
+             */
             case CursorMode::Hidden:
                 glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
                 break;
+
+            /**
+            *光标不可见。
+             光标被当前窗口捕获。
+             不再受到屏幕边缘限制。
+             GLFW 会提供连续的虚拟鼠标位置。
+             可以持续获得 Mouse Delta。
+             适合 UE 风格编辑器相机和第一人称游戏。
+             */
             case CursorMode::Locked:
                 glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
                 break;
