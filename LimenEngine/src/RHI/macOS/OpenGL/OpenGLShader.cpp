@@ -203,6 +203,7 @@ namespace Limen
         if (blockIndex == GL_INVALID_INDEX)
             return;
 
+        //这个Shader的MaterialData ──> Binding 1
         glUniformBlockBinding(
             m_RendererID,
             blockIndex,

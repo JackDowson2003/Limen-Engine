@@ -60,16 +60,11 @@ void main()
      */
     const vec3 lightIntensity = vec3(1.0, 0.95, 0.85);
 
-     /**
-     * 光线在世界空间中的传播方向。
-     */
-    const vec3 lightRayDirection = normalize(vec3(1.0, -1.0, -1.0));
-
     // n：世界空间中的单位表面法线。
     vec3 n = normalize(v_WorldNormal);
 
     // l：从着色点指向光源的单位方向。
-    vec3 l = -lightRayDirection;
+    vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
 
     float nDotL = max(dot(n, l), 0.0);
 

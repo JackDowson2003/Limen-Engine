@@ -12,7 +12,11 @@ layout(location = 0) out vec4 color;
  * 由CPU在绘制前上传。
  */
 //uniform vec3 u_Color;
-
+/**
+*std140
+*u_Color从Buffer偏移0开始读取
+*    vec3按照16字节对齐
+*/
 layout(std140) uniform MaterialData
 {
     vec3 u_Color;

@@ -4,6 +4,7 @@
 #pragma once
 #include "Limen/Application/Layer.h"
 #include "Limen/Renderer/PerspectiveCamera.h"
+#include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"
@@ -39,6 +40,8 @@ namespace SandBox
          */
         void OnUpdate(Limen::DeltaTime &deltaTime) override;
 
+        void OnEvent(Limen::Event& event) override;
+
     private:
 
         /**
@@ -54,7 +57,9 @@ namespace SandBox
          * 透视相机
          * 默认在(0, 0, 3)
          */
-        Limen::PerspectiveCamera m_Camera;
+        // Limen::PerspectiveCamera m_CameraController;
+
+        Limen::PerspectiveCameraController m_CameraController;
 
         Limen::Scope<Limen::VertexArray> m_CubeVAO;
 

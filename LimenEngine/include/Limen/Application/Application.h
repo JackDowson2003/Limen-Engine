@@ -43,12 +43,14 @@ namespace Limen
 
     private:
         bool OnWindowClose(WindowCloseEvent& e);
+        bool OnWindowResize(WindowResizeEvent& e);
 
         Scope<Window> m_Window;
         ImGUILayer* m_ImGUILayer = nullptr;
         // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
         LayerStack m_LayerStack;
         bool m_Running = true;
+        bool m_Minimized = false;
 
         double m_LastFrameTime = 0.0f;
 

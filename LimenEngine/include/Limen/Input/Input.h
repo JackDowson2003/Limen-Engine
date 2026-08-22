@@ -22,6 +22,21 @@ namespace Limen
         Button4,
         Button5
     };
+
+    /**
+     * @brief 引擎统一的鼠标光标模式。
+     *
+     * Normal：显示光标并允许它自由移动；
+     * Hidden：隐藏光标，但仍受窗口边界限制；
+     * Locked：隐藏并捕获光标，适合编辑器相机和第一人称视角。
+     */
+    enum class CursorMode : std::uint8_t
+    {
+        Normal,
+        Hidden,
+        Locked
+    };
+
     class LIMEN_API Input
     {
     public:
@@ -47,6 +62,11 @@ namespace Limen
         [[nodiscard]] static float GetMouseX() { return s_Instance->GetMouseXImpl(); }
         [[nodiscard]] static float GetMouseY() { return s_Instance->GetMouseYImpl(); }
 
+        static void SetCursorMode(const CursorMode mode)
+        {
+            s_Instance->SetCursorModeImpl(mode);
+        }
+
 
 
     protected:
@@ -55,6 +75,7 @@ namespace Limen
         [[nodiscard]] virtual std::pair<float, float> GetMousePosImpl() const = 0;
         [[nodiscard]] virtual float GetMouseXImpl() const = 0;
         [[nodiscard]] virtual float GetMouseYImpl() const = 0;
+        virtual void SetCursorModeImpl(CursorMode mode) const = 0;
 
     private:
         static Input* s_Instance;

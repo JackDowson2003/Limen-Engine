@@ -15,7 +15,9 @@
 // Rendering front-end and public RHI resources.
 #include "Limen/RHI/Buffer.h"
 #include "Limen/Renderer/OrthoGraphicCamera.h"
+#include "Limen/Renderer/OrthoGraphicCameraController.h"
 #include "Limen/Renderer/PerspectiveCamera.h"
+#include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/RendererAPI.h"
 #include "Limen/Renderer/RendererCommand.h"

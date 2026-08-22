@@ -28,5 +28,7 @@ namespace Limen
         [[nodiscard]] float GetMouseXImpl() const override;
 
         [[nodiscard]] float GetMouseYImpl() const override;
+
+        void SetCursorModeImpl(CursorMode mode) const override;
     };
 }

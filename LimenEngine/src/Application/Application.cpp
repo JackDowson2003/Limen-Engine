@@ -70,11 +70,14 @@ namespace Limen
                 break;
 
             const double time = glfwGetTime();
-            DeltaTime deltaTime = time-m_LastFrameTime;
+            DeltaTime deltaTime = time - m_LastFrameTime;
             m_LastFrameTime = time;
             // Application.cpp
-            for (Layer *layer: m_LayerStack)
-                layer->OnUpdate(deltaTime);
+            if (!m_Minimized)
+            {
+                for (Layer *layer: m_LayerStack)
+                    layer->OnUpdate(deltaTime);
+            }
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
             LM_CORE_ASSERT(m_ImGUILayer, "ImGui layer was not initialized");
@@ -96,6 +99,10 @@ namespace Limen
         {
             return OnWindowClose(e);
         });
+        dispatcher.Dispatch<WindowResizeEvent>([this](WindowResizeEvent &e)
+        {
+            return OnWindowResize(e);
+        });
         for (auto it = m_LayerStack.rbegin(); it != m_LayerStack.rend(); ++it)
         {
             if (e.IsHandled())
@@ -110,6 +117,18 @@ namespace Limen
     {
         m_Running = false;
         return true;
+    }
+
+    bool Application::OnWindowResize(WindowResizeEvent &e)
+    {
+        if (e.GetWidth() == 0 || e.GetHeight() == 0)
+        {
+            m_Minimized = true;
+            return false;
+        }
+        m_Minimized = false;
+        Renderer::OnWindowResize(e.GetWidth(), e.GetHeight());
+        return false;
     }
 
     void Application::PushLayer(Layer *layer)

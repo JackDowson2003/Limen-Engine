@@ -127,7 +127,7 @@ namespace Limen
         });
 
         //Set GLFW Callbacks
-        glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
+        glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
         {
             const auto cWidth = static_cast<unsigned int>(width);
             const auto cHeight = static_cast<unsigned int>(height);

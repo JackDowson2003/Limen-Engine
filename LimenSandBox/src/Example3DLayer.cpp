@@ -15,7 +15,7 @@ namespace SandBox
 {
     Example3DLayer::Example3DLayer()
         : Layer("3D Layer"),
-          m_Camera(
+          m_CameraController(
               45.f, 1600.f / 900.f, 0.1f, 100.f
           )
     {
@@ -178,10 +178,15 @@ namespace SandBox
 
         //校验texture
         LM_CORE_ASSERT(m_AlbedoTexture,"Failed to create cube albedo texture");
+
+        m_CameraController.SetMouseLookEnabled(true);
     }
 
     void Example3DLayer::OnUpdate(Limen::DeltaTime &deltaTime)
     {
+        // 必须先更新相机，再让BeginScene复制本帧的ViewProjection。
+        m_CameraController.OnUpdate(deltaTime);
+
         // 本测试层暂时负责清理当前帧。
         Limen::RendererCommand::SetClearColor(
             {0.1f, 0.1f, 0.1f, 1.0f}
@@ -201,13 +206,12 @@ namespace SandBox
          *
          * BeginScene会复制相机的ViewProjection矩阵和位置。
          */
-        Limen::Renderer::BeginScene(m_Camera);
+        Limen::Renderer::BeginScene(m_CameraController.GetCamera());
 
-        // 使用DeltaTime实现与帧率无关的旋转。
-        m_CubeRotationDegrees +=
-                deltaTime.GetSeconds() *
-                m_CubeRotationSpeed;
-
+        // // 使用DeltaTime实现与帧率无关的旋转。
+        // m_CubeRotationDegrees +=
+        //         deltaTime.GetSeconds() *
+        //         m_CubeRotationSpeed;
         /**
          * 创建立方体Model矩阵。
          *
@@ -245,5 +249,10 @@ namespace SandBox
          * 避免状态影响后续2D层和ImGui。
          */
         Limen::RendererCommand::SetDepthTest(false);
+    }
+
+    void Example3DLayer::OnEvent(Limen::Event &event)
+    {
+        m_CameraController.OnEvent(event);
     }
 } // SandBox

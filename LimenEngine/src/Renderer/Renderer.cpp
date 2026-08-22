@@ -49,6 +49,14 @@ namespace Limen
         s_SceneData.IsActive = true;
     }
 
+    void Renderer::OnWindowResize(const uint32_t width, const uint32_t height)
+    {
+        if (width == 0 || height == 0)
+            return;
+
+        RendererCommand::SetViewport(0, 0, width, height);
+    }
+
     void Renderer::EndScene()
     {
         if (!s_SceneData.IsActive)

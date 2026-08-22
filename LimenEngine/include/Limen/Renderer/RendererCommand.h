@@ -11,13 +11,13 @@ namespace Limen
     public:
         static void Clear()
         {
-            if (RendererAPI* api = GetRendererAPI())
+            if (RendererAPI *api = GetRendererAPI())
                 api->Clear();
         }
 
         static void SetClearColor(const glm::vec4 &color)
         {
-            if (RendererAPI* api = GetRendererAPI())
+            if (RendererAPI *api = GetRendererAPI())
                 api->SetClearColor(color);
         }
 
@@ -41,21 +41,39 @@ namespace Limen
          */
         static void SetDepthTest(const bool enabled)
         {
-            if (RendererAPI* api = GetRendererAPI())
+            if (RendererAPI *api = GetRendererAPI())
                 api->SetDepthTest(enabled);
         }
 
         static void DrawIndexed(const VertexArray &vao)
         {
-            if (RendererAPI* api = GetRendererAPI())
+            if (RendererAPI *api = GetRendererAPI())
                 api->DrawIndexed(vao);
+        }
+
+        static void SetViewport(
+            const uint32_t x,
+            const uint32_t y,
+            const uint32_t width,
+            const uint32_t height
+        )
+        {
+            if (RendererAPI *api = GetRendererAPI())
+            {
+                api->SetViewport(
+                    x,
+                    y,
+                    width,
+                    height
+                );
+            }
         }
 
     private:
         /**
          * @return 已初始化的RendererAPI；未初始化时记录错误并返回nullptr。
          */
-        static RendererAPI* GetRendererAPI() noexcept;
+        static RendererAPI *GetRendererAPI() noexcept;
 
         static Scope<RendererAPI> s_RendererAPI;
     };

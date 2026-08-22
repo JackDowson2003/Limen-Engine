@@ -16,6 +16,13 @@ namespace Limen
         // 场景开始后才能调用 Submit，且同一时间只能存在一个场景。
         static void BeginScene(const Camera& camera);
 
+        /**
+         * @brief 更新Renderer输出使用的GPU Viewport。
+         *
+         * 该函数不修改Camera的投影矩阵；CameraController会独立处理宽高比。
+         */
+        static void OnWindowResize(uint32_t width, uint32_t height);
+
         static void EndScene();
 
         static void Init();

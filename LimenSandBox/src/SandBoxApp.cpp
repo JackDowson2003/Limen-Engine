@@ -7,11 +7,6 @@
 #include "glm/gtc/type_ptr.hpp"
 
 
-namespace Limen
-{
-    class OpenGLShader;
-}
-
 //ExampleLayer2D
 namespace
 {
@@ -20,7 +15,7 @@ namespace
     public:
         ExampleLayer()
             : Layer("example layer"),
-              m_Camera(Limen::OrthographicCamera(-2.f, 2.f, -1.f, 1.f)),
+              m_CameraController(1600.f/900.f,true),
               m_Position(glm::vec3(0.0f)),
               m_Scale(glm::vec3(1.0f, 1.0f, 1.0f))
         {
@@ -54,8 +49,6 @@ namespace
                 0.05f, 0.05f, 0.0f, 1.f, 1.f,
                 -0.05f, 0.05f, 0.0f, 0.f, 1.f,
             };
-            //VAO Set IBO
-            m_VertexArray->SetIndexBuffer(m_IndexBuffer);
 
             //Layout2
             const Limen::BufferLayout layout2
@@ -108,17 +101,19 @@ namespace
                 "Failed to create Example2D FlatColor shader"
             );
 
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->BindUniformBlock("MaterialData",1);
+            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->BindUniformBlock("MaterialData",0);
 
             m_SquareVAO->UnBind();
-            m_Camera.SetPosition({-.2f, -.2f, 0.f});
-            m_Camera.SetRotation(0.f);
+
+            m_CameraController.GetCamera().SetPosition(
+                {-0.2f, -0.2f, 0.0f}
+            );
 
             // std140会为vec3保留一个16字节槽，但颜色本身仍然只有RGB三个分量。
             constexpr uint32_t std140Vec3StorageSize = 4 * sizeof(float);
             m_UniformBuffer = Limen::UniformBuffer::Create(
                 std140Vec3StorageSize,
-                1
+                0
             );
 
             m_Texture = Limen::Texture2D::Create("assets/textures/checkerboard.png");
@@ -131,78 +126,15 @@ namespace
 
         void OnUpdate(Limen::DeltaTime &dt) override
         {
-            dt = std::min(dt.GetSeconds(), 0.05f);
+            m_CameraController.OnUpdate(dt);
             // 深色背景能清楚显示亮蓝色三角形。
             Limen::RendererCommand::SetClearColor({0.1f, 0.1f, 0.1f, 1.0f});
             Limen::RendererCommand::Clear();
-            auto &position = m_Camera.GetPosition();
-            //region if block
-            if (Limen::Input::IsKeyPressed(Limen::KeyCode::Space))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Camera.SetRotation(m_Camera.GetRotation() - dt * m_RotateSpeed);
-            }
-
-            if (Limen::Input::IsKeyPressed(Limen::KeyCode::W))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-
-                m_Camera.SetPosition({position.x, position.y - dt * m_MoveSpeed, position.z});
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::S))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Camera.SetPosition({position.x, position.y + dt * m_MoveSpeed, position.z});
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::A))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Camera.SetPosition({position.x + dt * m_MoveSpeed, position.y, position.z});
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::D))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Camera.SetPosition({position.x - dt * m_MoveSpeed, position.y, position.z});
-            }
-
-            if (Limen::Input::IsKeyPressed(Limen::KeyCode::Up))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-
-                m_Position.y += dt * m_MoveSpeed;
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::Down))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Position.y -= dt * m_MoveSpeed;
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::Left))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Position.x -= dt * m_MoveSpeed;
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::Right))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Position.x += dt * m_MoveSpeed;
-            }
-
-
-            if (Limen::Input::IsKeyPressed(Limen::KeyCode::KeypadAdd))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-
-                m_Scale += dt * m_ScaleSpeed;
-            } else if (Limen::Input::IsKeyPressed(Limen::KeyCode::KeypadSubtract))
-            {
-                LM_TRACE("Delta Time : {0}ms", dt.GetMilliseconds());
-                m_Scale -= dt * m_ScaleSpeed;
-            }
-
-            //endregion
-            Limen::Renderer::BeginScene(m_Camera);
+            Limen::Renderer::BeginScene(m_CameraController.GetCamera());
 
             //必须先缩放 再平移  cuz T*S != S*T.
             //Excepted behaviour: scale the object locally, then translate it to target world position.
             const auto scale = glm::scale(glm::mat4(1.0f), m_Scale);
-            m_FlatColorShader->Bind();
-            // m_FlatColorShader->Bind();
-            // std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->UploadUniformFloat3(
-            //     "u_Color", m_SquareColor);
 
             m_UniformBuffer->SetData(
                 glm::value_ptr(m_SquareColor),
@@ -219,16 +151,6 @@ namespace
                     Limen::Renderer::Submit(m_FlatColorShader, *m_SquareVAO, transform * scale);
                 }
             }
-            // std::dynamic_pointer_cast<Limen::OpenGLShader>(m_Shader)->UploadUniformMat4(
-            //     "u_ViewProjection", m_Camera.GetViewProjectionMatrix());
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_TextureShader)->Bind();
-
-            // m_Texture->Bind(0);
-            // Limen::Renderer::Submit(m_TextureShader, *m_SquareVAO,glm::scale(glm::mat4(1.0f), glm::vec3(13.f)));
-            //
-            // m_LogoTexture->Bind(1);
-            // Limen::Renderer::Submit(m_TextureShader, *m_SquareVAO,glm::scale(glm::mat4(1.0f), glm::vec3(13.f)));
-
             m_Texture->Bind();
 
             Limen::Renderer::Submit(
@@ -248,8 +170,7 @@ namespace
 
         void OnEvent(Limen::Event &e) override
         {
-            // Limen::EventDispatcher dispatcher(e);
-            // dispatcher.Dispatch<>()
+            m_CameraController.OnEvent(e);
         }
 
         void OnImGuiRender() override
@@ -262,7 +183,7 @@ namespace
         }
 
     private:
-        Limen::OrthographicCamera m_Camera;
+        Limen::OrthoGraphicCameraController m_CameraController;
 
         // Ref默认是空指针；创建实际ShaderLibrary后才能调用Load()。
         Limen::Ref<Limen::ShaderLibrary> m_ShaderLib = Limen::CreateRef<Limen::ShaderLibrary>();
@@ -278,11 +199,6 @@ namespace
         Limen::Ref<Limen::VertexBuffer> m_VertexBuffer;
         Limen::Ref<Limen::VertexBuffer> m_SquareVBO;
         Limen::Ref<Limen::IndexBuffer> m_IndexBuffer;
-
-        float m_MoveSpeed = 1.0f;
-        float m_RotateSpeed = 360.0f;
-        float m_ScaleSpeed = 1.0f;
-
 
         glm::vec3 m_Position;
         glm::vec3 m_Scale;
@@ -301,9 +217,9 @@ namespace
                 Limen::RendererAPI::API::OPENGL
             )
         {
-            PushLayer(new ExampleLayer());
+            // PushLayer(new ExampleLayer());
             // 暂时只运行3D测试，先隔离验证透视和深度。
-            // PushLayer(new SandBox::Example3DLayer());
+            PushLayer(new SandBox::Example3DLayer());
         }
 
         ~SandBoxApp() override = default;

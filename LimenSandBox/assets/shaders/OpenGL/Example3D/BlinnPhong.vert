@@ -45,7 +45,7 @@ void main()
      /**
      * 法线矩阵：
      *
-     * transpose(inverse(mat3(Model)))
+     * transpose(inverse(mat3(transform)))
      *
      * 在物体存在非均匀缩放时，保证变换后的法线
      * 仍然垂直于对应表面。

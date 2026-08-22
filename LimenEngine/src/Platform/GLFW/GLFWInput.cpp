@@ -74,4 +74,23 @@ namespace Limen
         const auto [x, y] = GetMousePosImpl();
         return y;
     }
+
+    void GLFWInput::SetCursorModeImpl(const CursorMode mode) const
+    {
+        const auto &window = Application::GetApp().GetWindow();
+        auto *nativeWindow = static_cast<GLFWwindow *>(window.GetNativeWindow());
+
+        switch (mode)
+        {
+            case CursorMode::Normal:
+                glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                break;
+            case CursorMode::Hidden:
+                glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+                break;
+            case CursorMode::Locked:
+                glfwSetInputMode(nativeWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                break;
+        }
+    }
 }
