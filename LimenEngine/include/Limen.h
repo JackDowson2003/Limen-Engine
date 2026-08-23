@@ -27,6 +27,5 @@
 #include "Limen/RHI/UniformBuffer.h"
 #include "Limen/RHI/Framebuffer.h"
 
-//------Entry Point
+// 客户端入口点应最后包含，确保上述公共类型已经可用。
 #include "Limen/EntryPoint.h"
-//---------------------------

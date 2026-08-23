@@ -6,7 +6,7 @@
 
 namespace Limen
 {
-    //给出定义
+    // 静态日志器在此分配存储；头文件只声明公共访问接口。
     Ref<spdlog::logger> Log::s_CoreLogger;
     Ref<spdlog::logger> Log::s_ClientLogger;
 

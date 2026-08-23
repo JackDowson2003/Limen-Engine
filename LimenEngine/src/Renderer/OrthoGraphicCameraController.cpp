@@ -31,13 +31,13 @@ namespace Limen
 
         const float rotationRadians = glm::radians(m_Camera.GetRotation());
 
-        //相机局部的右方
+        // 根据当前旋转求相机局部右方向。
         const glm::vec2 cameraRight(
             std::cos(rotationRadians),
             std::sin(rotationRadians)
         );
 
-        //相机局部的上方
+        // 根据当前旋转求相机局部上方向。
         const glm::vec2 cameraUp(
             -std::sin(rotationRadians),
              std::cos(rotationRadians)
@@ -58,7 +58,7 @@ namespace Limen
             movementDirection -= cameraRight;
 
 
-        //归一化后，斜向移动不会比单方向移动更快。
+        // 归一化后，斜向移动不会比单方向移动更快。
         if (glm::dot(movementDirection, movementDirection) > 0.0f)
         {
             movementDirection = glm::normalize(movementDirection);
@@ -82,7 +82,7 @@ namespace Limen
         if (Input::IsKeyPressed(KeyCode::E))
             rotationInput -= 1.0f;
 
-        if (rotationInput != 0.0f) //发生旋转
+        if (rotationInput != 0.0f)
         {
             float cameraRotation = m_Camera.GetRotation();
 
@@ -114,7 +114,7 @@ namespace Limen
 
     void OrthoGraphicCameraController::OnResize(const float width, const float height)
     {
-        //窗口最小化时尺寸可能为0，此时不能计算宽高比。
+        // 窗口最小化时尺寸可能为 0，此时不能计算宽高比。
         if (width <= 0.0f || height <= 0.0f)
             return;
 
@@ -130,7 +130,7 @@ namespace Limen
     void OrthoGraphicCameraController::RecalculateProjection()
     {
         /*
-         * ZoomLevel是垂直范围的一半；
+         * ZoomLevel 是垂直可见范围的一半；
          * 乘宽高比得到水平方向的一半。
          */
         const float horizontalHalfSize =
@@ -150,7 +150,8 @@ namespace Limen
             m_ZoomLevel - event.GetYOffset() * m_ZoomSpeed
         );
 
-        return false; // 暂时允许其他Layer继续处理滚轮事件。
+        // 允许其他 Layer 继续处理滚轮事件。
+        return false;
     }
 
     bool OrthoGraphicCameraController::OnViewportResized(const WindowResizeEvent &event)
@@ -160,7 +161,7 @@ namespace Limen
             static_cast<float>(event.GetHeight())
         );
 
-        // Resize通常需要被多个系统共同处理。
+        // Resize 通常需要被多个系统共同处理。
         return false;
     }
 

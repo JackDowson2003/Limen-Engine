@@ -6,6 +6,7 @@
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Renderer/RenderPass.h"
 #include "Limen/RHI/Framebuffer.h"
+#include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"
@@ -57,14 +58,10 @@ namespace SandBox
 
         Limen::Scope<Limen::Framebuffer> m_SceneFramebuffer;
 
-        Limen::Scope<Limen::RenderPass> m_SceneRenderPass; //按照反序列来销毁 所以这样放是有意义的 RenderPass -> FBO
+        // RenderPass 非拥有地引用 Framebuffer；逆序析构会先销毁 RenderPass。
+        Limen::Scope<Limen::RenderPass> m_SceneRenderPass;
 
-        /**
-         * 透视相机
-         * 默认在(0, 0, 3)
-         */
-        // Limen::PerspectiveCamera m_CameraController;
-
+        // 透视相机控制器，默认相机位置为 (0, 0, 3)。
         Limen::PerspectiveCameraController m_CameraController;
 
         Limen::Scope<Limen::VertexArray> m_CubeVAO;
@@ -77,6 +74,14 @@ namespace SandBox
 
         // 负责将立方体顶点变换到裁剪空间并输出调试颜色。
         Limen::Ref<Limen::Shader> m_CubeShader;
+
+        /**
+         * @brief 立方体绘制使用的完整图形管线。
+         *
+         * 它组合Shader、深度测试、混合、剔除和图元拓扑状态。
+         */
+        // 声明在 Shader 之后，因此成员逆序析构时会先释放 Pipeline。
+        Limen::Ref<Limen::GraphicsPipeline> m_CubePipeline;
 
         /**
          * @brief 立方体材质使用的Albedo纹理。

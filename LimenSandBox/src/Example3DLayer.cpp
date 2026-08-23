@@ -4,13 +4,13 @@
 
 #include "Example3DLayer.h"
 
-#include "Limen/Renderer/Renderer.h"
-#include "glm/glm.hpp"
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/glm.hpp>
 
 #include "imgui.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
+#include "Limen/Renderer/Renderer.h"
 
 
 namespace SandBox
@@ -76,11 +76,9 @@ namespace SandBox
         };
 
         /**
-        * 立方体索引。
-        *
-        * 6个面 × 每面2个三角形 × 每个三角形3个索引
-        * = 36个索引。
-        */
+         * 立方体索引：6 个面 × 每面 2 个三角形 × 每个三角形 3 个索引
+         * = 36 个索引。每个面的绕序均与该面的外法线一致。
+         */
         constexpr uint32_t cubeIndices[] = {
             0, 1, 2, 2, 3, 0,
             4, 5, 6, 6, 7, 4,
@@ -114,7 +112,7 @@ namespace SandBox
         LM_CORE_ASSERT(m_SceneFramebuffer, "Failed to create 3D scene Framebuffer");
 
         Limen::RenderPassSpecification sceneRenderPassSpec;
-        //只取得 unique_ptr 内部的原始指针，不转移所有权。
+        // RenderPass 只借用 Framebuffer，不转移 unique_ptr 的所有权。
         sceneRenderPassSpec.TargetFramebuffer = m_SceneFramebuffer.get();
         sceneRenderPassSpec.ClearColor = {0.1f, 0.1f, 0.1f, 1.0f};
         sceneRenderPassSpec.DebugName = "Example3D Render Pass";
@@ -183,6 +181,43 @@ namespace SandBox
             "Failed to create Example3D BlinnPhong shader"
         );
 
+        Limen::GraphicsPipelineSpecification cubePipelineSpec;
+
+        cubePipelineSpec.ShaderProgram = m_CubeShader;
+        cubePipelineSpec.Topology =
+            Limen::PrimitiveTopology::TriangleList;
+
+        cubePipelineSpec.DepthTestEnabled =
+            true;
+
+        cubePipelineSpec.DepthWriteEnabled =
+            true;
+
+        cubePipelineSpec.DepthCompare =
+            Limen::CompareOperation::Less;
+
+        cubePipelineSpec.Blend =
+            Limen::BlendMode::Opaque;
+
+        cubePipelineSpec.Culling =
+            Limen::CullMode::Back;
+
+        cubePipelineSpec.FrontFaceWinding =
+            Limen::FrontFace::CounterClockwise;
+
+        cubePipelineSpec.DebugName =
+            "Example3D Cube Pipeline";
+
+        m_CubePipeline = Limen::GraphicsPipeline::Create(
+            cubePipelineSpec
+        );
+
+        LM_CORE_ASSERT(
+            m_CubePipeline,
+            "Failed to create Example3D cube graphics pipeline"
+        );
+
+
         /**
          * @brief 加载立方体的Albedo纹理。
          *
@@ -194,7 +229,6 @@ namespace SandBox
             "assets/textures/checkerboard.png"
         );
 
-        //校验texture
         LM_CORE_ASSERT(m_AlbedoTexture, "Failed to create cube albedo texture");
 
         m_CameraController.SetMouseLookEnabled(false);
@@ -236,22 +270,8 @@ namespace SandBox
         // 必须先更新相机，再让BeginScene复制本帧的ViewProjection。
         m_CameraController.OnUpdate(deltaTime);
 
-        // 从这里开始，Clear 和 Draw 都写入场景 Framebuffer。
-        // m_SceneFramebuffer->Bind();
-
-        // 本测试层暂时负责清理当前帧。
-        // Limen::RendererCommand::SetClearColor({0.1f, 0.1f, 0.1f, 1.0f});
-
-        // Limen::RendererCommand::Clear();
-
-        m_SceneRenderPass->Begin(); //绑定 并清理屏幕残留的颜色
-
-        /**
-         * 开启深度测试。
-         *
-         * 立方体前面的片元应该遮挡后面的片元。
-         */
-        Limen::RendererCommand::SetDepthTest(true);
+        // 绑定场景 Framebuffer，并清理本帧的颜色与深度附件。
+        m_SceneRenderPass->Begin();
 
         /**
          * 使用透视相机开始3D场景。
@@ -283,28 +303,17 @@ namespace SandBox
             glm::vec3(1.0f, 0.0f, 0.0f)
         );
 
-        m_AlbedoTexture->Bind(0); //绑定纹理
+        // Shader 中的 u_AlbedoTexture 约定从纹理槽 0 采样。
+        m_AlbedoTexture->Bind(0);
         Limen::Renderer::Submit(
-            m_CubeShader,
+            *m_CubePipeline,
             *m_CubeVAO,
             cubeTransform
         );
-
         Limen::Renderer::EndScene();
 
-        // 场景绘制完成，回到窗口默认 Framebuffer。
-        // m_SceneFramebuffer->UnBind();
-        //
-        // 把多采样颜色解析到普通 m_ColorAttachment。
-        // m_SceneFramebuffer->Resolve();
-
-        m_SceneRenderPass->End(); // UnBind Resolve
-
-        /**
-         * 离开3D测试层前关闭深度测试，
-         * 避免状态影响后续2D层和ImGui。
-         */
-        Limen::RendererCommand::SetDepthTest(false);
+        // 解绑场景 Framebuffer，并把 MSAA 颜色解析到可采样的 2D 纹理。
+        m_SceneRenderPass->End();
     }
 
     void Example3DLayer::OnEvent(Limen::Event &event)
@@ -326,16 +335,9 @@ namespace SandBox
 
             if (viewportSize.x > 0.0f && viewportSize.y > 0.0f)
             {
-                //为什么不在 OnImGuiRender() 里直接 Resize
                 /**
-                 *
-                * OnImGuiRender 记录尺寸
-                      ↓
-                  下一帧 OnUpdate 开始时 Resize
-                      ↓
-                  立即向新尺寸纹理绘制场景
-                      ↓
-                  OnImGuiRender 显示已经画好的纹理
+                 * 此处只记录 ImGui 内容区尺寸；下一帧 OnUpdate() 在绘制前
+                 * Resize Framebuffer，避免先显示旧尺寸纹理再重新分配附件。
                  */
                 m_ViewportWidth = static_cast<uint32_t>(viewportSize.x);
 
@@ -345,8 +347,9 @@ namespace SandBox
 
                 ImGui::Image(ImTextureRef(textureID),
                              viewportSize,
-                             ImVec2(0.0f, 1.0f), //垂直翻转
-                             ImVec2(1.0f, 0.0f) //垂直翻转
+                             // OpenGL 纹理原点与 ImGui 图像坐标原点相反，因此翻转 V。
+                             ImVec2(0.0f, 1.0f),
+                             ImVec2(1.0f, 0.0f)
                 );
             }
         }

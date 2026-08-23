@@ -29,12 +29,7 @@ namespace Limen
             m_MouseLookEnabled &&
             Input::IsMouseButtonPressed(MouseButton::Right);
 
-        /*
-         * 编辑器导航：只有按住鼠标右键时，
-         * 才锁定光标并响应鼠标和键盘相机控制。
-         *
-         * 没有按鼠标右键 而且是短时间内第一次点击右键
-         */
+        // 只有按住鼠标右键时才锁定光标，并响应飞行相机输入。
         if (!isNavigating)
         {
             if (m_WasMouseLooking)
@@ -54,7 +49,7 @@ namespace Limen
             m_WasMouseLooking = true;
             Input::SetCursorMode(CursorMode::Locked);
         }
-        else//不是刚按住右键的时候
+        else
         {
             const glm::vec2 mouseDelta = currentMousePos - m_LastMousePos;
             m_LastMousePos = currentMousePos;
@@ -78,10 +73,11 @@ namespace Limen
             m_Camera.SetRotation(rotation);
         }
 
-        // 使用Rodrigues公式得到旋转后的相机前向。
+        // 使用 Rodrigues 公式得到旋转后的相机前向。
         const glm::vec3 forward = CalculateForwardDirection();
-        constexpr glm::vec3 worldUp(0.0f, 1.0f, 0.0f); //现在是围绕Z轴转
-        //由于旋转后要让X轴位右侧 所以重新计算
+        constexpr glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+
+        // 前向改变后重新计算相机局部右方向。
         const glm::vec3 rightAxisVec = glm::normalize(glm::cross(forward, worldUp));
 
         glm::vec3 movementDirection(0.0f);
@@ -101,11 +97,11 @@ namespace Limen
         if (Input::IsKeyPressed(KeyCode::Q))
             movementDirection -= worldUp;
 
-        if (glm::dot(movementDirection, movementDirection) > 0.0f) //只在移动后进行计算
+        if (glm::dot(movementDirection, movementDirection) > 0.0f)
         {
             movementDirection = glm::normalize(movementDirection);
 
-            // Shift对应UE常见的临时加速导航。
+            // Shift 对应编辑器飞行相机的临时加速导航。
             constexpr float fastMoveMultiplier = 4.0f;
             const float speedMultiplier =
                 Input::IsKeyPressed(KeyCode::LeftShift)
@@ -134,7 +130,8 @@ namespace Limen
 
     void PerspectiveCameraController::OnResize(const float width, const float height)
     {
-        if (width <= 0.0f || height <= 0.0f) //最小化
+        // 窗口最小化时可能收到零尺寸，不能据此计算宽高比。
+        if (width <= 0.0f || height <= 0.0f)
             return;
 
         const float aspectRatio = width / height;
@@ -224,7 +221,6 @@ namespace Limen
                * (1.0f - cosTheta);
     }
 
-    //根据pitch和yaw来计算
     glm::vec3 PerspectiveCameraController::CalculateForwardDirection() const
     {
         const glm::vec3 rotation = m_Camera.GetRotation();
@@ -236,7 +232,7 @@ namespace Limen
 
         glm::vec3 forward(0.0f, 0.0f, -1.0f);
 
-        //绕世界Y轴进行Yaw旋转
+        // Yaw 绕世界 Y 轴旋转。
         forward = RotateAroundAxis(forward, worldUp, yaw);
 
         // Yaw 后，相机的局部右方向也发生了变化。

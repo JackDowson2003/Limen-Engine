@@ -86,7 +86,6 @@ namespace Limen
         return GL_NONE;
     }
 
-    ///VBO============================================================
     OpenGLVertexBuffer::OpenGLVertexBuffer(const void *vertices, const uint32_t size)
     {
         glGenBuffers(1, &m_RendererID);
@@ -127,9 +126,6 @@ namespace Limen
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    ///VBO END
-
-    ///IBO============================================================
     OpenGLIndexBuffer::OpenGLIndexBuffer(const uint32_t *indices, const uint32_t count)
         : m_Count(count)
     {
@@ -178,5 +174,4 @@ namespace Limen
         return m_Count;
     }
 
-    ///IBO============================================================ END
 }

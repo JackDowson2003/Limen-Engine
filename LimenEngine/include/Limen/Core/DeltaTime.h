@@ -67,6 +67,7 @@ namespace Limen
         float GetMilliseconds() const { return m_Time * 1000.0f; }
 
     private:
-        float m_Time; //seconds
+        // 当前时间间隔，单位为秒。
+        float m_Time;
     };
 }

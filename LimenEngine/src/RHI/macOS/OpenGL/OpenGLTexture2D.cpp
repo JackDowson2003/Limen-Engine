@@ -14,7 +14,8 @@ namespace Limen
         : m_Path(path)
     {
         int width, height, channels;
-        stbi_set_flip_vertically_on_load(1); //垂直翻转
+        // 图像文件通常以左上为原点，OpenGL 纹理坐标以左下为原点。
+        stbi_set_flip_vertically_on_load(1);
         stbi_uc *data = stbi_load(path.c_str(), &width, &height, &channels, 0);
         LM_CORE_ASSERT(data, "Failed to load image!");
         if (!data)
@@ -31,7 +32,8 @@ namespace Limen
         m_BPP = static_cast<uint32_t>(channels);
 
         glGenTextures(1, &m_RendererID);
-        OpenGLTexture2D::Bind(); //必须先Bind，只是为了初始化纹理，不表示这张纹理永远占用槽位 0
+        // OpenGL 的纹理参数和上传操作都作用于当前绑定对象。
+        OpenGLTexture2D::Bind();
 
         GLenum internalFormat = 0, dataFormat = 0;
         if (channels == 4)
@@ -46,15 +48,12 @@ namespace Limen
         }
         LM_CORE_ASSERT(internalFormat & dataFormat, "Format not supported!");
 
-        // 当纹理距离相机太远（纹理 > 屏幕区域）时使用线性插值 采用双线性过滤
+        // 缩小时在两级 Mipmap 之间线性插值，放大时使用双线性过滤。
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR_MIPMAP_LINEAR);
-        // glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-        // glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR));
-        //当纹素占据多个像素的时候就采用此算法 不过会有锯齿/马赛克感，因为离相机太近了 采用双线性过滤
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-        // S (u) 方向（水平）超出时重复GL_REPEAT GL_CLAMP_TO_EDGE 拉伸 GL_MIRRORED_REPEAT 镜像重复   GL_CLAMP_TO_BORDER 显示边框颜色
+
+        // 超出 [0, 1] 的纹理坐标采样边缘像素，避免边缘接缝。
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-        // T (v) 方向（水平）超出时重复
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
 
         glTexImage2D(
@@ -69,7 +68,7 @@ namespace Limen
             data // stbi_load返回的数据
         );
 
-        glGenerateMipmap(GL_TEXTURE_2D); //生成其余MipMap层
+        glGenerateMipmap(GL_TEXTURE_2D);
 
         glBindTexture(GL_TEXTURE_2D, 0);
         if (data)
@@ -83,7 +82,8 @@ namespace Limen
 
     void OpenGLTexture2D::Bind(const uint32_t slot) const
     {
-        glActiveTexture(GL_TEXTURE0 + slot); //源码是按顺序来的 总共GL_TEXTURE31 0~31
+        // 激活调用方指定的纹理单元，再把该纹理绑定到该单元。
+        glActiveTexture(GL_TEXTURE0 + slot);
         glBindTexture(GL_TEXTURE_2D, m_RendererID);
     }
 

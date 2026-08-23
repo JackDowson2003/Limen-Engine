@@ -76,7 +76,7 @@ namespace Limen
         [[nodiscard]] virtual float GetMouseXImpl() const = 0;
         [[nodiscard]] virtual float GetMouseYImpl() const = 0;
 
-        //Input 的后端实现接口，用于让不同平台分别实现“设置鼠标光标模式
+        // 平台后端负责把公共 CursorMode 转换为原生窗口系统的光标模式。
         virtual void SetCursorModeImpl(CursorMode mode) const = 0;
 
     private:

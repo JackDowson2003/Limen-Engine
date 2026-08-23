@@ -69,7 +69,7 @@ namespace Limen
         LM_CORE_INFO("Creating window {0} {1} {2}", props.Title, props.Width, props.Height);
         if (!s_GLFWInitialized)
         {
-            //TODO: glfwTerminate on system shutdown
+            // GLFW 进程级生命周期暂由窗口模块管理；退出阶段仍需集中调用 glfwTerminate。
             const int success = glfwInit();
             LM_CORE_ASSERT(success, "Could not initialize GLFW!");
             glfwSetErrorCallback(GLFWErrorCallback);
@@ -116,7 +116,7 @@ namespace Limen
         m_Context->Init();
 
         glfwSetWindowUserPointer(m_Window, &m_Data);
-        SetVSync(true); //垂直同步
+        SetVSync(true);
 
 
         glfwSetCharCallback(m_Window, [](GLFWwindow *window, unsigned int codepoint)
@@ -126,7 +126,7 @@ namespace Limen
             data.EventCallBack(event);
         });
 
-        //Set GLFW Callbacks
+        // 将 GLFW 回调转换为引擎事件并交给 Application。
         glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
         {
             const auto cWidth = static_cast<unsigned int>(width);

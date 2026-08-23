@@ -127,6 +127,65 @@ namespace Limen
         glUseProgram(0);
     }
 
+    void OpenGLShader::SetMat4(const char *name, const glm::mat4 &matrix)
+    {
+        if (name ==nullptr)
+        {
+            LM_CORE_ERROR("name is null");
+            return;
+        }
+        UploadUniformMat4(name,matrix);
+    }
+
+    void OpenGLShader::SetFloat3(const char *name, const glm::vec3& value)
+    {
+        if (name ==nullptr)
+        {
+            LM_CORE_ERROR("name is null");
+            return;
+        }
+        UploadUniformFloat3(name,value);
+    }
+
+    void OpenGLShader::SetInt(const char *name, int value)
+    {
+        if (name ==nullptr)
+        {
+            LM_CORE_ERROR("name is null");
+            return;
+        }
+        UploadUniformInt(name, value);
+    }
+
+    void OpenGLShader::SetUniformBufferBinding(const char *blockName, uint32_t binding)
+    {
+        if (blockName == nullptr)
+        {
+            LM_CORE_ERROR("Uniform buffer block name is null");
+            return;
+        }
+
+        const GLuint blockIndex = glGetUniformBlockIndex(
+            m_RendererID,
+            blockName
+        );
+
+        LM_CORE_ASSERT(
+            blockIndex != GL_INVALID_INDEX,
+            "Uniform block '{}' was not found",
+            blockName
+        );
+
+        if (blockIndex == GL_INVALID_INDEX)
+            return;
+
+        glUniformBlockBinding(
+            m_RendererID,
+            blockIndex,
+            binding
+        );
+    }
+
     void OpenGLShader::UploadUniformMat4(const char* name,const glm::mat4& val)
     {
         const GLint location = GetUniformLocation(name);
@@ -183,31 +242,4 @@ namespace Limen
         return location;
     }
 
-    void OpenGLShader::BindUniformBlock(
-    const char* blockName,
-    const uint32_t binding
-) const
-    {
-        const GLuint blockIndex =
-            glGetUniformBlockIndex(
-                m_RendererID,
-                blockName
-            );
-
-        LM_CORE_ASSERT(
-            blockIndex != GL_INVALID_INDEX,
-            "Uniform block '{}' was not found",
-            blockName
-        );
-
-        if (blockIndex == GL_INVALID_INDEX)
-            return;
-
-        //这个Shader的MaterialData ──> Binding 1
-        glUniformBlockBinding(
-            m_RendererID,
-            blockIndex,
-            binding
-        );
-    }
 }

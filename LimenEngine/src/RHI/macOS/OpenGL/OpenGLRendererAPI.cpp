@@ -5,8 +5,37 @@
 #include <glad/gl.h>
 #include "OpenGLRendererAPI.h"
 
+#include "Limen/Core/Log.h"
+
 namespace Limen
 {
+    namespace
+    {
+        /**
+         * @brief 将通用图元类型转换为OpenGL绘制模式。
+         */
+        GLenum ToOpenGLPrimitiveTopology(const PrimitiveTopology topology)
+        {
+            switch (topology)
+            {
+                case PrimitiveTopology::TriangleList:
+                    return GL_TRIANGLES;
+
+                case PrimitiveTopology::LineList:
+                    return GL_LINES;
+
+                case PrimitiveTopology::PointList:
+                    return GL_POINTS;
+            }
+
+            LM_CORE_ERROR(
+                "Unknown primitive topology"
+            );
+
+            return GL_TRIANGLES;
+        }
+    }
+
     OpenGLRendererAPI::~OpenGLRendererAPI()
     {
     }
@@ -35,15 +64,16 @@ namespace Limen
             glDisable(GL_DEPTH_TEST);
     }
 
-    inline void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray)
+    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, PrimitiveTopology topology)
     {
-        glDrawElements(GL_TRIANGLES,
+        glDrawElements(ToOpenGLPrimitiveTopology(topology),
                        static_cast<int>(vertexArray.GetIndexBuffer()->GetCount()),
                        GL_UNSIGNED_INT,
                        nullptr);
     }
 
-    void OpenGLRendererAPI::SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+
+    void OpenGLRendererAPI::SetViewport(const uint32_t x, const uint32_t y, const uint32_t width, const uint32_t height)
     {
         glViewport(static_cast<int>(x), static_cast<int>(y), static_cast<int>(width), static_cast<int>(height));
     }

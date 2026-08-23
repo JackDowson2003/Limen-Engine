@@ -5,18 +5,8 @@
  */
 layout(location = 0) out vec4 color;
 
-/**
- * 当前物体的纯色。
- *
- * RGB三个分量通常位于[0, 1]范围。
- * 由CPU在绘制前上传。
- */
-//uniform vec3 u_Color;
-/**
-*std140
-*u_Color从Buffer偏移0开始读取
-*    vec3按照16字节对齐
-*/
+// MaterialData 对应绑定到该 uniform block 的材质 UBO。
+// std140 规定 vec3 的基础对齐为 16 字节。
 layout(std140) uniform MaterialData
 {
     vec3 u_Color;

@@ -4,9 +4,6 @@
 #include "SandBox2D.h"
 
 
-//ExampleLayer2D
-
-
 namespace
 {
     class SandBoxApp : public Limen::Application
@@ -18,8 +15,7 @@ namespace
                 Limen::RendererAPI::API::OPENGL
             )
         {
-            // PushLayer(new SandBox2D());
-            // 暂时只运行3D测试，先隔离验证透视和深度。
+            // 当前只运行 3D 测试层，便于隔离验证透视、深度与 Pipeline。
             PushLayer(new SandBox::Example3DLayer());
         }
 
@@ -27,7 +23,7 @@ namespace
     };
 }
 
-//不实现是无法run的
+// EntryPoint.h 调用该工厂创建客户端 Application。
 Limen::Application *Limen::CreateApplication()
 {
     return new SandBoxApp();

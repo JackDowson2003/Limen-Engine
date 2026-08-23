@@ -35,8 +35,8 @@ namespace Limen
 
     private:
         uint32_t m_RendererID;
-        //BPP是每个像素所需位数 BPP = 颜色通道数 × 每个通道的位数 和我们选择的格式有关
-        //还有个BPB Bytes Per Pixel
+
+        // m_BPP 保存源图像的通道数（RGB 为 3，RGBA 为 4）。
         uint32_t m_Width, m_Height, m_BPP;
         std::string m_Path;
     };

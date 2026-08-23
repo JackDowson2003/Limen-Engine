@@ -4,7 +4,6 @@
 #include "Limen/Renderer/Renderer.h"
 
 #include "Limen/Core/Log.h"
-#include "RHI/macOS/OpenGL/OpenGLShader.h"
 
 namespace Limen
 {
@@ -20,21 +19,8 @@ namespace Limen
         SceneData s_SceneData;
     }
 
-    // void Renderer::BeginScene(const OrthoGraphicCamera &camera)
-    // {
-    //     if (s_SceneData.IsActive)
-    //     {
-    //         LM_CORE_ASSERT(false, "Renderer::BeginScene cannot be called while another scene is active");
-    //         return;
-    //     }
-    //     s_SceneData.ViewProjectionMatrix = camera.GetViewProjectionMatrix();
-    //
-    //     s_SceneData.IsActive = true;
-    // }
-
     void Renderer::BeginScene(const Camera &camera)
     {
-
         if (s_SceneData.IsActive)
         {
             LM_CORE_ERROR("Another scene is already active");
@@ -65,8 +51,7 @@ namespace Limen
             return;
         }
 
-        // EndScene 结束的是逻辑提交区间。交换缓冲仍由 Window::OnUpdate 负责，
-        // 因为 Present/SwapBuffers 属于窗口与帧生命周期，而不是场景本身。
+        // Present 属于窗口帧生命周期；EndScene() 只关闭逻辑提交区间。
         s_SceneData.IsActive = false;
     }
 
@@ -80,14 +65,12 @@ namespace Limen
         RendererCommand::Shutdown();
     }
 
-    //OpenGL Submit
-    //Just Get Resources to use by displaying
+    // 兼容尚未迁移到 GraphicsPipeline 的 2D 示例。
     void Renderer::Submit(
         const Ref<Shader> &shader,
         const VertexArray &vertexArray,
         const glm::mat4& transform
-
-        )
+    )
     {
         if (!s_SceneData.IsActive)
         {
@@ -95,37 +78,76 @@ namespace Limen
             return;
         }
 
-        switch (GetRenderAPI())
+        if (!shader)
         {
-            case RendererAPI::API::OPENGL:
-            {
-                // Submit 只借用资源，不参与 Shader 和 VertexArray 的所有权。
-                shader->Bind();
-                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_ViewProjection", s_SceneData.ViewProjection);
-                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformMat4("u_Transform", transform);
-                // Blinn-Phong需要从当前着色点指向相机的观察方向。
-                // BeginScene已从Camera中保存了相机世界坐标，此处上传给Shader。
-                std::dynamic_pointer_cast<OpenGLShader>(shader)->UploadUniformFloat3(
-                    "u_CameraPosition",
-                    s_SceneData.CameraPosition
-                );
-                vertexArray.Bind();
-                //底层命令
-                RendererCommand::DrawIndexed(vertexArray);
-                break;
-            }
-            case RendererAPI::API::DIRECT12:
-            {
-                LM_CORE_ERROR("Cannot implement direct renderer temporeraly");
-                break;
-            }
-            case RendererAPI::API::NONE:
-            {
-                LM_CORE_ERROR("Not implemented");
-                break;
-            }
-            default:
-                break;
+            LM_CORE_ASSERT(false, "Renderer::Submit received a null shader");
+            return;
         }
+
+        shader->Bind();
+
+        shader->SetMat4(
+            "u_ViewProjection",
+            s_SceneData.ViewProjection
+        );
+
+        shader->SetMat4(
+            "u_Transform",
+            transform
+        );
+
+        shader->SetFloat3(
+            "u_CameraPosition",
+            s_SceneData.CameraPosition
+        );
+
+        vertexArray.Bind();
+        RendererCommand::DrawIndexed(vertexArray);
+    }
+
+    void Renderer::Submit(
+        const GraphicsPipeline &pipeline,
+        const VertexArray &vertexArray,
+        const glm::mat4 &transform
+    )
+    {
+        if (!s_SceneData.IsActive)
+        {
+            LM_CORE_ERROR("Renderer::Submit must be called between BeginScene and EndScene");
+            return;
+        }
+
+        const GraphicsPipelineSpecification &specification = pipeline.GetSpecification();
+
+        if (!specification.ShaderProgram)
+        {
+            LM_CORE_ERROR("Renderer::Submit received a pipeline without a shader");
+            return;
+        }
+
+        pipeline.Bind();
+
+        const Ref<Shader> &shader = specification.ShaderProgram;
+
+        shader->SetMat4(
+            "u_ViewProjection",
+            s_SceneData.ViewProjection
+        );
+
+        shader->SetMat4(
+            "u_Transform",
+            transform
+        );
+
+        shader->SetFloat3(
+            "u_CameraPosition",
+            s_SceneData.CameraPosition
+        );
+
+        vertexArray.Bind();
+        RendererCommand::DrawIndexed(
+            vertexArray,
+            specification.Topology
+        );
     }
 }

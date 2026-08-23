@@ -2,6 +2,7 @@
 // Created by chenlong on 2026/8/12.
 //
 #pragma once
+
 #include "Limen/RHI/RendererAPI.h"
 
 namespace Limen
@@ -45,10 +46,19 @@ namespace Limen
                 api->SetDepthTest(enabled);
         }
 
-        static void DrawIndexed(const VertexArray &vao)
+        /**
+         * @brief 向当前 RendererAPI 提交一次索引绘制命令。
+         *
+         * @param vertexArray 顶点输入布局以及顶点、索引缓冲。
+         * @param topology 输入顶点的图元组装方式。
+         */
+        static void DrawIndexed(
+            const VertexArray &vertexArray,
+            const PrimitiveTopology topology = PrimitiveTopology::TriangleList
+        )
         {
             if (RendererAPI *api = GetRendererAPI())
-                api->DrawIndexed(vao);
+                api->DrawIndexed(vertexArray, topology);
         }
 
         static void SetViewport(

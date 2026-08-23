@@ -39,7 +39,7 @@ namespace Limen
         void UnBind() const override;
 
     private:
-        uint32_t m_RendererID{}; //buffer ID
+        uint32_t m_RendererID = 0;
         BufferLayout m_Layout;
     };
 
@@ -51,7 +51,7 @@ namespace Limen
         OpenGLIndexBuffer(OpenGLIndexBuffer&&) noexcept;
         OpenGLIndexBuffer& operator=(OpenGLIndexBuffer&&) noexcept;
 
-        ~OpenGLIndexBuffer() override; //不能是default
+        ~OpenGLIndexBuffer() override;
         void Bind() const override;
 
         void UnBind() const override;

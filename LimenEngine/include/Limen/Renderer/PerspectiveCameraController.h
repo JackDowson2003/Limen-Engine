@@ -15,7 +15,6 @@ namespace Limen
 
     class LIMEN_API PerspectiveCameraController
     {
-
     public:
         /**
          * @brief 创建透视投影的controller
@@ -45,7 +44,7 @@ namespace Limen
         /**
          * 接收引擎事件。
          *
-         * 当前处理滚轮和窗口尺寸变化事件。
+         * 当前处理用于调整飞行速度的滚轮事件。
          *
          * @param event 当前事件。
          */
@@ -123,19 +122,22 @@ namespace Limen
     private:
         PerspectiveCamera m_Camera;
 
+        // 相机移动速度，单位为世界单位/秒。
         float m_TranslationSpeed = 3.f;
-        float m_MouseSensitivity = 0.1f; //鼠标灵敏度
-        float m_SpeedAdjustmentStep = 0.5f; //步长
 
-        //是否允许鼠标控制相机朝向
+        // 鼠标每移动一个像素对应的旋转角度。
+        float m_MouseSensitivity = 0.1f;
+
+        // 每个滚轮刻度调整移动速度的比例。
+        float m_SpeedAdjustmentStep = 0.5f;
+
+        // 是否允许鼠标控制相机朝向。
         bool m_MouseLookEnabled = true;
 
-        //用于判断右键是否刚被按下，避免第一次计算鼠标差值的时候突然跳转
+        // 记录上一帧是否处于鼠标观察状态，避免首次计算产生跳变。
         bool m_WasMouseLooking = false;
 
-        //上一帧鼠标的位置
+        // 上一帧鼠标位置，用于计算相对位移。
         glm::vec2 m_LastMousePos = glm::vec2(0.0f);
-
-
     };
 }

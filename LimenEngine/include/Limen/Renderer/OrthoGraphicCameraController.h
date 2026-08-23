@@ -17,32 +17,27 @@ namespace Limen
     /**
      * @brief 正交相机输入控制器。
      *
-     * Controller负责根据键盘、鼠标滚轮和视口尺寸改变相机状态；
-     * OrthoGraphicCamera只负责保存相机状态并计算矩阵。
+     * Controller 负责根据键盘、鼠标滚轮和视口尺寸改变相机状态；
+     * OrthoGraphicCamera 只负责保存相机状态并计算矩阵。
      */
     class LIMEN_API OrthoGraphicCameraController
     {
     public:
         /**
-         *@brief 正交相机的输入控制器的构造器
+         * @brief 创建正交相机输入控制器。
          *
-         *@param aspectRatio
-         *当前视口的宽高比 width/height
-         *用宽高比是因为有多重可能，而且绝对像素数量不会改变相机能看到多少世界空间。
-         *
-         *@param enableRotation
-         *是否允许用户通过输入旋转相机
+         * @param aspectRatio 当前视口宽高比，即 width / height。
+         * @param enableRotation 是否允许用户通过输入旋转相机。
          */
         explicit OrthoGraphicCameraController(float aspectRatio, bool enableRotation = false);
 
         /**
          * @brief 每帧更新相机的位置和旋转。
          *
-         * 该函数会读取当前键盘状态，并使用deltaTime
+         * 该函数会读取当前键盘状态，并使用 deltaTime
          * 保证相机移动速度不受帧率影响。
          *
-         * @param deltaTime
-         * 当前帧和上一帧之间经过的时间。
+         * @param deltaTime 当前帧和上一帧之间经过的时间。
          */
         void OnUpdate(const DeltaTime &deltaTime);
 
@@ -53,8 +48,7 @@ namespace Limen
          * - MouseScrolledEvent：调整正交相机缩放。
          * - WindowResizeEvent：更新相机宽高比。
          *
-         * @param event
-         * Application传递下来的引擎事件。
+         * @param event Application 传递下来的引擎事件。
          */
         void OnEvent(Event &event);
 
@@ -63,13 +57,13 @@ namespace Limen
          *
          * 该函数只更新相机投影比例，不负责修改GPU Viewport。
          *
-         * @param width 视口的宽度 单位是pixel
-         * @param height 视口的长度 单位是pixel
+         * @param width 视口宽度，单位为像素。
+         * @param height 视口高度，单位为像素。
          */
         void OnResize(float width, float height);
 
         /**
-         * @brief 设置每个滚轮单位改变多少ZoomLevel。
+         * @brief 设置每个滚轮刻度改变多少 ZoomLevel。
          */
         void SetZoomSpeed(float zoomSpeed);
 
@@ -79,16 +73,14 @@ namespace Limen
         * 数值越小，看到的世界范围越小，物体看起来越大；
         * 数值越大，看到的世界范围越大，物体看起来越小。
         *
-        * @param zoomLevel
-        * 新缩放等级，必须大于0。
+        * @param zoomLevel 新缩放等级，必须大于 0。
         */
         void SetZoomLevel(float zoomLevel);
 
         /**
          * @brief 设置相机平移速度。
          *
-         * @param translationSpeed
-         * 用户持续按住移动键时，相机每秒移动的世界单位数量。
+         * @param translationSpeed 用户持续按住移动键时，相机每秒移动的世界单位数量。
          * 该值不应该小于0。
          */
         void SetTranslationSpeed(float translationSpeed);
@@ -96,8 +88,7 @@ namespace Limen
         /**
          * @brief 设置相机旋转速度。
          *
-         * @param rotationSpeed
-         * 用户持续按住旋转键时，相机每秒旋转的角度。
+         * @param rotationSpeed 用户持续按住旋转键时，相机每秒旋转的角度。
          * 单位为度每秒，不应该小于0。
          */
         void SetRotationSpeed(float rotationSpeed);
@@ -105,8 +96,7 @@ namespace Limen
         /**
          * @brief 启用或关闭相机旋转控制。
          *
-         * @param enabled
-         * true表示允许旋转；false表示忽略旋转输入。
+         * @param enabled true 表示允许旋转；false 表示忽略旋转输入。
          */
         void SetRotationEnabled(bool enabled)
         {
@@ -170,38 +160,29 @@ namespace Limen
         bool OnMouseScrolled(const MouseScrolledEvent &event);
 
         bool OnViewportResized(const WindowResizeEvent &event);
-
-
-
     private:
-        //宽高比
+        // 当前视口的宽高比。
         float m_AspectRatio = 1.0f;
 
-        /**当前正交相机看到的场景的范围
-        *ZoomLevel	可见高度	显示效果
-         0.5	1个世界单位	放大
-         1.0	2个世界单位	默认
-         2.0	4个世界单位	缩小
-         10.0	20个世界单位	看到很大范围
-        */
+        // 垂直可见范围的一半；值越小，画面中的物体看起来越大。
         float m_ZoomLevel = 1.0f;
 
-        //每次滚轮改变多少缩放等级
+        // 每个滚轮刻度改变的缩放等级。
         float m_ZoomSpeed = 0.25f;
 
-        //缩放的最小等级，避免<=0
+        // 缩放下限，避免产生零或负的投影范围。
         float m_MinZoomLevel = 0.25f;
 
-        //相机每秒移动多少单位
+        // 相机每秒移动的世界单位数。
         float m_TranslationSpeed = 1.0f;
 
-        //相机每秒可以旋转多少单位
+        // 相机每秒旋转的角度。
         float m_RotationSpeed = 180.0f;
 
-        //是否允许控制器控制相机的旋转
+        // 是否响应旋转输入。
         bool m_RotationEnabled = false;
 
-        //Controller直接拥有Camera，不需要堆分配或共享所有权。
+        // Controller 独占 Camera 的生命周期，无需堆分配或共享所有权。
         OrthoGraphicCamera m_Camera;
     };
 }

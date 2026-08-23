@@ -22,19 +22,18 @@ namespace Limen
         LM_CORE_ASSERT(!s_Instance, "Application already initialized!");
         s_Instance = this;
 
-        // 图形API必须先于Window和GraphicsContext确定。
-        // 例如macOS下，同一个MacWindow可以承载OpenGLContext或MetalContext。
+        // 图形 API 必须先于 Window/GraphicsContext 确定；同一个 MacWindow
+        // 以后可以根据该选择承载 OpenGLContext 或 MetalContext。
         RendererAPI::SetAPI(rendererAPI);
 
         m_Window = Scope<Window>(Window::Create());
         m_Window->SetVSync(isVSYNC);
-        //发生Events的时候，就调用这个匿名函数,也就是OnEvent()
+        // Window 将原生事件转换为引擎 Event 后，通过该回调交给 Application。
         m_Window->SetEventCallback([this](Event &e)
         {
             OnEvent(e);
         });
 
-        //初始化参数
         Renderer::Init();
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
@@ -47,13 +46,13 @@ namespace Limen
 
     Application::~Application()
     {
-        // Layer中的GPU资源必须先于Renderer后端和Window/Context释放。
+        // Layer 中的 GPU 资源必须先于 Renderer 后端与 Window/Context 释放。
         m_LayerStack.Clear();
         m_ImGUILayer = nullptr;
 
         Renderer::Shutdown();
 
-        // 最后销毁Context和Native Window。
+        // 最后销毁图形 Context 与原生窗口。
         m_Window.reset();
         s_Instance = nullptr;
     }
@@ -63,7 +62,7 @@ namespace Limen
         m_LastFrameTime = glfwGetTime();
         while (m_Running)
         {
-            // 帧首获取最新窗口、键盘和鼠标事件。
+            // 帧首获取最新的窗口、键盘和鼠标事件。
             m_Window->PollEvents();
 
             if (!m_Running)
@@ -72,14 +71,13 @@ namespace Limen
             const double time = glfwGetTime();
             DeltaTime deltaTime = time - m_LastFrameTime;
             m_LastFrameTime = time;
-            // Application.cpp
             if (!m_Minimized)
             {
                 for (Layer *layer: m_LayerStack)
                     layer->OnUpdate(deltaTime);
 
                 /*
-                 * 所有离屏场景渲染结束后，Example3DLayer 已经 UnBind，
+                 * 所有离屏场景渲染结束后，Example3DLayer 已经解绑场景 FBO，
                  * 当前渲染目标重新是窗口默认 Framebuffer。
                  *
                  * 清理上一帧窗口内容，随后 ImGui 会重新绘制编辑器界面。
@@ -99,7 +97,7 @@ namespace Limen
             m_ImGUILayer->End();
 #endif
 
-            // 所有场景和ImGui绘制完成后再Present。
+            // 所有场景与 ImGui 命令完成后再交换窗口缓冲。
             m_Window->Present();
         }
     }
@@ -122,7 +120,6 @@ namespace Limen
 
             (*it)->OnEvent(e);
         }
-        // LM_CORE_TRACE("{0}",e.ToString());
     }
 
     bool Application::OnWindowClose(WindowCloseEvent &e)

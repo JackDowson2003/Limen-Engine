@@ -91,7 +91,8 @@ namespace Limen
     void ImGUILayer::OnEvent(Event &e)
     {
         EventDispatcher dispatcher(e);
-        //设置各个函数的
+
+        // 将引擎输入事件转换为 ImGui 的输入事件。
         dispatcher.Dispatch<MouseButtonPressedEvent>([this](const MouseButtonPressedEvent &e)
         {
             return OnMouseButtonPressedEvent(e);
@@ -228,26 +229,25 @@ namespace Limen
         return ImGui::GetIO().WantCaptureKeyboard;
     }
 
-    /**
-     * 做好imgui的设置包括glsl_version的设置
-     */
     void ImGUILayer::OnAttach()
     {
         IMGUI_CHECKVERSION();
-        ///Configuration
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
+
         ImGuiIO &io = ImGui::GetIO();
-        io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors; //Enable MouseCursor
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad; // Enable Gamepad Controls
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // 允许 App 窗口内的面板停靠。
-        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;   // 禁止面板拖出 App 后成为原生窗口。
+        io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        // 关闭多原生窗口，确保停靠面板不能拖出应用窗口。
+        io.ConfigFlags &= ~ImGuiConfigFlags_ViewportsEnable;
 #if GLFW_VERSION_MAJOR >= 3 && GLFW_VERSION_MINOR >= 3
         io.ConfigDpiScaleFonts = true;
-        // [Experimental] Automatically overwrite style.FontScaleDpi in Begin() when Monitor DPI changes. This will scale fonts but _NOT_ scale sizes/padding for now.
 #endif
-        // Setup Platform/Renderer backends
+
+        // GLFW 负责平台输入，具体 Renderer backend 由当前图形 API 决定。
         const auto &window = Application::GetApp().GetWindow();
 
         auto *glfwWindow = static_cast<GLFWwindow *>(

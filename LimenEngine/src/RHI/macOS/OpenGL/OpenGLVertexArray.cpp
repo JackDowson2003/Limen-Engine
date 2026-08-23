@@ -33,7 +33,8 @@ namespace Limen
     void OpenGLVertexArray::AddVertexBuffer(const Ref<VertexBuffer> &vertexBuffer)
     {
         OpenGLVertexArray::Bind();
-        vertexBuffer->Bind(); //必须先bind 因为需要让后面的glVertexAttribPointer 接收到buffer ID
+        // glVertexAttribPointer 会把当前 GL_ARRAY_BUFFER 记录进 VAO 状态。
+        vertexBuffer->Bind();
 
         LM_CORE_ASSERT(vertexBuffer->GetLayout().GetElements().size(), "Vertex Buffer has no layout!");
 
@@ -44,7 +45,7 @@ namespace Limen
         {
             glEnableVertexAttribArray(index);
             const GLenum type = ShaderDataTypeToOpenGLType(element.Type);
-            const GLint &size = static_cast<int>(element.GetComponentSize()); //元素的数据类型的size
+            const GLint size = static_cast<int>(element.GetComponentSize());
             glVertexAttribPointer(
                 index,
                 size,

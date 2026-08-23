@@ -23,9 +23,10 @@ namespace Limen
 
     void OpenGLContext::Init()
     {
-        glfwMakeContextCurrent(m_Window); //创建上下文
+        // 后续所有 OpenGL 调用都作用于这个线程的当前上下文。
+        glfwMakeContextCurrent(m_Window);
 
-        //让 GLAD 找到并保存当前 OpenGL 驱动中各个 OpenGL 函数的地址
+        // 通过 GLFW 查询驱动函数地址，并填充 GLAD 的 OpenGL 函数指针。
         const int status = gladLoadGL(glfwGetProcAddress);
         LM_CORE_ASSERT(status, "Failed to initialize OpenGL context");
         if (!status)

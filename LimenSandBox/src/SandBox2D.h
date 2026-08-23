@@ -5,7 +5,6 @@
 #include <imgui.h>
 #include <glm/ext/matrix_transform.hpp>
 
-#include "../../LimenEngine/src/RHI/macOS/OpenGL/OpenGLShader.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/Log.h"
@@ -18,11 +17,6 @@
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/UniformBuffer.h"
 #include "Limen/RHI/VertexArray.h"
-
-namespace Limen
-{
-    class OpenGLShader;
-}
 
 namespace SandBox
 {
@@ -41,9 +35,8 @@ namespace SandBox
                 0.5f, 0.5f, 0.0f,
             };
 
-            //Vertex Array
+            // 三角形测试几何。
             m_VertexArray.reset(Limen::VertexArray::Create());
-            //Vertex Buffer
             m_VertexBuffer.reset(Limen::VertexBuffer::Create(vertices, sizeof(vertices)));
             const Limen::BufferLayout layout
             {
@@ -52,21 +45,19 @@ namespace SandBox
             m_VertexBuffer->SetLayout(layout);
             m_VertexArray->AddVertexBuffer(m_VertexBuffer);
 
-            //Index Buffer
             constexpr uint32_t indices[] = {0, 1, 2};
             m_IndexBuffer.reset(Limen::IndexBuffer::Create(indices, sizeof(indices) / sizeof(uint32_t)));
             m_VertexArray->SetIndexBuffer(m_IndexBuffer);
-            //====================
+            // 由两个三角形组成的纹理方块。
             m_SquareVAO.reset(Limen::VertexArray::Create());
             constexpr float SquareVertices[] = {
-                // position              //texture
+                // Position              // TexCoord
                 -0.05f, -0.05f, 0.0f, 0.f, 0.f,
                 0.05f, -0.05f, 0.0f, 1.f, 0.f,
                 0.05f, 0.05f, 0.0f, 1.f, 1.f,
                 -0.05f, 0.05f, 0.0f, 0.f, 1.f,
             };
 
-            //Layout2
             const Limen::BufferLayout layout2
             {
                 {Limen::ShaderDataType::Float3, "a_Position"},
@@ -112,7 +103,7 @@ namespace SandBox
                 "Failed to create Example2D FlatColor shader"
             );
 
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_FlatColorShader)->BindUniformBlock("MaterialData", 0);
+            m_FlatColorShader->SetUniformBufferBinding("MaterialData", 0);
 
             m_SquareVAO->UnBind();
 
@@ -130,8 +121,8 @@ namespace SandBox
             m_Texture = Limen::Texture2D::Create("assets/textures/checkerboard.png");
             m_LogoTexture = Limen::Texture2D::Create("assets/textures/cherno.png");
 
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_TextureShader)->Bind();
-            std::dynamic_pointer_cast<Limen::OpenGLShader>(m_TextureShader)->UploadUniformInt("u_Texture", 0);
+            m_TextureShader->Bind();
+            m_TextureShader->SetInt("u_Texture", 0);
         }
 
 
@@ -143,8 +134,7 @@ namespace SandBox
             Limen::RendererCommand::Clear();
             Limen::Renderer::BeginScene(m_CameraController.GetCamera());
 
-            //必须先缩放 再平移  cuz T*S != S*T.
-            //Excepted behaviour: scale the object locally, then translate it to target world position.
+            // transform * scale 表示先在局部空间缩放，再移动到目标世界坐标。
             const auto scale = glm::scale(glm::mat4(1.0f), m_Scale);
 
             m_UniformBuffer->SetData(

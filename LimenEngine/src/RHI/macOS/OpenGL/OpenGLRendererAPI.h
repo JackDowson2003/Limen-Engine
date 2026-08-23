@@ -30,7 +30,12 @@ namespace Limen
          */
         void SetDepthTest(bool enabled) override;
 
-        void DrawIndexed(const VertexArray &vertexArray) override;
+        /**
+         * @brief 用缓冲区绘制
+         * @param vertexArray vao
+         * @param topology 顶点/图元的连接方式
+         */
+        void DrawIndexed(const VertexArray& vertexArray,PrimitiveTopology topology) override;
 
         void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
     };

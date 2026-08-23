@@ -9,10 +9,7 @@
 
 namespace Limen {
 
-	// Events in Limen are currently blocking, meaning when an event occurs it
-	// immediately gets dispatched and must be dealt with right then an there.
-	// For the future, a better strategy might be to buffer events in an event
-	// bus and process them during the "event" part of the update stage.
+	// 当前事件采用同步分发：窗口回调产生事件后，立即沿 LayerStack 传播。
 
 	enum class EventType
 	{
@@ -26,11 +23,11 @@ namespace Limen {
 	enum class   EventCategory : std::uint32_t
 	{
 		None = 0,
-		EventCategoryApplication    = BIT(0), //1
-		EventCategoryInput          = BIT(1), //2
-		EventCategoryKeyboard       = BIT(2), //4
-		EventCategoryMouse          = BIT(3), //8
-		EventCategoryMouseButton    = BIT(4) //16
+		EventCategoryApplication = BIT(0),
+		EventCategoryInput = BIT(1),
+		EventCategoryKeyboard = BIT(2),
+		EventCategoryMouse = BIT(3),
+		EventCategoryMouseButton = BIT(4)
 	};
 
 	// 保留 enum class 的强类型约束，同时让事件声明可以简写为
@@ -96,13 +93,14 @@ namespace Limen {
 		{
 		}
 		
-		// F will be deduced by the compiler
+		// F 由编译器从传入的可调用对象推导。
 		template<typename T, typename F>
 		bool Dispatch(const F& func)
 		{
 			if (m_Event.GetEventType() == T::GetStaticType())
 			{
-				m_Event.m_Handled |= func(static_cast<T&>(m_Event)); //会保留以前的状态 true | false == true
+				// 一旦事件已被处理，后续回调不能把它恢复为未处理状态。
+				m_Event.m_Handled |= func(static_cast<T&>(m_Event));
 				return true;
 			}
 			return false;

@@ -10,10 +10,13 @@
 namespace Limen
 {
     RenderPass::RenderPass(const RenderPassSpecification &spec)
-        :m_Specification(spec)
+        : m_Specification(spec)
     {
-        LM_CORE_ASSERT(m_Specification.TargetFramebuffer,"RenderPass '{}' requires a valid Framebuffer",
-                    m_Specification.DebugName);
+        LM_CORE_ASSERT(
+            m_Specification.TargetFramebuffer,
+            "RenderPass '{}' requires a valid Framebuffer",
+            m_Specification.DebugName
+        );
     }
 
     void RenderPass::Begin()
@@ -37,24 +40,15 @@ namespace Limen
             return;
         }
 
-        /**
-         * 选择该阶段的输出目标
-         * Bind同时设置 Framebuffer 自己的 Viewport
-         */
+        // Bind() 同时把 Viewport 更新为目标 Framebuffer 的尺寸。
         m_Specification.TargetFramebuffer->Bind();
 
-        /**
-         *
-         * 第一版 RenderPass固定清除颜色和深度
-         * 后续会通过LoadOperation 决定 Clear、Load 或 DontCare
-         *
-         */
+        // 当前版本固定清除颜色和深度；未来由 LoadOperation 决定行为。
         RendererCommand::SetClearColor(m_Specification.ClearColor);
-
         RendererCommand::Clear();
 
-        m_IsActive = true; // 完成 Bind 和 Clear 后，才把逻辑状态标记为 Active。
-
+        // 只有 Bind 与 Clear 都完成后，该 Pass 才处于活动状态。
+        m_IsActive = true;
     }
 
     void RenderPass::End()
@@ -69,16 +63,10 @@ namespace Limen
             return;
         }
 
-        /**
-         * 第一版结束后回到默认的窗口渲染目标
-         * 后续多Pass系统系统会修改为下一个渲染目标
-         */
+        // 当前版本回到窗口默认 Framebuffer；多 Pass 系统将改为绑定下一目标。
         m_Specification.TargetFramebuffer->UnBind();
 
-        /*
-         * Samples == 1 时 Resolve() 内部直接返回；
-         * Samples > 1 时把 MSAA 结果解析到普通颜色纹理。
-         */
+        // 单采样时 Resolve() 直接返回；多采样时解析到普通颜色纹理。
         m_Specification.TargetFramebuffer->Resolve();
 
         m_IsActive = false;

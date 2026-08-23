@@ -37,12 +37,12 @@ namespace Limen
 
     void OrthoGraphicCamera::RecalculateViewMatrix()
     {
-        //把世界平移 "-m_Position"
-        glm::mat4 transform = glm::translate(glm::mat4(1.0f), -m_Position); //让按照postion的位置变换
-        //以Y轴旋转 trans * rotate
+        // 先构造相机变换，再取逆得到观察矩阵。
+        glm::mat4 transform = glm::translate(glm::mat4(1.0f), -m_Position);
         transform = glm::rotate(transform, glm::radians(m_Rotation), glm::vec3(0.0f, 1.0f, 0.0f));
-        //同时在相机视图矩阵中应该先旋转再平移 因为执行顺序：先反向平移整个世界，再反向旋转整个世界
-        m_ViewMatrix = glm::inverse(transform); //逆矩阵
-        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix; // p * v * m MVP
+        m_ViewMatrix = glm::inverse(transform);
+
+        // Model 矩阵由提交绘制时再乘入。
+        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix;
     }
 }

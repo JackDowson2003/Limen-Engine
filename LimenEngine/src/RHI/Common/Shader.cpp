@@ -80,11 +80,11 @@ namespace Limen
             if (requestedPath.empty())
                 return {};
 
-            //变成/a/b/c.txt
+            // 消除多余的分隔符以及 . 等路径组件。
             const std::filesystem::path normalizedPath =
                     requestedPath.lexically_normal();
 
-            //看看是否为绝对路径
+            // 绝对路径由调用方完整指定，不再拼接 assets/shaders。
             if (normalizedPath.is_absolute())
                 return normalizedPath;
 
@@ -256,7 +256,6 @@ namespace Limen
         }
     }
 
-    //region shader
     Ref<Shader> Shader::CreateFromSource(
         const std::string &name,
         const std::string &vertexSource,
@@ -397,9 +396,6 @@ namespace Limen
         );
     }
 
-    //endregion
-
-    //region ShaderLibrary
     void ShaderLibrary::Add(const Ref<Shader> &shader)
     {
         if (!shader)
@@ -557,5 +553,4 @@ namespace Limen
         return m_Shaders.contains(name);
     }
 
-    //endregion
 }

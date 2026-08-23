@@ -13,7 +13,7 @@ namespace Limen
 {
     class ImGUILayer;
 
-    class LIMEN_API Application //静态链接不需要写__declspec(dllexport)
+    class LIMEN_API Application
     {
     public:
 
@@ -29,7 +29,7 @@ namespace Limen
             RendererAPI::API rendererAPI = RendererAPI::API::OPENGL
         );
 
-        virtual ~Application(); //交给sandbox去实现
+        virtual ~Application();
 
         void Run();
         void PushLayer(Layer* layer);
@@ -47,7 +47,7 @@ namespace Limen
 
         Scope<Window> m_Window;
         ImGUILayer* m_ImGUILayer = nullptr;
-        // LayerStack 负责销毁所有 Layer；这里仅保存 ImGui Layer 的非拥有引用。
+        // LayerStack 拥有并销毁所有 Layer；此处只是指向其中 ImGui Layer 的观察指针。
         LayerStack m_LayerStack;
         bool m_Running = true;
         bool m_Minimized = false;
@@ -59,6 +59,6 @@ namespace Limen
 
     };
 
-    //To be defined in CLIENT
+    // 由客户端实现，EntryPoint 使用它创建具体的 Application。
     Application *CreateApplication();
 }

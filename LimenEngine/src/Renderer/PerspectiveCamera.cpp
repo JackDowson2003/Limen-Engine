@@ -16,7 +16,7 @@ namespace Limen
         LM_CORE_ASSERT(near > 0.f, "Perspective camera near must be greater than 0.");
         LM_CORE_ASSERT(far > near, "Perspective camera far plane must be greater than near plane.");
 
-        //顺序可变换
+        // 两个矩阵互不依赖初始化顺序；第二次计算会得到完整的 VP 矩阵。
         RecalculateProjectionMatrix();
         RecalculateViewMatrix();
     }
@@ -56,9 +56,6 @@ namespace Limen
         RecalculateProjectionMatrix();
     }
 
-    /**
-         * 镜头如何把3D压扁到2D屏幕上”
-         */
     void PerspectiveCamera::RecalculateProjectionMatrix()
     {
         m_ProjectionMatrix = glm::perspective(
@@ -67,25 +64,23 @@ namespace Limen
             m_Near,
             m_Far
         );
-        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix; //p v => MVP = P V M
+        // 顶点最终按 Projection * View * Model 的顺序变换。
+        m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix;
     }
 
 
-    /**
-    * 镜头在哪里 朝向哪里 怎么旋转
-    */
     void PerspectiveCamera::RecalculateViewMatrix()
     {
         glm::mat4 transform = glm::translate(glm::mat4(1.0f), m_Position);
 
-        //旋转顺序  yaw(Y) → pitch(X) → roll(Z)
+        // 相机局部变换按 Yaw(Y) -> Pitch(X) -> Roll(Z) 组合。
         transform = glm::rotate(transform, glm::radians(m_Rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
 
         transform = glm::rotate(transform, glm::radians(m_Rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
 
         transform = glm::rotate(transform, glm::radians(m_Rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
 
-        //因为CameraTransform = Translation * Rotation; 在global world中需要inverse
+        // View 矩阵需要执行相机世界变换的逆变换。
         m_ViewMatrix = glm::inverse(transform);
 
         m_ViewProjectionMatrix = m_ProjectionMatrix * m_ViewMatrix;

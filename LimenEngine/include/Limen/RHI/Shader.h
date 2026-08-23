@@ -3,9 +3,13 @@
 //
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include "Limen/Core/Core.h"
 
@@ -17,7 +21,52 @@ namespace Limen
         virtual ~Shader() = default;
 
         virtual void Bind() const = 0;
+
         virtual void UnBind() const = 0;
+
+        /**
+         * @brief 设置一个 4×4 矩阵参数。
+         *
+         * @param name Shader 中声明的参数名称。
+         * @param matrix 要上传的矩阵。
+         */
+        virtual void SetMat4(const char *name, const glm::mat4 &matrix) = 0;
+
+        /**
+         * @brief 设置一个三维浮点向量参数。
+         *
+         * @param name Shader 中声明的参数名称。
+         * @param value 要上传的三维向量。
+         */
+        virtual void SetFloat3(const char *name, const glm::vec3 &value) = 0;
+
+        /**
+         * @brief 设置一个整数 Shader 参数。
+         *
+         * 目前主要用于设置纹理采样器所使用的纹理槽。
+         *
+         * @param name Shader 参数名称，例如 u_Texture。
+         * @param value 整数值，例如纹理槽 0。
+         */
+        virtual void SetInt(
+            const char* name,
+            int value
+        ) = 0;
+
+        /**
+         * @brief 将 Shader 中的 Uniform Block 关联到指定绑定点。
+         *
+         * OpenGL 对应 glUniformBlockBinding()；Direct3D 后端将映射到
+         * Constant Buffer 的绑定位置。
+         *
+         * @param blockName Shader 中的 Uniform Block 名称。
+         * @param binding UniformBuffer 使用的绑定点。
+         */
+        virtual void SetUniformBufferBinding(
+            const char* blockName,
+            uint32_t binding
+        ) = 0;
+
 
         /**
          * @brief 获取Shader的逻辑名称。
@@ -25,7 +74,7 @@ namespace Limen
          * 该名称用于ShaderLibrary查找，不代表底层GPU对象ID。
          */
         [[nodiscard]]
-        virtual const std::string& GetName() const noexcept = 0;
+        virtual const std::string &GetName() const noexcept = 0;
 
         /**
          * @brief 从内存中的源码字符串创建Shader。
@@ -38,11 +87,10 @@ namespace Limen
          */
         [[nodiscard]]
         static Ref<Shader> CreateFromSource(
-            const std::string& name,
+            const std::string &name,
             const std::string &vertexSource,
             const std::string &fragmentSource
         );
-
         /**
          * @brief 从两个Shader源码文件创建一个图形Shader Program。
          *
@@ -71,8 +119,8 @@ namespace Limen
          */
         [[nodiscard]]
         static Ref<Shader> CreateFromFiles(
-            const std::filesystem::path& vertexPath,
-            const std::filesystem::path& fragmentPath
+            const std::filesystem::path &vertexPath,
+            const std::filesystem::path &fragmentPath
         );
 
         /**
@@ -85,8 +133,8 @@ namespace Limen
         [[nodiscard]]
         static Ref<Shader> CreateFromFiles(
             std::string name,
-            const std::filesystem::path& vertexPath,
-            const std::filesystem::path& fragmentPath
+            const std::filesystem::path &vertexPath,
+            const std::filesystem::path &fragmentPath
         );
 
         /**
@@ -116,7 +164,7 @@ namespace Limen
          *
          * @param shader 要共享和缓存的Shader，不能为nullptr。
          */
-        void Add(const Ref<Shader>& shader);
+        void Add(const Ref<Shader> &shader);
 
         /**
          * @brief 根据当前RendererAPI加载图形Shader。
@@ -134,7 +182,7 @@ namespace Limen
          * @param logicalPath 相对于后端Shader目录的路径，不包含扩展名。
          */
         [[nodiscard]]
-        Ref<Shader> Load(const std::filesystem::path& logicalPath);
+        Ref<Shader> Load(const std::filesystem::path &logicalPath);
 
         /**
          * @brief 从两个阶段文件加载Shader。
@@ -144,8 +192,8 @@ namespace Limen
          */
         [[nodiscard]]
         Ref<Shader> Load(
-            const std::filesystem::path& vertexPath,
-            const std::filesystem::path& fragmentPath
+            const std::filesystem::path &vertexPath,
+            const std::filesystem::path &fragmentPath
         );
 
         /**
@@ -158,8 +206,8 @@ namespace Limen
         [[nodiscard]]
         Ref<Shader> Load(
             std::string name,
-            const std::filesystem::path& vertexPath,
-            const std::filesystem::path& fragmentPath
+            const std::filesystem::path &vertexPath,
+            const std::filesystem::path &fragmentPath
         );
 
         /**
@@ -170,10 +218,8 @@ namespace Limen
         [[nodiscard]]
         Ref<Shader> Get(const std::string &name) const;
 
-
-
     private:
-        std::unordered_map<std::string, Ref<Shader>> m_Shaders;
+        std::unordered_map<std::string, Ref<Shader> > m_Shaders;
 
         /**
          * @brief 检查指定名称是否已经加载。
@@ -184,5 +230,4 @@ namespace Limen
         [[nodiscard]]
         bool Exists(const std::string &name) const noexcept;
     };
-
 }

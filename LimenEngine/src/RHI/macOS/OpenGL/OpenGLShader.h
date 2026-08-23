@@ -13,7 +13,7 @@ namespace Limen
     class OpenGLShader : public Shader
     {
     public :
-        OpenGLShader(const std::string &name,const std::string &vertexSource, const std::string &fragmentSource);
+        OpenGLShader(const std::string &name, const std::string &vertexSource, const std::string &fragmentSource);
 
         ~OpenGLShader() override;
 
@@ -21,26 +21,41 @@ namespace Limen
 
         void UnBind() const override;
 
+        void SetMat4(const char *name, const glm::mat4 &matrix) override;
+
+        void SetFloat3(const char *name, const glm::vec3 &value) override;
+
+        void SetInt(
+            const char *name,
+            int value
+        ) override;
+
+        void SetUniformBufferBinding(
+            const char *blockName,
+            uint32_t binding
+        ) override;
+
         [[nodiscard]]
-        const std::string& GetName() const noexcept override
+        const std::string &GetName() const noexcept override
         {
             return m_Name;
         }
 
         void UploadUniformMat3(const char *name, const glm::mat3 &val);
+
         void UploadUniformMat4(const char *name, const glm::mat4 &val);
 
-        void UploadUniformInt(const char *name,  int value);
+        void UploadUniformInt(const char *name, int value);
 
-        void UploadUniformFloat(const char *name,  float value);
+        void UploadUniformFloat(const char *name, float value);
+
         void UploadUniformFloat2(const char *name, const glm::vec2 &val);
+
         void UploadUniformFloat3(const char *name, const glm::vec3 &val);
+
         void UploadUniformFloat4(const char *name, const glm::vec4 &val);
 
         int GetUniformLocation(const char *name);
-
-
-        void BindUniformBlock(const char* blockName,uint32_t binding) const;
 
     private:
         uint32_t m_RendererID = 0;
