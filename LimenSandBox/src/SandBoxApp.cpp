@@ -18,9 +18,9 @@ namespace
                 Limen::RendererAPI::API::OPENGL
             )
         {
-            PushLayer(new SandBox2D());
+            // PushLayer(new SandBox2D());
             // 暂时只运行3D测试，先隔离验证透视和深度。
-            // PushLayer(new SandBox::Example3DLayer());
+            PushLayer(new SandBox::Example3DLayer());
         }
 
         ~SandBoxApp() override = default;

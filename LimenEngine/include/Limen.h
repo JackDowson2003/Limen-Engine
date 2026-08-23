@@ -25,6 +25,7 @@
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"
 #include "Limen/RHI/UniformBuffer.h"
+#include "Limen/RHI/Framebuffer.h"
 
 //------Entry Point
 #include "Limen/EntryPoint.h"

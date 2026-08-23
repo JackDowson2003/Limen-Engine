@@ -130,10 +130,6 @@ namespace Limen
             return OnMouseScrolled(event);
         });
 
-        dispatcher.Dispatch<WindowResizeEvent>([this](const WindowResizeEvent &event)
-        {
-            return OnWindowResize(event);
-        });
     }
 
     void PerspectiveCameraController::OnResize(const float width, const float height)
@@ -213,14 +209,6 @@ namespace Limen
         return false;
     }
 
-    bool PerspectiveCameraController::OnWindowResize(const WindowResizeEvent &event)
-    {
-        OnResize(
-            static_cast<float>(event.GetWidth()),
-            static_cast<float>(event.GetHeight())
-        );
-        return false;
-    }
 
     glm::vec3 PerspectiveCameraController::RotateAroundAxis(const glm::vec3 &vector, const glm::vec3 &axis,
                                                             const float angleRadians)

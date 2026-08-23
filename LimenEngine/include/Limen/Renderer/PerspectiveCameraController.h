@@ -9,7 +9,6 @@
 
 namespace Limen
 {
-    class WindowResizeEvent;
     class MouseScrolledEvent;
     class DeltaTime;
     class Event;
@@ -99,11 +98,6 @@ namespace Limen
          * 第一版中，滚轮用于调整相机移动速度，而不是改变 FOV。
          */
         bool OnMouseScrolled(const MouseScrolledEvent& event);
-
-        /**
-         * 处理窗口尺寸变化，重新计算宽高比。
-         */
-        bool OnWindowResize(const WindowResizeEvent& event);
 
         /**
          * 根据当前 Pitch 和 Yaw 计算相机朝向。

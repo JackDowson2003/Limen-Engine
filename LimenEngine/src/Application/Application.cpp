@@ -77,6 +77,18 @@ namespace Limen
             {
                 for (Layer *layer: m_LayerStack)
                     layer->OnUpdate(deltaTime);
+
+                /*
+                 * 所有离屏场景渲染结束后，Example3DLayer 已经 UnBind，
+                 * 当前渲染目标重新是窗口默认 Framebuffer。
+                 *
+                 * 清理上一帧窗口内容，随后 ImGui 会重新绘制编辑器界面。
+                 */
+                RendererCommand::SetClearColor(
+                    {0.04f, 0.04f, 0.04f, 1.0f}
+                );
+
+                RendererCommand::Clear();
             }
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)

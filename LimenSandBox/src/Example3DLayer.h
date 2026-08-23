@@ -4,6 +4,8 @@
 #pragma once
 #include "Limen/Application/Layer.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
+#include "Limen/Renderer/RenderPass.h"
+#include "Limen/RHI/Framebuffer.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"
@@ -41,6 +43,8 @@ namespace SandBox
 
         void OnEvent(Limen::Event& event) override;
 
+        void OnImGuiRender() override;
+
     private:
 
         /**
@@ -49,8 +53,11 @@ namespace SandBox
          * Ref声明本身只会产生空shared_ptr，因此必须同时创建实际对象，
          * 才能在构造函数中安全调用Load()。
          */
-        Limen::Ref<Limen::ShaderLibrary> m_ShaderLib =
-            Limen::CreateRef<Limen::ShaderLibrary>();
+        Limen::Ref<Limen::ShaderLibrary> m_ShaderLib = Limen::CreateRef<Limen::ShaderLibrary>();
+
+        Limen::Scope<Limen::Framebuffer> m_SceneFramebuffer;
+
+        Limen::Scope<Limen::RenderPass> m_SceneRenderPass; //按照反序列来销毁 所以这样放是有意义的 RenderPass -> FBO
 
         /**
          * 透视相机
@@ -86,6 +93,19 @@ namespace SandBox
 
         // 立方体每秒旋转的角度，单位为度/秒。
         float m_CubeRotationSpeed = 45.0f;
+
+        // ImGui Scene 面板希望使用的渲染尺寸。
+        uint32_t m_ViewportWidth = 1280;
+        uint32_t m_ViewportHeight = 720;
+
+        // 鼠标上一帧是否位于 Scene 面板中。
+        bool m_ViewportHovered = false;
+
+        // Scene 面板是否拥有键盘焦点。
+        bool m_ViewportFocused = false;
+
+        // 右键导航是否已经从 Scene 面板中启动。
+        bool m_ViewportNavigationActive = false;
 
     };
 } // SandBox

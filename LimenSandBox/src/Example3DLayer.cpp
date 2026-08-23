@@ -8,7 +8,9 @@
 #include "glm/glm.hpp"
 #include <glm/ext/matrix_transform.hpp>
 
+#include "imgui.h"
 #include "Limen/Core/Log.h"
+#include "Limen/Input/Input.h"
 
 
 namespace SandBox
@@ -37,40 +39,40 @@ namespace SandBox
             // Position                  // Normal             // TexCoord
 
             // 前面：z = +0.5
-            -0.5f, -0.5f,  0.5f,        0.0f,  0.0f,  1.0f,   0.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,        0.0f,  0.0f,  1.0f,   1.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,        0.0f,  0.0f,  1.0f,   1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,        0.0f,  0.0f,  1.0f,   0.0f, 1.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+            0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+            -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
 
             // 后面：z = -0.5
-             0.5f, -0.5f, -0.5f,        0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,        0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,        0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
-             0.5f,  0.5f, -0.5f,        0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
+            -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
+            0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
 
             // 左面：x = -0.5
-            -0.5f, -0.5f, -0.5f,       -1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,       -1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,       -1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,       -1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+            -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+            -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+            -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
 
             // 右面：x = +0.5
-             0.5f, -0.5f,  0.5f,        1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
-             0.5f, -0.5f, -0.5f,        1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,        1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
-             0.5f,  0.5f,  0.5f,        1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
+            0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+            0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+            0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
 
             // 上面：y = +0.5
-            -0.5f,  0.5f,  0.5f,        0.0f,  1.0f,  0.0f,   0.0f, 0.0f,
-             0.5f,  0.5f,  0.5f,        0.0f,  1.0f,  0.0f,   1.0f, 0.0f,
-             0.5f,  0.5f, -0.5f,        0.0f,  1.0f,  0.0f,   1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,        0.0f,  1.0f,  0.0f,   0.0f, 1.0f,
+            -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+            0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
 
             // 下面：y = -0.5
-            -0.5f, -0.5f, -0.5f,        0.0f, -1.0f,  0.0f,   0.0f, 0.0f,
-             0.5f, -0.5f, -0.5f,        0.0f, -1.0f,  0.0f,   1.0f, 0.0f,
-             0.5f, -0.5f,  0.5f,        0.0f, -1.0f,  0.0f,   1.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,        0.0f, -1.0f,  0.0f,   0.0f, 1.0f
+            -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+            0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+            0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f
         };
 
         /**
@@ -102,6 +104,23 @@ namespace SandBox
                 sizeof(cubeVertices)
             )
         );
+
+        Limen::FramebufferSpecification spec;
+        spec.Width = 1280;
+        spec.Height = 720;
+        spec.Samples = 4;
+
+        m_SceneFramebuffer = Limen::Framebuffer::Create(spec);
+        LM_CORE_ASSERT(m_SceneFramebuffer, "Failed to create 3D scene Framebuffer");
+
+        Limen::RenderPassSpecification sceneRenderPassSpec;
+        //只取得 unique_ptr 内部的原始指针，不转移所有权。
+        sceneRenderPassSpec.TargetFramebuffer = m_SceneFramebuffer.get();
+        sceneRenderPassSpec.ClearColor = {0.1f, 0.1f, 0.1f, 1.0f};
+        sceneRenderPassSpec.DebugName = "Example3D Render Pass";
+
+        m_SceneRenderPass = Limen::CreateScope<Limen::RenderPass>(sceneRenderPassSpec);
+
 
         /**
          * @brief 描述一条立方体顶点记录的内存布局。
@@ -176,22 +195,56 @@ namespace SandBox
         );
 
         //校验texture
-        LM_CORE_ASSERT(m_AlbedoTexture,"Failed to create cube albedo texture");
+        LM_CORE_ASSERT(m_AlbedoTexture, "Failed to create cube albedo texture");
 
-        m_CameraController.SetMouseLookEnabled(true);
+        m_CameraController.SetMouseLookEnabled(false);
     }
 
     void Example3DLayer::OnUpdate(Limen::DeltaTime &deltaTime)
     {
+        if (m_ViewportWidth > 0 && m_ViewportHeight > 0 && (
+                m_SceneFramebuffer->GetSpecification().Width != m_ViewportWidth ||
+                m_SceneFramebuffer->GetSpecification().Height != m_ViewportHeight))
+        {
+            // 重新创建颜色、深度和 MSAA 附件。
+            m_SceneFramebuffer->Resize(
+                m_ViewportWidth,
+                m_ViewportHeight
+            );
+            // 更新透视投影矩阵的宽高比。
+            m_CameraController.OnResize(
+                static_cast<float>(m_ViewportWidth),
+                static_cast<float>(m_ViewportHeight)
+            );
+        }
+
+        const bool rightMousePressed = Limen::Input::IsMouseButtonPressed(Limen::MouseButton::Right);
+
+        // 松开右键，结束本次导航。
+        if (!rightMousePressed)
+        {
+            m_ViewportNavigationActive = false;
+        }
+        // 右键必须从 Scene 面板内部按下，才能开始导航。
+        else if (!m_ViewportNavigationActive &&
+                 m_ViewportHovered)
+        {
+            m_ViewportNavigationActive = true;
+        }
+
+        m_CameraController.SetMouseLookEnabled(m_ViewportNavigationActive);
         // 必须先更新相机，再让BeginScene复制本帧的ViewProjection。
         m_CameraController.OnUpdate(deltaTime);
 
-        // 本测试层暂时负责清理当前帧。
-        Limen::RendererCommand::SetClearColor(
-            {0.1f, 0.1f, 0.1f, 1.0f}
-        );
+        // 从这里开始，Clear 和 Draw 都写入场景 Framebuffer。
+        // m_SceneFramebuffer->Bind();
 
-        Limen::RendererCommand::Clear();
+        // 本测试层暂时负责清理当前帧。
+        // Limen::RendererCommand::SetClearColor({0.1f, 0.1f, 0.1f, 1.0f});
+
+        // Limen::RendererCommand::Clear();
+
+        m_SceneRenderPass->Begin(); //绑定 并清理屏幕残留的颜色
 
         /**
          * 开启深度测试。
@@ -207,10 +260,6 @@ namespace SandBox
          */
         Limen::Renderer::BeginScene(m_CameraController.GetCamera());
 
-        // // 使用DeltaTime实现与帧率无关的旋转。
-        // m_CubeRotationDegrees +=
-        //         deltaTime.GetSeconds() *
-        //         m_CubeRotationSpeed;
         /**
          * 创建立方体Model矩阵。
          *
@@ -234,7 +283,7 @@ namespace SandBox
             glm::vec3(1.0f, 0.0f, 0.0f)
         );
 
-        m_AlbedoTexture->Bind(0);
+        m_AlbedoTexture->Bind(0); //绑定纹理
         Limen::Renderer::Submit(
             m_CubeShader,
             *m_CubeVAO,
@@ -242,6 +291,14 @@ namespace SandBox
         );
 
         Limen::Renderer::EndScene();
+
+        // 场景绘制完成，回到窗口默认 Framebuffer。
+        // m_SceneFramebuffer->UnBind();
+        //
+        // 把多采样颜色解析到普通 m_ColorAttachment。
+        // m_SceneFramebuffer->Resolve();
+
+        m_SceneRenderPass->End(); // UnBind Resolve
 
         /**
          * 离开3D测试层前关闭深度测试，
@@ -253,5 +310,46 @@ namespace SandBox
     void Example3DLayer::OnEvent(Limen::Event &event)
     {
         m_CameraController.OnEvent(event);
+    }
+
+    void Example3DLayer::OnImGuiRender()
+    {
+        const bool sceneVisible = ImGui::Begin("Scene");
+
+        m_ViewportFocused = sceneVisible && ImGui::IsWindowFocused();
+
+        m_ViewportHovered = sceneVisible && ImGui::IsWindowHovered();
+
+        if (sceneVisible)
+        {
+            const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+
+            if (viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+            {
+                //为什么不在 OnImGuiRender() 里直接 Resize
+                /**
+                 *
+                * OnImGuiRender 记录尺寸
+                      ↓
+                  下一帧 OnUpdate 开始时 Resize
+                      ↓
+                  立即向新尺寸纹理绘制场景
+                      ↓
+                  OnImGuiRender 显示已经画好的纹理
+                 */
+                m_ViewportWidth = static_cast<uint32_t>(viewportSize.x);
+
+                m_ViewportHeight = static_cast<uint32_t>(viewportSize.y);
+
+                const ImTextureID textureID = m_SceneFramebuffer->GetColorAttachmentHandle();
+
+                ImGui::Image(ImTextureRef(textureID),
+                             viewportSize,
+                             ImVec2(0.0f, 1.0f), //垂直翻转
+                             ImVec2(1.0f, 0.0f) //垂直翻转
+                );
+            }
+        }
+        ImGui::End();
     }
 } // SandBox

@@ -69,7 +69,7 @@ namespace Limen
             data // stbi_load返回的数据
         );
 
-        glGenerateMipmap(GL_TEXTURE_2D); //生成其余层
+        glGenerateMipmap(GL_TEXTURE_2D); //生成其余MipMap层
 
         glBindTexture(GL_TEXTURE_2D, 0);
         if (data)
