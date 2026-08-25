@@ -8,7 +8,7 @@ namespace Limen {
 	class LIMEN_API WindowResizeEvent : public Event
 	{
 	public:
-		WindowResizeEvent(unsigned int width, unsigned int height)
+		WindowResizeEvent(const unsigned int width, const unsigned int height)
 			: m_Width(width), m_Height(height) {}
 
 		[[nodiscard]] unsigned int GetWidth() const { return m_Width; }

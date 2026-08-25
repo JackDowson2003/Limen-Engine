@@ -149,6 +149,7 @@ namespace Limen
             LM_CORE_ERROR("Cannot bind OpenGL graphics pipeline without a shader");
             return;
         }
+
         // Shader 必须先绑定，后续 Set* Uniform 调用才会写入正确的 Program。
         m_Specification.ShaderProgram->Bind();
 

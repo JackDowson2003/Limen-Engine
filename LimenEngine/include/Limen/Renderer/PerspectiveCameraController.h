@@ -119,7 +119,7 @@ namespace Limen
             const glm::vec3 &axis,
             float angleRadians
         );
-    private:
+
         PerspectiveCamera m_Camera;
 
         // 相机移动速度，单位为世界单位/秒。

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "Limen/RHI/RenderState.h"
 #include "Limen/RHI/VertexArray.h"
 #include "glm/glm.hpp"
@@ -84,7 +82,7 @@ namespace Limen
          *
          * 必须在Renderer::Init()之前调用；Renderer初始化后不允许切换后端。
          */
-        static void SetAPI(API api) noexcept
+        static void SetAPI(const API api) noexcept
         {
             s_API = api;
         }

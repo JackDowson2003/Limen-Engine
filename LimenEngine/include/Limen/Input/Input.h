@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <utility>
 
 #include "Limen/Core/Core.h"
@@ -44,12 +43,12 @@ namespace Limen
 
         Input() = default;
 
-        [[nodiscard]] static bool IsKeyPressed(KeyCode keyCode)
+        [[nodiscard]] static bool IsKeyPressed(const KeyCode keyCode)
         {
             return s_Instance->IsKeyPressedImpl(keyCode);
         }
 
-        [[nodiscard]] static bool IsMouseButtonPressed(MouseButton button)
+        [[nodiscard]] static bool IsMouseButtonPressed(const MouseButton button)
         {
             return s_Instance->IsMouseButtonPressedImpl(button);
         }

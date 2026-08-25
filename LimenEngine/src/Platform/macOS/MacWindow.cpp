@@ -118,7 +118,10 @@ namespace Limen
         glfwSetWindowUserPointer(m_Window, &m_Data);
         SetVSync(true);
 
-
+        /**
+         * 这个回调会告诉你输入了什么字符
+         * codepoint 是按下的字符 例如 'a'
+         */
         glfwSetCharCallback(m_Window, [](GLFWwindow *window, unsigned int codepoint)
         {
             const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));

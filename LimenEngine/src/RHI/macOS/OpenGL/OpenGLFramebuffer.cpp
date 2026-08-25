@@ -57,6 +57,7 @@ namespace Limen
 
         // 将完整颜色区域从多采样附件解析到单采样纹理。
         // 多采样 Resolve 的过滤参数必须使用 GL_NEAREST。
+        // 将整个抗锯齿图像，拷贝并解析到普通FBO
         glBlitFramebuffer(0,
                           0,
                           static_cast<GLint>(m_Specification.Width),
@@ -125,6 +126,8 @@ namespace Limen
         glGenTextures(1, &m_ColorAttachment);
 
         // 场景是 2D 还是 3D 不影响渲染目标的维度；屏幕颜色结果仍是二维纹理。
+        // 多采样 Renderbuffer 不能直接作为普通 Texture2D 交给当前的 ImGui::Image() 使用。
+        // 所以还需要：m_ColorAttachment
         glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
 
         // 渲染目标不生成 Mipmap，因此缩小过滤不能选择 Mipmap 模式。
@@ -156,7 +159,7 @@ namespace Limen
 
         if (m_Specification.Samples == 1)
         {
-            // 单采样：普通颜色纹理直接挂载到主 FBO。
+            // 单采样：普通颜色纹理直接挂载到主 FBO (默认生成的)。
             glFramebufferTexture2D(
                 GL_FRAMEBUFFER,
                 GL_COLOR_ATTACHMENT0,
@@ -172,7 +175,8 @@ namespace Limen
             glRenderbufferStorage(GL_RENDERBUFFER,
                                   GL_DEPTH24_STENCIL8,
                                   width, height);
-        } else
+        }
+        else
         {
             // 多采样：颜色与深度/模板附件必须使用相同的样本数。
             glGenRenderbuffers(1, &m_MultisampleColorRenderbuffer);
@@ -196,6 +200,7 @@ namespace Limen
             glBindRenderbuffer(GL_RENDERBUFFER, m_DepthStencilRenderbuffer);
 
             // 为每个样本分配深度/模板存储。
+            //渲染缓冲区分配内存，并指定它需要支持的“样本”（samples）数量，从而实现多重采样抗锯齿（MSAA）功能
             glRenderbufferStorageMultisample(GL_RENDERBUFFER,
                                              static_cast<GLsizei>(m_Specification.Samples),
                                              GL_DEPTH24_STENCIL8,
@@ -211,6 +216,9 @@ namespace Limen
         LM_CORE_ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
                        "OpenGL scene Framebuffer is incomplete");
 
+        //但采样的时候我们不去create FBO
+        //让默认的FBO去接受他
+        //如果是离屏的 就必须要创建 FBO
         if (m_Specification.Samples > 1)
         {
             glGenFramebuffers(1, &m_ResolveFramebufferID);
@@ -228,6 +236,8 @@ namespace Limen
         }
 
         // 恢复默认绑定，避免后续资源操作误改本 Framebuffer。
+        //glBindRenderbuffer将一个创建好的渲染缓冲对象（Renderbuffer Object）绑定到特定的目标上，
+        //使其成为当前操作的“活跃”对象
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }

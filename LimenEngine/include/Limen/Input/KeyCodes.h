@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-
 namespace Limen
 {
     // 引擎自己的键码。不要在这里使用 GLFW、Win32 或 macOS 的原生键码。

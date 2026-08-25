@@ -66,6 +66,7 @@ namespace Limen
 
     void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, PrimitiveTopology topology)
     {
+        //按照我给的这张‘索引地图’，从你现有的顶点数据里，把指定的顶点取出来，画成我想要的图形
         glDrawElements(ToOpenGLPrimitiveTopology(topology),
                        static_cast<int>(vertexArray.GetIndexBuffer()->GetCount()),
                        GL_UNSIGNED_INT,

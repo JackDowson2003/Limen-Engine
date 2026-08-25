@@ -48,7 +48,7 @@ namespace Limen {
 		);
 	}
 
-	constexpr EventCategory& operator|=(EventCategory& lhs, EventCategory rhs)
+	constexpr EventCategory& operator|=(EventCategory& lhs, const EventCategory rhs)
 	{
 		lhs = lhs | rhs;
 		return lhs;
@@ -88,7 +88,7 @@ namespace Limen {
 		template<typename T>
 		using EventFn = std::function<bool(T&)>;
 	public:
-		EventDispatcher(Event& event)
+		explicit EventDispatcher(Event& event)
 			: m_Event(event)
 		{
 		}

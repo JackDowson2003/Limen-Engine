@@ -12,7 +12,6 @@
 #include "Limen/Input/Input.h"
 #include "Limen/Renderer/Renderer.h"
 
-
 namespace SandBox
 {
     Example3DLayer::Example3DLayer()
@@ -252,10 +251,8 @@ namespace SandBox
             );
         }
 
-        const bool rightMousePressed = Limen::Input::IsMouseButtonPressed(Limen::MouseButton::Right);
-
         // 松开右键，结束本次导航。
-        if (!rightMousePressed)
+        if (const bool rightMousePressed = Limen::Input::IsMouseButtonPressed(Limen::MouseButton::Right); !rightMousePressed)
         {
             m_ViewportNavigationActive = false;
         }
@@ -271,6 +268,10 @@ namespace SandBox
         m_CameraController.OnUpdate(deltaTime);
 
         // 绑定场景 Framebuffer，并清理本帧的颜色与深度附件。
+        /**
+         * 我们必选先从这开始
+         * 这里会bind FBO 我们的GPU需要知道
+         */
         m_SceneRenderPass->Begin();
 
         /**
@@ -307,7 +308,7 @@ namespace SandBox
         m_AlbedoTexture->Bind(0);
         Limen::Renderer::Submit(
             *m_CubePipeline,
-            *m_CubeVAO,
+            *m_CubeVAO, //记住了Albedo_Texture
             cubeTransform
         );
         Limen::Renderer::EndScene();
@@ -331,9 +332,7 @@ namespace SandBox
 
         if (sceneVisible)
         {
-            const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
-
-            if (viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+            if (const ImVec2 viewportSize = ImGui::GetContentRegionAvail(); viewportSize.x > 0.0f && viewportSize.y > 0.0f)
             {
                 /**
                  * 此处只记录 ImGui 内容区尺寸；下一帧 OnUpdate() 在绘制前

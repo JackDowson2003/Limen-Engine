@@ -98,7 +98,7 @@ namespace Limen
          *
          * @param enabled true 表示允许旋转；false 表示忽略旋转输入。
          */
-        void SetRotationEnabled(bool enabled)
+        void SetRotationEnabled(const bool enabled)
         {
             m_RotationEnabled = enabled;
         }
@@ -160,7 +160,7 @@ namespace Limen
         bool OnMouseScrolled(const MouseScrolledEvent &event);
 
         bool OnViewportResized(const WindowResizeEvent &event);
-    private:
+
         // 当前视口的宽高比。
         float m_AspectRatio = 1.0f;
 

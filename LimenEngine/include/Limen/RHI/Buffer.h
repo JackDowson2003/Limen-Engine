@@ -3,7 +3,6 @@
 //
 #pragma once
 
-#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -340,7 +339,6 @@ namespace Limen
     {
     public:
         virtual ~VertexBuffer() = default;
-        VertexBuffer() = default;
 
         virtual void Bind() const = 0;
         virtual void UnBind() const = 0;

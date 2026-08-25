@@ -24,7 +24,7 @@ namespace Limen
     class LIMEN_API KeyPressedEvent : public KeyEvent
     {
     public:
-        KeyPressedEvent(const KeyCode keyCode, const int repeatCount = 0)
+        explicit KeyPressedEvent(const KeyCode keyCode, const int repeatCount = 0)
             : KeyEvent(keyCode), m_RepeatCount(repeatCount) {}
 
         [[nodiscard]] bool IsRepeat() const { return m_RepeatCount > 0; }
@@ -71,7 +71,7 @@ namespace Limen
         [[nodiscard]] std::string ToString() const override
         {
             std::stringstream stream;
-            stream << "KeyTypedEvent: " << static_cast<std::uint32_t>(m_Codepoint);
+            stream << "KeyTypedEvent: " << m_Codepoint;
             return stream.str();
         }
 

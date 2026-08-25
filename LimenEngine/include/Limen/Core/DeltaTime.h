@@ -6,6 +6,9 @@
 
 namespace Limen
 {
+    /**
+     * 不能是explicit的
+     */
     class DeltaTime
     {
     public:

@@ -24,7 +24,7 @@ namespace Limen
          * @param rendererAPI 本次运行使用的图形API。macOS可选择OpenGL或Metal；
          *                    当前阶段仅OpenGL后端已经实现。
          */
-        Application(
+        explicit Application(
             bool isVSYNC = true,
             RendererAPI::API rendererAPI = RendererAPI::API::OPENGL
         );
@@ -37,9 +37,9 @@ namespace Limen
 
         void OnEvent(Event& e);
 
-        [[nodiscard]] inline Window& GetWindow() const { return *m_Window; }
+        [[nodiscard]] Window& GetWindow() const { return *m_Window; }
 
-        inline static  Application& GetApp() { return *s_Instance; }
+        static  Application& GetApp() { return *s_Instance; }
 
     private:
         bool OnWindowClose(WindowCloseEvent& e);
@@ -54,7 +54,6 @@ namespace Limen
 
         double m_LastFrameTime = 0.0f;
 
-    private:
         static Application *s_Instance;
 
     };

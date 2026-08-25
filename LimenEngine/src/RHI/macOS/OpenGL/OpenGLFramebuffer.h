@@ -40,14 +40,13 @@ namespace Limen
         std::uintptr_t
         GetColorAttachmentHandle() const noexcept override
         {
-            return static_cast<std::uintptr_t>(
-                m_ColorAttachment
-            );
+            return m_ColorAttachment;
         }
 
     private:
         /**
-         * 删除旧附件，再按当前 Specification 重建。
+         * 删除旧附件，再按当前 Specification 重建
+         * 只负责创建和连接资源，不负责绘制场景
          */
         void Invalidate();
 

@@ -8,6 +8,9 @@
 
 namespace Limen
 {
+    /**
+     * @brief 图形上下文
+     */
     class  GraphicsContext
     {
     public:

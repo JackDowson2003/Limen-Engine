@@ -76,6 +76,7 @@ namespace Limen
 
     private:
         RenderPassSpecification m_Specification;
+        //是否创建（激活）
         bool m_IsActive = false;
     };
 }

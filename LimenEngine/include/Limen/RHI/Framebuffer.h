@@ -2,7 +2,6 @@
 // Created by chenlong on 2026/8/23.
 //
 #pragma once
-#include <cstdint>
 #include "Limen/Core/Core.h"
 
 namespace Limen

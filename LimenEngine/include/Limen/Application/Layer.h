@@ -10,7 +10,7 @@ namespace  Limen {
 	class LIMEN_API Layer
 	{
 	public:
-		Layer( std::string  name = "Layer");
+		explicit Layer( std::string  name = "Layer");
 		virtual ~Layer() = default;
 
 		virtual void OnAttach() {}

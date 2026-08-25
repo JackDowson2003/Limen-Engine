@@ -74,7 +74,7 @@ namespace Limen
             if (!m_Minimized)
             {
                 for (Layer *layer: m_LayerStack)
-                    layer->OnUpdate(deltaTime);
+                    layer->OnUpdate(deltaTime); //更新数据
 
                 /*
                  * 所有离屏场景渲染结束后，Example3DLayer 已经解绑场景 FBO，
@@ -93,12 +93,12 @@ namespace Limen
             LM_CORE_ASSERT(m_ImGUILayer, "ImGui layer was not initialized");
             m_ImGUILayer->Begin();
             for (Layer *&layer: m_LayerStack)
-                layer->OnImGuiRender();
+                layer->OnImGuiRender(); //设置好imgui的数据
             m_ImGUILayer->End();
 #endif
 
             // 所有场景与 ImGui 命令完成后再交换窗口缓冲。
-            m_Window->Present();
+            m_Window->Present(); //render
         }
     }
 
