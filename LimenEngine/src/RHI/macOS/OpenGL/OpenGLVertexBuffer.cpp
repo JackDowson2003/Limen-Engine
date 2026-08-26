@@ -87,6 +87,7 @@ namespace Limen
     }
 
     OpenGLVertexBuffer::OpenGLVertexBuffer(const void *vertices, const uint32_t size)
+        : m_Size(size)
     {
         glGenBuffers(1, &m_RendererID);
         glBindBuffer(GL_ARRAY_BUFFER, m_RendererID);
@@ -99,19 +100,35 @@ namespace Limen
     }
 
     OpenGLVertexBuffer::OpenGLVertexBuffer(OpenGLVertexBuffer &&vb) noexcept
-        :m_RendererID(vb.m_RendererID),m_Layout(std::move(vb.m_Layout))
+        : m_RendererID(vb.m_RendererID),
+          m_Layout(std::move(vb.m_Layout)),
+          m_Size(vb.m_Size)
     {
         vb.m_RendererID = 0;
+        vb.m_Size = 0;
     }
 
-    OpenGLVertexBuffer & OpenGLVertexBuffer::operator=(OpenGLVertexBuffer &&vb) noexcept
+    OpenGLVertexBuffer &OpenGLVertexBuffer::operator=(OpenGLVertexBuffer &&vb) noexcept
     {
         if (this == &vb)
         {
             return *this;
         }
+
+        // 当前对象可能已经拥有一个 OpenGL Buffer，
+        // 覆盖 ID 前必须释放，否则会产生 GPU 资源泄漏。
+        if (m_RendererID != 0)
+            glDeleteBuffers(1, &m_RendererID);
+
+
         m_RendererID = vb.m_RendererID;
         m_Layout = std::move(vb.m_Layout);
+        m_Size = vb.m_Size;
+
+        // 清空源对象的所有权，避免它析构时重复删除。
+        vb.m_RendererID = 0;
+        vb.m_Size = 0;
+
         return *this;
     }
 
@@ -126,11 +143,57 @@ namespace Limen
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size)
+    OpenGLVertexBuffer::OpenGLVertexBuffer(const uint32_t size)
+        : m_Size(size)
     {
+        LM_CORE_ASSERT(size > 0, "Size must be greater than 0");
+        if (size == 0)
+            return;
+        glGenBuffers(1, &m_RendererID);
+        OpenGLVertexBuffer::Bind();
+
+        // Must bind the VBO before we set Data
+        // Apply for space that we need
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            size,
+            nullptr,
+            GL_DYNAMIC_DRAW
+        );
     }
 
-    void OpenGLVertexBuffer::SetData(const void *data, uint32_t size, uint32_t offset)
+    void OpenGLVertexBuffer::SetData(const void *data, const uint32_t size, const uint32_t offset)
     {
+        LM_CORE_ASSERT(
+            data,
+            "OpenGLVertexBuffer::SetData received null data"
+        );
+
+        LM_CORE_ASSERT(
+            size > 0,
+            "OpenGLVertexBuffer::SetData size must be greater than zero"
+        );
+
+        LM_CORE_ASSERT(
+            offset <= m_Size && size <= m_Size - offset,
+            "OpenGLVertexBuffer::SetData exceeds buffer capacity"
+        );
+
+
+        if (!data || size == 0)
+            return;
+
+        if (offset > m_Size || size > m_Size - offset)
+            return;
+
+        OpenGLVertexBuffer::Bind();
+
+        //存入数据
+        glBufferSubData(
+            GL_ARRAY_BUFFER,
+            static_cast<GLintptr>(offset),
+            static_cast<GLsizeiptr>(size),
+            data
+        );
     }
 }

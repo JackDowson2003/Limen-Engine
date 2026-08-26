@@ -38,17 +38,22 @@ namespace Limen
         virtual void Init() = 0;
 
         /**
-         * @brief 使用索引缓冲绘制顶点。
+         * @brief 使用索引缓冲提交一次绘制。
          *
          * @param vertexArray
-         * 包含顶点缓冲、索引缓冲和顶点布局的VertexArray。
+         * 保存顶点缓冲、索引缓冲以及顶点布局的 VertexArray。
          *
          * @param topology
-         * GPU将索引指定的顶点组装成三角形、线或点的方式。
+         * GPU 使用的图元组装方式，例如 TriangleList。
+         *
+         * @param indexCount
+         * 本次实际绘制的索引数量。
+         * 传入0表示使用 IndexBuffer 保存的全部索引。
          */
         virtual void DrawIndexed(
             const VertexArray& vertexArray,
-            PrimitiveTopology topology
+            PrimitiveTopology topology,
+            uint32_t indexCount = 0
         ) = 0;
 
         virtual void SetViewport(

@@ -1,18 +1,19 @@
 #version 410 core
 
 /**
- * 当前片元最终写入颜色缓冲区的RGBA颜色。
+ * 光栅化阶段插值得到的片元颜色。
+ *
+ * 如果一个 Quad 的四个顶点颜色相同，
+ * 整个 Quad 就会显示为统一颜色。
+ */
+in vec4 v_Color;
+
+/**
+ * 当前片元最终写入颜色附件的 RGBA 颜色。
  */
 layout(location = 0) out vec4 color;
 
-// MaterialData 对应绑定到该 uniform block 的材质 UBO。
-// std140 中 vec4 的大小和基础对齐均为16字节。
-layout(std140) uniform MaterialData
-{
-    vec4 u_Color;
-};
-
 void main()
 {
-    color = u_Color;
+    color = v_Color;
 }

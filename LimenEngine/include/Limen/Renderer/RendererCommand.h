@@ -52,14 +52,18 @@ namespace Limen
          *
          * @param vertexArray 顶点输入布局以及顶点、索引缓冲。
          * @param topology 输入顶点的图元组装方式。
+         * @param indexCount
+         * 本次实际绘制的索引数量。
+         * 传入0表示绘制 IndexBuffer 中的全部索引。
          */
         static void DrawIndexed(
             const VertexArray &vertexArray,
-            const PrimitiveTopology topology = PrimitiveTopology::TriangleList
+            const PrimitiveTopology topology = PrimitiveTopology::TriangleList,
+            const uint32_t indexCount = 0
         )
         {
             if (RendererAPI *api = GetRendererAPI())
-                api->DrawIndexed(vertexArray, topology);
+                api->DrawIndexed(vertexArray, topology,indexCount);
         }
 
         static void SetViewport(

@@ -46,14 +46,37 @@ namespace Limen
             glEnableVertexAttribArray(index);
             const GLenum type = ShaderDataTypeToOpenGLType(element.Type);
             const GLint size = static_cast<int>(element.GetComponentSize());
-            glVertexAttribPointer(
-                index,
-                size,
-                type,
-                element.Normalized ? GL_TRUE : GL_FALSE,
-                stride,
-                reinterpret_cast<void *>(element.Offset)
-            );
+            // glVertexAttribPointer(
+            //     index,
+            //     size,
+            //     type,
+            //     element.Normalized ? GL_TRUE : GL_FALSE,
+            //     stride,
+            //     reinterpret_cast<void *>(element.Offset)
+            // );
+            if (ShaderDataTypeIsInteger(element.Type) && !element.Normalized)
+            {
+                // Int、UInt 等整数属性必须使用整数读取接口，
+                // 这样 GLSL 才能使用 int/uint 接收原始整数值。
+                glVertexAttribIPointer(
+                    index,
+                    size,
+                    type,
+                    stride,
+                    reinterpret_cast<const void *>(element.Offset)
+                );
+            } else
+            {
+                // Float 属性以及需要归一化为浮点数的整数存储走普通接口。
+                glVertexAttribPointer(
+                    index,
+                    size,
+                    type,
+                    element.Normalized ? GL_TRUE : GL_FALSE,
+                    stride,
+                    reinterpret_cast<const void *>(element.Offset)
+                );
+            }
             index++;
         }
         m_VertexBuffers.push_back(vertexBuffer);
@@ -67,14 +90,13 @@ namespace Limen
         m_IndexBuffer = indexBuffer;
     }
 
-    const std::vector<Ref<VertexBuffer>>& OpenGLVertexArray::GetVertexBuffers() const
+    const std::vector<Ref<VertexBuffer> > &OpenGLVertexArray::GetVertexBuffers() const
     {
         return m_VertexBuffers;
     }
 
-    const Ref<IndexBuffer>& OpenGLVertexArray::GetIndexBuffer() const
+    const Ref<IndexBuffer> &OpenGLVertexArray::GetIndexBuffer() const
     {
         return m_IndexBuffer;
     }
-
 }

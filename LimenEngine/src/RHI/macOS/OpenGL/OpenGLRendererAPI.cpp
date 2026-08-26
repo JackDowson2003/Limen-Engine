@@ -64,13 +64,46 @@ namespace Limen
             glDisable(GL_DEPTH_TEST);
     }
 
-    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, PrimitiveTopology topology)
+    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, PrimitiveTopology topology, uint32_t indexCount)
     {
+        // 获取 VAO 当前绑定的 IndexBuffer。
+        const Ref<IndexBuffer> &indexBuffer =
+                vertexArray.GetIndexBuffer();
+        LM_CORE_ASSERT(
+            indexBuffer,
+            "OpenGLRendererAPI::DrawIndexed requires an IndexBuffer"
+        );
+
+        if (!indexBuffer)
+            return;
+
+        // indexCount 为0时，保持旧行为：
+        // 绘制 IndexBuffer 中的全部索引。
+        const uint32_t actualIndexCount =
+            indexCount == 0
+                ? indexBuffer->GetCount()
+                : indexCount;
+
+        // 防止绘制数量超过 IndexBuffer 实际容量。
+        LM_CORE_ASSERT(
+            actualIndexCount <= indexBuffer->GetCount(),
+            "DrawIndexed index count exceeds IndexBuffer capacity"
+        );
+
+        if (actualIndexCount > indexBuffer->GetCount())
+            return;
+
+        // 没有索引时不向 GPU 提交空绘制命令。
+        if (actualIndexCount == 0)
+            return;
+
         //按照我给的这张‘索引地图’，从你现有的顶点数据里，把指定的顶点取出来，画成我想要的图形
-        glDrawElements(ToOpenGLPrimitiveTopology(topology),
-                       static_cast<int>(vertexArray.GetIndexBuffer()->GetCount()),
-                       GL_UNSIGNED_INT,
-                       nullptr);
+        glDrawElements(
+                ToOpenGLPrimitiveTopology(topology),
+                static_cast<GLsizei>(actualIndexCount),
+                GL_UNSIGNED_INT,
+                nullptr
+            );
     }
 
 

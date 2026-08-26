@@ -31,11 +31,23 @@ namespace Limen
         void SetDepthTest(bool enabled) override;
 
         /**
-         * @brief 用缓冲区绘制
-         * @param vertexArray vao
-         * @param topology 顶点/图元的连接方式
+         * @brief 使用索引缓冲提交一次绘制。
+         *
+         * @param vertexArray
+         * 保存顶点缓冲、索引缓冲以及顶点布局的 VertexArray。
+         *
+         * @param topology
+         * GPU 使用的图元组装方式，例如 TriangleList。
+         *
+         * @param indexCount
+         * 本次实际绘制的索引数量。
+         * 传入0表示使用 IndexBuffer 保存的全部索引。
          */
-        void DrawIndexed(const VertexArray& vertexArray,PrimitiveTopology topology) override;
+        void DrawIndexed(
+           const VertexArray& vertexArray,
+           PrimitiveTopology topology,
+           uint32_t indexCount = 0
+       ) override;
 
         void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
     };

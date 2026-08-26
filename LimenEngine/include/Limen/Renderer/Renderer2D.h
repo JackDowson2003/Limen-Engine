@@ -163,5 +163,29 @@ namespace Limen
          * 使用 Scope 可以明确内部资源的所有权，避免手动 delete。
          */
         static Scope<Renderer2DData> s_Data;
+
+        /**
+         * @brief 开始收集一个新的批次。
+         *
+         * 清空当前索引数量，并把 CPU 顶点写入指针
+         * 重置到顶点数组开头。
+         */
+        static void StartBatch();
+
+        /**
+         * @brief 提交当前已经收集的批次。
+         *
+         * 将 CPU 顶点上传到动态 VBO，
+         * 然后使用实际索引数量发出一次 Draw Call。
+         */
+        static void Flush();
+
+        /**
+         * @brief 提交当前批次并开始一个新批次。
+         *
+         * 当顶点或索引容量不足时调用。
+         */
+        static void NextBatch();
+
     };
 }
