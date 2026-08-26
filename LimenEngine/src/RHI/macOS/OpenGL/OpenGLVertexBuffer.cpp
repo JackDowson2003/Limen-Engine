@@ -126,52 +126,11 @@ namespace Limen
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    OpenGLIndexBuffer::OpenGLIndexBuffer(const uint32_t *indices, const uint32_t count)
-        : m_Count(count)
+    OpenGLVertexBuffer::OpenGLVertexBuffer(uint32_t size)
     {
-        glGenBuffers(1, &m_RendererID);
-        OpenGLIndexBuffer::Bind();
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t) * count, indices,GL_STATIC_DRAW);
     }
 
-    OpenGLIndexBuffer::OpenGLIndexBuffer(OpenGLIndexBuffer &&ib) noexcept
-        :m_RendererID(ib.m_RendererID),m_Count(ib.m_Count)
+    void OpenGLVertexBuffer::SetData(const void *data, uint32_t size, uint32_t offset)
     {
-        ib.m_RendererID = 0;
-        ib.m_Count = 0;
     }
-
-    OpenGLIndexBuffer & OpenGLIndexBuffer::operator=(OpenGLIndexBuffer &&ib) noexcept
-    {
-        if (this == &ib)
-        {
-            return *this;
-        }
-        m_RendererID = ib.m_RendererID;
-        m_Count = ib.m_Count;
-        ib.m_RendererID = 0;
-        ib.m_Count = 0;
-        return *this;
-    }
-
-    OpenGLIndexBuffer::~OpenGLIndexBuffer()
-    {
-        glDeleteBuffers(1, &m_RendererID);
-    }
-
-    void OpenGLIndexBuffer::Bind() const
-    {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_RendererID);
-    }
-
-    void OpenGLIndexBuffer::UnBind() const
-    {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    }
-
-    uint32_t OpenGLIndexBuffer::GetCount() const
-    {
-        return m_Count;
-    }
-
 }

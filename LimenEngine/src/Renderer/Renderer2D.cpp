@@ -11,6 +11,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include "Limen/RHI/Buffer.h"
+#include "Limen/RHI/IndexBuffer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/UniformBuffer.h"

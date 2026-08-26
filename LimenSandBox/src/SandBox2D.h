@@ -13,6 +13,7 @@
 #include "Limen/Renderer/PerspectiveCamera.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/Renderer/RendererCommand.h"
+#include "Limen/RHI/IndexBuffer.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/UniformBuffer.h"

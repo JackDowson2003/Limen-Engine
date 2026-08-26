@@ -7,6 +7,7 @@
 #include "Limen/Renderer/RenderPass.h"
 #include "Limen/RHI/Framebuffer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
+#include "Limen/RHI/IndexBuffer.h"
 #include "Limen/RHI/Shader.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/VertexArray.h"

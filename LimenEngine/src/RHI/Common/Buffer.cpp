@@ -26,22 +26,4 @@ namespace Limen
         LM_CORE_ERROR("Unknown Render API! Cannot create vertex buffer!");
         return nullptr;
     }
-
-
-    IndexBuffer *IndexBuffer::Create(const uint32_t *indices, const uint32_t count)
-    {
-        switch (Renderer::GetRenderAPI())
-        {
-            case RendererAPI::API::NONE:
-            {
-                LM_CORE_ASSERT(false, "RendererAPI::API::NONE is not supported!");
-                return nullptr;
-            }
-            case RendererAPI::API::OPENGL: return new OpenGLIndexBuffer(indices, count);
-            default:
-                break;
-        }
-        LM_CORE_ERROR("Unknown Render API! Cannot create index buffer!");
-        return nullptr;
-    }
 }

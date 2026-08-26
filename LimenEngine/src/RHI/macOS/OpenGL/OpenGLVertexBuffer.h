@@ -20,6 +20,17 @@ namespace Limen
     public:
         OpenGLVertexBuffer(const void *vertices, uint32_t size);
 
+        /**
+         * @brief 创建指定容量的动态 OpenGL VertexBuffer。
+         */
+        explicit OpenGLVertexBuffer(uint32_t size);
+
+        void SetData(
+            const void *data,
+            uint32_t size,
+            uint32_t offset = 0
+        ) override;
+
         ~OpenGLVertexBuffer() override;
         OpenGLVertexBuffer(OpenGLVertexBuffer&&) noexcept;
         OpenGLVertexBuffer& operator=(OpenGLVertexBuffer&&) noexcept;
@@ -41,25 +52,13 @@ namespace Limen
     private:
         uint32_t m_RendererID = 0;
         BufferLayout m_Layout;
+
+        /**
+         * @brief 当前VBO分配的总字节
+         *
+         * SetData() 使用他检查写入范围是否越界
+         */
+        uint32_t m_Size = 0;
     };
 
-    class LIMEN_API OpenGLIndexBuffer : public IndexBuffer
-    {
-    public:
-        OpenGLIndexBuffer(const uint32_t *indices, uint32_t count);
-
-        OpenGLIndexBuffer(OpenGLIndexBuffer&&) noexcept;
-        OpenGLIndexBuffer& operator=(OpenGLIndexBuffer&&) noexcept;
-
-        ~OpenGLIndexBuffer() override;
-        void Bind() const override;
-
-        void UnBind() const override;
-
-        [[nodiscard]] uint32_t GetCount() const override;
-
-    private:
-        uint32_t m_RendererID = 0;
-        uint32_t m_Count;
-    };
 }
