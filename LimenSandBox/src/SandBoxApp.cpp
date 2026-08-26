@@ -1,6 +1,7 @@
 #include "Limen.h"
 
 #include "Example3DLayer.h"
+#include "Renderer2DTestLayer.h"
 #include "SandBox2D.h"
 
 
@@ -16,7 +17,8 @@ namespace
             )
         {
             // 当前只运行 3D 测试层，便于隔离验证透视、深度与 Pipeline。
-            PushLayer(new SandBox::Example3DLayer());
+            // PushLayer(new SandBox::Example3DLayer());
+            PushLayer(new SandBox::Renderer2DTestLayer());
         }
 
         ~SandBoxApp() override = default;

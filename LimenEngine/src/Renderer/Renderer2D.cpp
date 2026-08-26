@@ -356,6 +356,7 @@ namespace Limen
         if (!s_Data->TexturePipeline)
         {
             s_Data.reset();
+            return;
         }
     }
 
