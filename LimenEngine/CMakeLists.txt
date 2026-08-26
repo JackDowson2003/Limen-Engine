@@ -184,10 +184,13 @@ else ()
     )
 endif ()
 
+
 target_compile_definitions(LimenEngine
         PUBLIC
         $<$<CONFIG:Debug>:LM_ENABLE_ASSERTS>
 )
+
+
 
 # 应用根目录定义的统一警告与 Sanitizer 策略。
 limen_configure_target(LimenEngine)

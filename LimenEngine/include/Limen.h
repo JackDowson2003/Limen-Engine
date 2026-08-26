@@ -19,6 +19,7 @@
 #include "Limen/Renderer/PerspectiveCamera.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Renderer/Renderer.h"
+#include "Limen/Renderer/Renderer2D.h"
 #include "Limen/RHI/RendererAPI.h"
 #include "Limen/Renderer/RendererCommand.h"
 #include "Limen/RHI/Shader.h"

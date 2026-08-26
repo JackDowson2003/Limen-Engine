@@ -52,6 +52,11 @@ namespace Limen
             int value
         ) = 0;
 
+        virtual void SetInt(
+            const char* name,
+            uint32_t value
+        ) = 0;
+
         /**
          * @brief 将 Shader 中的 Uniform Block 关联到指定绑定点。
          *
@@ -155,6 +160,11 @@ namespace Limen
         );
     };
 
+    /**
+     * @brief 用于管理Shader 并负责创建按照文件路径创建Shader
+     *
+     * 会进行Shader的缓存
+     */
     class LIMEN_API ShaderLibrary
     {
     public:

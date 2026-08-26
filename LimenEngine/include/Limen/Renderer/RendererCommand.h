@@ -24,6 +24,7 @@ namespace Limen
 
         /**
          * @brief 根据RendererAPI::GetAPI()和当前平台创建并初始化后端。
+         * 初始化当前选定图形 API 的底层命令后端，例如 OpenGLRendererAPI，并设置初始 GPU 状态。
          */
         static void Init();
 

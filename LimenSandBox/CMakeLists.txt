@@ -14,23 +14,27 @@ target_link_libraries(LimenSandBox
 # 与引擎使用同一套警告和 Sanitizer 配置。
 limen_configure_target(LimenSandBox)
 
-# 开发期把资源镜像到可执行文件旁，保证从 out/LimenSandBox 启动时路径稳定。
-# 正式资源系统将用资源根目录或打包文件替代全量复制。
+# 从 LimenSandBox/ 回到仓库根目录。
+get_filename_component(LIMEN_PROJECT_ROOT
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        ABSOLUTE
+)
+
+# 开发期把引擎内置资源和 Sandbox 项目资源复制到可执行文件旁。
+# 先复制引擎资源，再复制项目资源。
 add_custom_command(
         TARGET LimenSandBox
         POST_BUILD
 
         COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${LIMEN_PROJECT_ROOT}/LimenEngine/assets"
+        "$<TARGET_FILE_DIR:LimenSandBox>/assets"
+
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:LimenSandBox>/assets"
 
-        COMMENT "Copying Sandbox assets"
-)
-
-# 从 LimenSandBox/ 回到仓库根目录。
-get_filename_component(LIMEN_PROJECT_ROOT
-        "${CMAKE_CURRENT_SOURCE_DIR}/.."
-        ABSOLUTE
+        COMMENT "Copying LimenEngine and Sandbox assets"
 )
 
 # 将不同构建目录生成的可执行文件统一放到仓库根目录的 out/。

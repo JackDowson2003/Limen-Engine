@@ -30,6 +30,11 @@ namespace Limen
             int value
         ) override;
 
+        void SetInt(
+            const char* name,
+            uint32_t value
+        ) override;
+
         void SetUniformBufferBinding(
             const char *blockName,
             uint32_t binding

@@ -157,7 +157,12 @@ namespace Limen
         UploadUniformInt(name, value);
     }
 
-    void OpenGLShader::SetUniformBufferBinding(const char *blockName, uint32_t binding)
+    void OpenGLShader::SetInt(const char *name, uint32_t value)
+    {
+        SetInt(name,static_cast<int>(value));
+    }
+
+    void OpenGLShader::SetUniformBufferBinding(const char *blockName, const uint32_t binding)
     {
         if (blockName == nullptr)
         {

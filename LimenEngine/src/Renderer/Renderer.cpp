@@ -1,6 +1,7 @@
 //
 // Created by chenlong on 2026/8/11.
 //
+#include "Limen/Renderer/Renderer2D.h"
 #include "Limen/Renderer/Renderer.h"
 
 #include "Limen/Core/Log.h"
@@ -27,10 +28,10 @@ namespace Limen
             return;
         }
         s_SceneData.ViewProjection =
-            camera.GetViewProjectionMatrix();
+                camera.GetViewProjectionMatrix();
 
         s_SceneData.CameraPosition =
-            camera.GetPosition();
+                camera.GetPosition();
 
         s_SceneData.IsActive = true;
     }
@@ -57,11 +58,31 @@ namespace Limen
 
     void Renderer::Init()
     {
+        /*
+         * 先创建并初始化底层 RendererAPI。
+         *
+         * Renderer2D 创建 VAO、VBO、Shader、UBO 和 Pipeline 时，
+         * 会通过 RendererCommand 和 RHI 使用当前图形 API。
+         */
         RendererCommand::Init();
+
+        /*
+         * 底层渲染后端和 GraphicsContext 已经可用，
+         * 现在可以创建 Renderer2D 的公共 GPU 资源。
+         */
+        Renderer2D::Init();
     }
 
     void Renderer::Shutdown()
     {
+        /*
+         * 先释放依赖底层图形 API 的二维 GPU 资源。
+         */
+        Renderer2D::Shutdown();
+
+        /*
+         * 所有高层渲染资源释放后，再销毁底层 RendererAPI。
+         */
         RendererCommand::Shutdown();
     }
 
@@ -69,7 +90,7 @@ namespace Limen
     void Renderer::Submit(
         const Ref<Shader> &shader,
         const VertexArray &vertexArray,
-        const glm::mat4& transform
+        const glm::mat4 &transform
     )
     {
         if (!s_SceneData.IsActive)
