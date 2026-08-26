@@ -25,6 +25,7 @@ namespace Limen
     void PerspectiveCameraController::OnUpdate(const DeltaTime &deltaTime)
     {
         const float dt = deltaTime.GetSeconds();
+
         const bool isNavigating =
             m_MouseLookEnabled &&
             Input::IsMouseButtonPressed(MouseButton::Right);

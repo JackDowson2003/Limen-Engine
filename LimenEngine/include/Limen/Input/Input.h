@@ -48,7 +48,8 @@ namespace Limen
             return s_Instance->IsKeyPressedImpl(keyCode);
         }
 
-        [[nodiscard]] static bool IsMouseButtonPressed(const MouseButton button)
+        [[nodiscard]]
+        static bool IsMouseButtonPressed(const MouseButton button)
         {
             return s_Instance->IsMouseButtonPressedImpl(button);
         }
