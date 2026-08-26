@@ -293,12 +293,12 @@ namespace Limen
         }
     };
 
-    class BufferLayout
+    class VertexBufferLayout
     {
     public:
-        BufferLayout() = default;
+        VertexBufferLayout() = default;
 
-        BufferLayout(const std::initializer_list<BufferElement> elements)
+        VertexBufferLayout(const std::initializer_list<BufferElement> elements)
             : m_Elements(elements)
         {
             CalculateOffsetAndStride();
@@ -343,8 +343,8 @@ namespace Limen
         virtual void Bind() const = 0;
         virtual void UnBind() const = 0;
 
-        virtual void SetLayout(const BufferLayout &layout) = 0;
-        [[nodiscard]] virtual const BufferLayout &GetLayout() const = 0;
+        virtual void SetLayout(const VertexBufferLayout &layout) = 0;
+        [[nodiscard]] virtual const VertexBufferLayout &GetLayout() const = 0;
 
         /**
          * @brief 更新 VertexBuffer 中的一段顶点数据。

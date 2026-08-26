@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "Limen/RHI/Buffer.h"
+#include "Limen/RHI/VertexBuffer.h"
 #include "Limen/RHI/IndexBuffer.h"
 
 namespace Limen

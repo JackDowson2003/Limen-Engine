@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <cstdint>
-
 #include "Limen/Core/Core.h"
 
 namespace Limen

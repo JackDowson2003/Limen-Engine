@@ -39,7 +39,7 @@ namespace SandBox
             // 三角形测试几何。
             m_VertexArray.reset(Limen::VertexArray::Create());
             m_VertexBuffer.reset(Limen::VertexBuffer::Create(vertices, sizeof(vertices)));
-            const Limen::BufferLayout layout
+            const Limen::VertexBufferLayout layout
             {
                 {Limen::ShaderDataType::Float3, "a_Position"},
             };
@@ -59,7 +59,7 @@ namespace SandBox
                 -0.05f, 0.05f, 0.0f, 0.f, 1.f,
             };
 
-            const Limen::BufferLayout layout2
+            const Limen::VertexBufferLayout layout2
             {
                 {Limen::ShaderDataType::Float3, "a_Position"},
                 {Limen::ShaderDataType::Float2, "a_TexCoord"},

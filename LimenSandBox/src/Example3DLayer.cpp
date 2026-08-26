@@ -130,7 +130,7 @@ namespace SandBox
          *
          *     (3 + 3 + 2) * sizeof(float) = 32字节
          */
-        const Limen::BufferLayout cubeLayout
+        const Limen::VertexBufferLayout cubeLayout
         {
             {
                 Limen::ShaderDataType::Float3,

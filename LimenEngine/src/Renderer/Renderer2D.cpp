@@ -10,7 +10,7 @@
 #include "Limen/Renderer/Renderer2D.h"
 
 #include <glm/gtc/matrix_transform.hpp>
-#include "Limen/RHI/Buffer.h"
+#include "Limen/RHI/VertexBuffer.h"
 #include "Limen/RHI/IndexBuffer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Shader.h"
@@ -185,7 +185,7 @@ namespace Limen
          * Position offset = 0
          * TexCoord offset = 12 bytes
          */
-        const BufferLayout quadLayout{
+        const VertexBufferLayout quadLayout{
             {ShaderDataType::Float3, "a_Position"},
             {ShaderDataType::Float2, "a_TexCoord"}
         };

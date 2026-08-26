@@ -6,7 +6,7 @@
 
 #include <glad/gl.h>
 
-#include "Limen/RHI/Buffer.h"
+#include "Limen/RHI/VertexBuffer.h"
 
 namespace Limen
 {
@@ -34,12 +34,12 @@ namespace Limen
         ~OpenGLVertexBuffer() override;
         OpenGLVertexBuffer(OpenGLVertexBuffer&&) noexcept;
         OpenGLVertexBuffer& operator=(OpenGLVertexBuffer&&) noexcept;
-        void SetLayout(const BufferLayout &layout) override
+        void SetLayout(const VertexBufferLayout &layout) override
         {
             m_Layout = layout;
         }
 
-        const BufferLayout &GetLayout() const override
+        const VertexBufferLayout &GetLayout() const override
         {
             return m_Layout;
         }
@@ -51,7 +51,7 @@ namespace Limen
 
     private:
         uint32_t m_RendererID = 0;
-        BufferLayout m_Layout;
+        VertexBufferLayout m_Layout;
 
         /**
          * @brief 当前VBO分配的总字节
