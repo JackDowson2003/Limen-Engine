@@ -4,7 +4,7 @@
 #include "Limen/RHI/Buffer.h"
 
 #include "Limen/Core/Log.h"
-#include "RHI/macOS/OpenGL/OpenGLBuffer.h"
+#include "RHI/macOS/OpenGL/OpenGLVertexBuffer.h"
 #include "Limen/Renderer/Renderer.h"
 
 namespace Limen

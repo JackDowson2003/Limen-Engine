@@ -5,7 +5,7 @@
 #include "OpenGLVertexArray.h"
 
 #include "Limen/Core/Log.h"
-#include "OpenGLBuffer.h"
+#include "OpenGLVertexBuffer.h"
 
 namespace Limen
 {

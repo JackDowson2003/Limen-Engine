@@ -4,7 +4,7 @@
 
 #include <glad/gl.h>
 
-#include "OpenGLBuffer.h"
+#include "OpenGLVertexBuffer.h"
 #include "Limen/Core/Log.h"
 
 namespace Limen
