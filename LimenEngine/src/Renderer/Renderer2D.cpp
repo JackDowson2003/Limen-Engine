@@ -119,8 +119,7 @@ namespace Limen
      * 有效纹理槽范围是 [0, MaxTextureSlots - 1]，
      * 所以 MaxTextureSlots 本身可以作为特殊保留值。
      */
-    static constexpr uint32_t NoTextureIndex =
-            MaxTextureSlots;
+    static constexpr uint32_t NoTextureIndex = MaxTextureSlots;
 
     /**
      * @brief Renderer2D 的私有资源和当前批次运行状态。
@@ -183,8 +182,7 @@ namespace Limen
          * 顺序必须和 QuadVertexPositions 完全一致：
          * 左下、右下、右上、左上。
          */
-        std::array<glm::vec2, VerticesPerQuad>
-        QuadTextureCoordinates{};
+        std::array<glm::vec2, VerticesPerQuad> QuadTextureCoordinates{};
 
         /**
          * @brief CPU 端批处理顶点数组的所有者。
@@ -242,14 +240,6 @@ namespace Limen
          * 开启 AlphaBlend、不进行面剔除、使用 TriangleList。
          */
         Ref<GraphicsPipeline> TexturePipeline;
-
-        /**
-         * @brief 旧版纯色 Quad 使用的 UniformBuffer，现已弃用。
-         *
-         * 当前颜色已经直接写入每个 QuadVertex，因此多个不同颜色的
-         * Quad 可以进入同一个批次，不再需要逐对象更新 UniformBuffer。
-         */
-        // Scope<UniformBuffer> ColorUniformBuffer;
 
         /**
          * @brief 当前二维场景使用的 ViewProjection 矩阵。
@@ -457,7 +447,6 @@ namespace Limen
      */
     void Renderer2D::Init()
     {
-        LM_CORE_INFO("Running Renderer2D::Init()");
 
         // 防止重复初始化覆盖尚未释放的 GPU 资源。
         LM_CORE_ASSERT(!s_Data, "Renderer2D already initialized!");
@@ -470,6 +459,15 @@ namespace Limen
 
         // 第1步：创建 VAO。VAO 稍后会记录动态 VBO 的布局以及静态 IBO。
         s_Data->QuadVertexArray.reset(VertexArray::Create());
+
+        // 工厂创建可能在 Release 构建中返回 nullptr，所以断言后仍保留保护。
+        LM_CORE_ASSERT(s_Data->QuadVertexArray, "Renderer2D: Vertex Array creation failed!");
+
+        if (!s_Data->QuadVertexArray)
+        {
+            s_Data.reset();
+            return;
+        }
 
         /*
          * 第2步：定义以局部原点为中心、宽高均为1的单位 Quad。
@@ -497,21 +495,10 @@ namespace Limen
          * 这里只构造 MaxVertices 个 QuadVertex 的连续内存，
          * 后续 StartBatch() 只重置写指针，不会每帧重复申请。
          */
-        s_Data->QuadVertexBufferBase =
-                CreateScope<QuadVertex[]>(MaxVertices);
+        s_Data->QuadVertexBufferBase = CreateScope<QuadVertex[]>(MaxVertices);
 
         // 初始写入位置是 CPU 缓存起点。
-        s_Data->QuadVertexBufferWritePointer =
-                s_Data->QuadVertexBufferBase.get();
-
-        // 工厂创建可能在 Release 构建中返回 nullptr，所以断言后仍保留保护。
-        LM_CORE_ASSERT(s_Data->QuadVertexArray, "Renderer2D: Vertex Array creation failed!");
-
-        if (!s_Data->QuadVertexArray)
-        {
-            s_Data.reset();
-            return;
-        }
+        s_Data->QuadVertexBufferWritePointer = s_Data->QuadVertexBufferBase.get();
 
         /*
          * 创建能够容纳整个最大批次的动态 GPU VBO。
@@ -522,6 +509,7 @@ namespace Limen
         s_Data->QuadVertexBuffer.reset(VertexBuffer::Create(
             MaxVertices * sizeof(QuadVertex)
         ));
+
         LM_CORE_ASSERT(s_Data->QuadVertexBuffer, "Renderer2D: Vertex Buffer creation failed!");
 
         if (!s_Data->QuadVertexBuffer)
@@ -607,6 +595,7 @@ namespace Limen
 
 
         LM_CORE_ASSERT(s_Data->QuadIndexBuffer, "Renderer2D,Failed to create Renderer2D quad IndexBuffer");
+
         if (!s_Data->QuadIndexBuffer)
         {
             s_Data.reset();
@@ -617,7 +606,6 @@ namespace Limen
 
         // 恢复干净的 VAO 绑定状态。
         s_Data->QuadVertexArray->UnBind();
-
 
         /*
          * 第5步：加载 Renderer2D 的统一 Shader。
@@ -630,7 +618,7 @@ namespace Limen
         LM_CORE_ASSERT(s_Data->TextureShader, "Renderer2D batch Shader load failed");
 
         // Release 构建中断言可能被关闭，因此仍要用运行时分支保护。
-        if ( !s_Data->TextureShader)
+        if (!s_Data->TextureShader)
         {
             s_Data.reset();
             return;
@@ -657,7 +645,7 @@ namespace Limen
             s_Data->TextureShader->SetInt(uniformName.c_str(), textureSlot);
         }
 
-        // 初始化映射结束，恢复不绑定该 Shader 的状态。
+        // 初始化映射结束，解除绑定。
         s_Data->TextureShader->UnBind();
 
         /*
@@ -684,9 +672,7 @@ namespace Limen
         flatColorPipelineSpec.FrontFaceWinding = FrontFace::CounterClockwise;
 
         // 用于日志、调试和未来的 Pipeline 缓存。
-        flatColorPipelineSpec.DebugName =
-                "Renderer2D Flat Color Pipeline";
-
+        flatColorPipelineSpec.DebugName = "Renderer2D Flat Color Pipeline";
 
         /*
          * 第6步：创建统一 Renderer2D 图形管线规格。
@@ -797,8 +783,7 @@ namespace Limen
         Renderer::BeginScene(camera);
 
         // Renderer2D 也保存一份矩阵，Flush() 会把它写入批处理 Shader。
-        s_Data->ViewProjection =
-                camera.GetViewProjectionMatrix();
+        s_Data->ViewProjection = camera.GetViewProjectionMatrix();
 
         // 清空上一批 CPU 状态，开始收集当前场景的 Quad。
         StartBatch();
@@ -923,7 +908,7 @@ namespace Limen
             // 取得 CPU 顶点数组中当前可以写入的位置，并将四个字段
             // 分别绑定为局部引用，下面的赋值会直接写入该 QuadVertex。
             auto &[Position, Color, TexCoord, TextureIndex] =
-                *s_Data->QuadVertexBufferWritePointer;
+                    *s_Data->QuadVertexBufferWritePointer;
 
             // 单位 Quad 局部位置经过 Model 矩阵后得到世界空间位置。
             const glm::vec4 &worldPosition = transform * s_Data->QuadVertexPositions[vertexIndex];

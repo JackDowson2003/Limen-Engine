@@ -64,11 +64,10 @@ namespace Limen
             glDisable(GL_DEPTH_TEST);
     }
 
-    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, PrimitiveTopology topology, uint32_t indexCount)
+    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, const PrimitiveTopology topology, const uint32_t indexCount)
     {
         // 获取 VAO 当前绑定的 IndexBuffer。
-        const Ref<IndexBuffer> &indexBuffer =
-                vertexArray.GetIndexBuffer();
+        const Ref<IndexBuffer> &indexBuffer = vertexArray.GetIndexBuffer();
         LM_CORE_ASSERT(
             indexBuffer,
             "OpenGLRendererAPI::DrawIndexed requires an IndexBuffer"

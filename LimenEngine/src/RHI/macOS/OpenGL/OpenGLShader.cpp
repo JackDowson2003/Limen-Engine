@@ -147,7 +147,7 @@ namespace Limen
         UploadUniformFloat3(name,value);
     }
 
-    void OpenGLShader::SetInt(const char *name, int value)
+    void OpenGLShader::SetInt(const char *name, const int value)
     {
         if (name ==nullptr)
         {
@@ -157,7 +157,7 @@ namespace Limen
         UploadUniformInt(name, value);
     }
 
-    void OpenGLShader::SetInt(const char *name, uint32_t value)
+    void OpenGLShader::SetInt(const char *name, const uint32_t value)
     {
         SetInt(name,static_cast<int>(value));
     }

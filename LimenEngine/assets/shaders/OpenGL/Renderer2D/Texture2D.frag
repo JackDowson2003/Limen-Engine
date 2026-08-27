@@ -20,6 +20,7 @@ layout(location = 0) out vec4 color;
  * 当前批次最多同时绑定16张二维纹理。
  *
  * 数组下标必须和 CPU 端 TextureSlots 的下标一致。
+ * 表示 Fragment Shader 最多能够通过这16个采样器访问16个纹理单元。
  */
 uniform sampler2D u_Textures[16];
 
@@ -69,7 +70,7 @@ void main()
         default: break;
     }
 
-/*
+    /*
      * 顶点颜色作为纹理 Tint。
      *
      * 传入白色 vec4(1.0) 时保持纹理原色；
