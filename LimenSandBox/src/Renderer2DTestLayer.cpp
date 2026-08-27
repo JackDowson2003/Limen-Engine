@@ -2,7 +2,7 @@
 // Created by chenlong on 2026/8/26.
 //
 #include "Renderer2DTestLayer.h"
-
+#include <cmath>
 #include "imgui.h"
 #include "Limen/Renderer/Renderer2D.h"
 #include "Limen/Core/Log.h"
@@ -15,6 +15,34 @@ namespace SandBox
               false
           )
     {
+        // 粒子从世界坐标原点产生。
+        m_ParticleSpecification.Position =
+                glm::vec3(0.0f, 0.0f, 0.0f);
+
+        //X Y Z三个方向上的速度的随机变化的范围
+        m_ParticleSpecification.VelocityVariation =
+                glm::vec3(.4f, .2f, .0f);
+
+        // 粒子每秒向上移动0.6个世界单位。
+        m_ParticleSpecification.Velocity =
+                glm::vec3(0.0f, 0.6f, 0.0f);
+
+        // 开始时为橙红色且完全不透明。
+        m_ParticleSpecification.ColorBegin =
+                glm::vec4(1.0f, 0.2f, 0.05f, 1.0f);
+
+        // 结束时为黄色且完全透明。
+        m_ParticleSpecification.ColorEnd =
+                glm::vec4(1.0f, 1.0f, 0.1f, 0.0f);
+
+        // 从较小尺寸逐渐缩小到0。
+        m_ParticleSpecification.SizeBegin = 0.15f;
+        m_ParticleSpecification.SizeEnd = 0.0f;
+
+        // 每个粒子存活1.5秒。
+        m_ParticleSpecification.LifeTime = 1.5f;
+
+        //其余参数默认
     }
 
     void Renderer2DTestLayer::OnAttach()
@@ -39,6 +67,7 @@ namespace SandBox
         renderPassSpec.DebugName = "Render Pass 2D";
 
         m_SceneRenderPass = Limen::CreateScope<Limen::RenderPass>(renderPassSpec);
+
         LM_CORE_ASSERT(
             m_SceneRenderPass,
             "Renderer2D test failed to create scene RenderPass"
@@ -50,12 +79,15 @@ namespace SandBox
             return;
         }
 
-        m_CheckerboardTexture = Limen::Texture2D::Create("assets/textures/checkerboard.png");
+        m_CheckerboardTexture = Limen::Texture2D::Create(
+            "assets/textures/checkerboard.png"
+        );
 
         LM_CORE_ASSERT(
             m_CheckerboardTexture,
             "Renderer2D test failed to create Checkerboard Texture"
         );
+
         if (!m_CheckerboardTexture)
         {
             m_SceneRenderPass.reset();
@@ -97,7 +129,51 @@ namespace SandBox
             static_cast<float>(m_ViewportHeight)
         );
 
+
         m_CameraController.OnUpdate(deltaTime);
+
+        m_ParticleSystem.Update(deltaTime);
+
+
+        if (m_ParticleEmissionRate > 0.f && m_MaxParticleEmissionsPerFrame > 0)
+        {
+            //每个粒子需要个多久发射一次
+            const float emissionInterval = 1.f / m_ParticleEmissionRate;
+
+            //累计经过本帧的时间
+            m_ParticleEmissionTimeAccumulator += deltaTime.GetSeconds();
+
+            //这帧发射了了几个
+            uint32_t emissionsThisFrame = 0;
+
+
+            /*
+             * 累计时间达到一个发射间隔后产生粒子。
+             *
+             * 使用 while 是因为某一帧可能很慢（掉帧了），
+             * 一帧积累的时间可能足够产生多个粒子。
+             */
+            while (m_ParticleEmissionTimeAccumulator >= emissionInterval && emissionsThisFrame <
+                   m_MaxParticleEmissionsPerFrame)
+            {
+                m_ParticleSystem.Emit(m_ParticleSpecification);
+
+                //消费一个时间间隔
+                //这会导致掉帧的时候会出现突发
+                m_ParticleEmissionTimeAccumulator -= emissionInterval;
+
+                ++emissionsThisFrame;
+            }
+            //掉帧重补了四个 就重置一下m_ParticleEmissionTimeAccumulator
+            if (
+                emissionsThisFrame == m_MaxParticleEmissionsPerFrame
+                && m_ParticleEmissionTimeAccumulator >= emissionInterval
+            )
+                m_ParticleEmissionTimeAccumulator = std::fmod(m_ParticleEmissionTimeAccumulator, emissionInterval);
+        } else //下次重启就从0开始
+        {
+            m_ParticleEmissionTimeAccumulator = 0.f;
+        }
 
         // 绑定并清理场景
         // 需要绑定FBO 以及清理一下上一帧的颜色
@@ -107,6 +183,8 @@ namespace SandBox
          * Renderer2D 开始记录使用当前正交相机的二维场景。
          */
         Limen::Renderer2D::BeginScene(m_CameraController.GetCamera());
+
+        m_ParticleSystem.Render();
 
         /*
          * 左侧纯色 Quad。

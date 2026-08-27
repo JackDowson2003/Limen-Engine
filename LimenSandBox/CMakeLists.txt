@@ -3,6 +3,7 @@ add_executable(LimenSandBox
         src/Example3DLayer.cpp
         src/SandBox2D.cpp
         src/Renderer2DTestLayer.cpp
+        src/ParticleSystem.cpp
 )
 
 # Sandbox 使用引擎公共 API，并直接编写 ImGui 面板，因此显式链接两个目标。

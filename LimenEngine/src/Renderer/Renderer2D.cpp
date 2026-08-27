@@ -278,6 +278,7 @@ namespace Limen
 
     /**
      * @brief 定义 Renderer2D 在头文件中声明的静态数据。
+     * 外部调用不应该直接访问
      *
      * 此时只创建一个空 Scope，不会创建任何 GPU 资源。
      * 真正的 Renderer2DData 将在 Init() 中创建。
@@ -760,8 +761,6 @@ namespace Limen
      */
     void Renderer2D::BeginScene(const Camera &camera)
     {
-        LM_CORE_INFO("Running Renderer2D::BeginScene()");
-
         LM_CORE_ASSERT(
             s_Data,
             "Renderer2D::Init() must be called before BeginScene()"

@@ -4,6 +4,7 @@
 #pragma once
 
 
+#include "ParticleSystem.h"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/DeltaTime.h"
 #include "Limen/Events/Event.h"
@@ -55,6 +56,14 @@ namespace SandBox
         Limen::OrthoGraphicCameraController m_CameraController;
 
         /**
+         * @brief Renderer2D 测试层独占的CPU粒子系统
+         *
+         * 构造时一次性创建1000个粒子槽位
+         * 后续Emit() 循环服用这些槽位
+         */
+        ParticleSystem m_ParticleSystem{1000};
+
+        /**
          * @brief 保存 Renderer2D 绘制结果的离屏 Framebuffer。
          *
          * Framebuffer 必须声明在 RenderPass 前面，因为成员按声明的
@@ -79,5 +88,31 @@ namespace SandBox
          */
         uint32_t m_ViewportWidth = 1280;
         uint32_t m_ViewportHeight = 720;
+
+        /**
+         * @brief Particle的统一设置
+         */
+        ParticleSpecification m_ParticleSpecification{};
+
+        /**
+         * @brief 每秒希望发射的粒子数量。
+         */
+        float m_ParticleEmissionRate = 20.0f;
+
+        /**
+         * @brief 尚未转换成粒子发射次数的累计时间。
+         *
+         *      → 累加每一帧的 DeltaTime
+         *      → 达到0.05秒时发射一个粒子
+         */
+        float m_ParticleEmissionTimeAccumulator = 0.0f;
+
+        /**
+         * @brief 一帧最多允许补发的粒子数量。
+         *
+         * 防止严重掉帧后，一帧突然创建大量粒子，
+         * 进一步增加CPU和GPU压力。
+         */
+        uint32_t m_MaxParticleEmissionsPerFrame = 4;
     };
 }
