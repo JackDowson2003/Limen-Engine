@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "Limen/Application/Layer.h"
+#include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Renderer/RenderPass.h"
 #include "Limen/RHI/Framebuffer.h"
@@ -66,6 +67,9 @@ namespace SandBox
         Limen::PerspectiveCameraController m_CameraController;
 
         Limen::Scope<Limen::VertexArray> m_CubeVAO;
+
+        //Mesh
+        Limen::Scope<Limen::Mesh> m_CubeMesh;
 
         // 保存立方体24条顶点记录，每条记录包含Position、Normal和TexCoord。
         Limen::Ref<Limen::VertexBuffer> m_CubeVBO;

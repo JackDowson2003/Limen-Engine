@@ -86,21 +86,27 @@ namespace SandBox
             16, 17, 18, 18, 19, 16,
             20, 21, 22, 22, 23, 20
         };
-        // 创建用于保存立方体顶点输入状态的VAO。
-        m_CubeVAO.reset(Limen::VertexArray::Create());
 
-        /**
-         * 创建顶点缓冲。
-         *
-         * 第一个参数：CPU顶点数组的首地址。
-         * 第二个参数：整个数组占用的字节数。
-         */
-        m_CubeVBO.reset(
-            Limen::VertexBuffer::Create(
-                cubeVertices,
-                sizeof(cubeVertices)
-            )
-        );
+        Limen::MeshData cubeData;
+
+        for (uint32_t i = 0; i < sizeof(cubeVertices) / sizeof(float); i += 8)
+        {
+            cubeData.Vertices.push_back(
+                //C++20 标准增加了部分“聚合类型圆括号初始化”能力，但不同工具链及模板构造场景的支持并不完全一致。
+                //所以不能写Limen::MeshVertex(xxxxx)
+                Limen::MeshVertex{
+                    .Position = glm::vec3{cubeVertices[i], cubeVertices[i + 1], cubeVertices[i + 2]},
+                    .Normal = glm::vec3{cubeVertices[i + 3], cubeVertices[i + 4], cubeVertices[i + 5]},
+                    .TexCoord = glm::vec2{cubeVertices[i + 6], cubeVertices[i + 7]}
+                }
+            );
+        }
+
+        for (uint32_t i = 0; i < sizeof(cubeIndices) / sizeof(uint32_t); ++i)
+            cubeData.Indices.emplace_back(cubeIndices[i]);
+
+
+        m_CubeMesh.reset(new Limen::Mesh(cubeData));
 
         Limen::FramebufferSpecification spec;
         spec.Width = 1280;
@@ -119,50 +125,6 @@ namespace SandBox
         m_SceneRenderPass = Limen::CreateScope<Limen::RenderPass>(sceneRenderPassSpec);
 
 
-        /**
-         * @brief 描述一条立方体顶点记录的内存布局。
-         *
-         * location 0：Position，3个float；
-         * location 1：Normal，3个float；
-         * location 2：TexCoord，2个float。
-         *
-         * 总步长为：
-         *
-         *     (3 + 3 + 2) * sizeof(float) = 32字节
-         */
-        const Limen::VertexBufferLayout cubeLayout
-        {
-            {
-                Limen::ShaderDataType::Float3,
-                "a_Position"
-            },
-            {
-                Limen::ShaderDataType::Float3,
-                "a_Normal"
-            },
-            {
-                Limen::ShaderDataType::Float2,
-                "a_TexCoord"
-            }
-        };
-
-        m_CubeVBO->SetLayout(cubeLayout);
-        m_CubeVAO->AddVertexBuffer(m_CubeVBO);
-
-        /**
-         * 创建索引缓冲。
-         *
-         * 第一个参数：索引数组首地址。
-         * 第二个参数：索引数量，不是字节数。
-         */
-        m_CubeIBO.reset(
-            Limen::IndexBuffer::Create(
-                cubeIndices,
-                sizeof(cubeIndices) / sizeof(uint32_t)
-            )
-        );
-
-        m_CubeVAO->SetIndexBuffer(m_CubeIBO);
 
         /**
          * @brief 按当前RendererAPI加载3D Blinn-Phong Shader。
@@ -180,32 +142,33 @@ namespace SandBox
             "Failed to create Example3D BlinnPhong shader"
         );
 
+        //region FBO config
         Limen::GraphicsPipelineSpecification cubePipelineSpec;
 
         cubePipelineSpec.ShaderProgram = m_CubeShader;
         cubePipelineSpec.Topology =
-            Limen::PrimitiveTopology::TriangleList;
+                Limen::PrimitiveTopology::TriangleList;
 
         cubePipelineSpec.DepthTestEnabled =
-            true;
+                true;
 
         cubePipelineSpec.DepthWriteEnabled =
-            true;
+                true;
 
         cubePipelineSpec.DepthCompare =
-            Limen::CompareOperation::Less;
+                Limen::CompareOperation::Less;
 
         cubePipelineSpec.Blend =
-            Limen::BlendMode::Opaque;
+                Limen::BlendMode::Opaque;
 
         cubePipelineSpec.Culling =
-            Limen::CullMode::Back;
+                Limen::CullMode::Back;
 
         cubePipelineSpec.FrontFaceWinding =
-            Limen::FrontFace::CounterClockwise;
+                Limen::FrontFace::CounterClockwise;
 
         cubePipelineSpec.DebugName =
-            "Example3D Cube Pipeline";
+                "Example3D Cube Pipeline";
 
         m_CubePipeline = Limen::GraphicsPipeline::Create(
             cubePipelineSpec
@@ -215,6 +178,7 @@ namespace SandBox
             m_CubePipeline,
             "Failed to create Example3D cube graphics pipeline"
         );
+        //endregion
 
 
         /**
@@ -252,7 +216,8 @@ namespace SandBox
         }
 
         // 松开右键，结束本次导航。
-        if (const bool rightMousePressed = Limen::Input::IsMouseButtonPressed(Limen::MouseButton::Right); !rightMousePressed)
+        if (const bool rightMousePressed = Limen::Input::IsMouseButtonPressed(Limen::MouseButton::Right); !
+            rightMousePressed)
         {
             m_ViewportNavigationActive = false;
         }
@@ -306,9 +271,15 @@ namespace SandBox
 
         // Shader 中的 u_AlbedoTexture 约定从纹理槽 0 采样。
         m_AlbedoTexture->Bind(0);
+        // Limen::Renderer::Submit(
+        //     *m_CubePipeline,
+        //     *m_CubeVAO, //记住了Albedo_Texture
+        //     cubeTransform
+        // );
+
         Limen::Renderer::Submit(
             *m_CubePipeline,
-            *m_CubeVAO, //记住了Albedo_Texture
+            m_CubeMesh->GetVertexArray(), //记住了Albedo_Texture
             cubeTransform
         );
         Limen::Renderer::EndScene();
@@ -332,7 +303,8 @@ namespace SandBox
 
         if (sceneVisible)
         {
-            if (const ImVec2 viewportSize = ImGui::GetContentRegionAvail(); viewportSize.x > 0.0f && viewportSize.y > 0.0f)
+            if (const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+                viewportSize.x > 0.0f && viewportSize.y > 0.0f)
             {
                 /**
                  * 此处只记录 ImGui 内容区尺寸；下一帧 OnUpdate() 在绘制前
