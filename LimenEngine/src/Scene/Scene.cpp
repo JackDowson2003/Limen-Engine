@@ -75,6 +75,23 @@ namespace Limen
         m_DirectionalLight = light;
     }
 
+    void Scene::AddPointLight(const PointLight &light)
+    {
+        const bool intensityIsValid = light.Intensity >= 0.f;
+
+        LM_CORE_ASSERT(intensityIsValid, "PointLight intensity cannot be negative");
+
+        if (!intensityIsValid)
+            return;
+
+        m_PointLights.push_back(light);
+    }
+
+    const std::vector<PointLight> & Scene::GetPointLights() const noexcept
+    {
+        return m_PointLights;
+    }
+
     const DirectionalLight & Scene::GetDirectionalLight() const noexcept
     {
         return m_DirectionalLight;

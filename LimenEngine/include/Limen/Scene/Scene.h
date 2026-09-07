@@ -89,8 +89,6 @@ namespace Limen
         }
     };
 
-
-
     /**
      * @brief 保存一个场景中的对象数据
      *
@@ -127,6 +125,24 @@ namespace Limen
          * 包含光线的传播方向、RGB颜色和强度
          */
         void SetDirectionalLight(const DirectionalLight& light);
+
+        /**
+         * @brief 向场景中添加一个点光源。
+         *
+         * @param light
+         * 点光源的位置、RGB颜色和强度。
+         */
+        void AddPointLight(const PointLight& light);
+
+        /**
+         * @brief 获取场景中的全部点光源。
+         *
+         * 返回const引用，避免复制整个数组，
+         * 同时防止外部绕过Scene直接增删光源。
+         */
+        [[nodiscard]]
+        const std::vector<PointLight>&
+        GetPointLights() const noexcept;
 
         /**
          * @brief 修改指定场景对象的模型变换矩阵。
@@ -184,5 +200,13 @@ namespace Limen
          * 因此直接按值保存，不需要 Scope 或 Ref。
          */
         DirectionalLight m_DirectionalLight;
+
+        /**
+         * @brief 当前场景中的全部点光源。
+         *
+         * 每个点光源都会在着色时产生一份漫反射和镜面反射贡献，
+         * 最终由Renderer累加。
+         */
+        std::vector<PointLight> m_PointLights;
     };
 }

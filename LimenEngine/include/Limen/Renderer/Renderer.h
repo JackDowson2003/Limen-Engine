@@ -3,18 +3,19 @@
 //
 #pragma once
 
+#include  <vector>
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/RendererCommand.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Shader.h"
+
+#include "Limen/Scene/Light.h"
 
 namespace Limen
 {
     class Camera;
     class Material;
     class Mesh;
-
-    struct DirectionalLight;
 
     class LIMEN_API Renderer
     {
@@ -24,7 +25,7 @@ namespace Limen
          *
          * BeginScene() 与 EndScene() 必须成对调用；同一时刻只能有一个活动场景。
          */
-        static void BeginScene(const Camera& camera);
+        static void BeginScene(const Camera &camera);
 
         /**
          * @brief 使用指定相机和主平行光开始渲染场景。
@@ -33,8 +34,27 @@ namespace Limen
          * @param directionalLight 本次场景使用的主平行光。
          */
         static void BeginScene(
+            const Camera &camera,
+            const DirectionalLight &directionalLight
+        );
+
+        /**
+         * @brief 使用相机、主平行光和多个点光源开始场景。
+         *
+         * @param camera
+         * 当前场景使用的相机，提供ViewProjection和相机世界坐标。
+         *
+         * @param directionalLight
+         * 当前场景的主平行光。
+         *
+         * @param pointLights
+         * 当前场景中的全部点光源。
+         * 使用const引用，避免在函数传参阶段复制整个vector。
+         */
+        static void BeginScene(
             const Camera& camera,
-            const DirectionalLight& directionalLight
+            const DirectionalLight& directionalLight,
+            const std::vector<PointLight>& pointLights
         );
 
         /**
@@ -81,9 +101,9 @@ namespace Limen
          * 调用顺序为：绑定 Pipeline、上传绘制参数、绑定几何数据、发出绘制命令。
          */
         static void Submit(
-            const GraphicsPipeline& pipeline,
-            const VertexArray& vertexArray,
-            const glm::mat4& transform = glm::mat4(1.0f)
+            const GraphicsPipeline &pipeline,
+            const VertexArray &vertexArray,
+            const glm::mat4 &transform = glm::mat4(1.0f)
         );
 
         /**
@@ -98,11 +118,10 @@ namespace Limen
          * @param transform Mesh从模型空间变换到世界空间的矩阵。
          */
         static void Submit(
-            const Material& material,
-            const Mesh& mesh,
-            const glm::mat4& transform = glm::mat4(1.0f)
+            const Material &material,
+            const Mesh &mesh,
+            const glm::mat4 &transform = glm::mat4(1.0f)
         );
-
 
 
         static RendererAPI::API GetRenderAPI()

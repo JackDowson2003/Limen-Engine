@@ -228,10 +228,26 @@ namespace SandBox
         // 当前测试使用普通亮度倍率。
         mainDirectionalLight.Intensity = 1.0f;
 
-        m_Scene.SetDirectionalLight(
-            mainDirectionalLight
-        );
+        m_Scene.SetDirectionalLight(mainDirectionalLight);
 
+        /*
+         * 创建用于测试GAMES101 Blinn-Phong光照的点光源。
+         *
+         * 目前只是把光源加入Scene；
+         * Renderer和Shader还没有读取它，所以暂时不会改变画面。
+         */
+        Limen::PointLight pointLight;
+
+        // 点光源位于两个立方体的右上前方
+        pointLight.Position = glm::vec3(2.0f, 2.0f, 2.0f);
+
+        // 使用白色光，方便观察材质本身的颜色
+        pointLight.Color = glm::vec3(1.0f);
+
+        // 后续使用平方衰减
+        pointLight.Intensity = 10.0f;
+
+        m_Scene.AddPointLight(pointLight);
 
         /*
          * SceneRenderObject 把资源和物体的世界变换组合起来。

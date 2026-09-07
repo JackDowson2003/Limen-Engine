@@ -29,7 +29,7 @@ namespace Limen
          * 当前默认值对应之前 Shader 中：
          * l = normalize(vec3(-1.0, 1.0, 1.0))
          */
-        glm::vec3 Direction{1.f,-1.f,-1.f};
+        glm::vec3 Direction{1.f, -1.f, -1.f};
 
         /**
          * @brief 光源颜色，使用线性 RGB。
@@ -50,5 +50,24 @@ namespace Limen
         * 当前还不是具有真实物理单位的光度值。
         */
         float Intensity = 1.0f;
+    };
+
+    /**
+     * @brief 点光源
+     *
+     * 点光源具有确定的世界坐标位置，
+     * 光线从该位置向四周传播，并随距离增加而衰减
+     */
+    struct PointLight
+    {
+        // 点光源在世界中的位置
+        glm::vec3 Position{0.f};
+
+        // 点光源的线性 RGB 颜色
+        glm::vec3 Color{1.f};
+
+        // 光源的亮度倍率
+        float Intensity = 1.0f;
+
     };
 }

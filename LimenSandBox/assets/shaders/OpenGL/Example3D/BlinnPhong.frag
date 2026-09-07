@@ -1,5 +1,13 @@
 #version 410 core
 
+/**
+ * 第一版前向渲染最多处理4个点光源。
+ *
+ * GLSL普通uniform数组的长度必须是编译期常量，
+ * 因此不能直接使用u_PointLightCount作为数组长度。
+ */
+#define LIMEN_MAX_POINT_LIGHTS 4
+
 layout (location = 0) out vec4 color;
 
 /**
@@ -32,6 +40,36 @@ uniform vec3 u_DirectionalLightColor;
  * 主平行光的亮度倍率。
  */
 uniform float u_DirectionalLightIntensity;
+
+/**
+ * @brief GAMES101 Blinn-Phong模型中的点光源。
+ */
+struct PointLight
+{
+    // 点光源在世界空间中的位置。
+    vec3 Position;
+
+    // 点光源发出的线性RGB颜色。
+    vec3 Color;
+
+    // 点光源的整体强度倍率。
+    float Intensity;
+};
+
+/**
+ * 当前参与着色的点光源数量。
+ *
+ * 有效范围为：
+ * 0到LIMEN_MAX_POINT_LIGHTS。
+ */
+uniform int u_PointLightCount;
+
+/**
+ * 当前场景中的点光源数组。
+ *
+ * Shader只读取前u_PointLightCount个元素。
+ */
+uniform PointLight u_PointLights[LIMEN_MAX_POINT_LIGHTS];
 
 /**
  * 当前材质的Albedo纹理。
@@ -130,5 +168,55 @@ void main()
     // L_s = k_s * I * max(0, n dot h)^p
     vec3 specular = k_s * lightIntensity * specularStrength;
 
-    color = vec4(ambient + diffuse + specular, albedoSample.a);
+    /**
+     * 所有点光源产生的漫反射总和。
+     *
+     * 从黑色开始，每处理一个点光源就累加一次贡献。
+     */
+    vec3 pointLightDiffuse = vec3(0.0);
+
+    for (int pointLightIndex = 0; pointLightIndex < u_PointLightCount; pointLightIndex++)
+    {
+        /**
+         * 从当前着色点p指向点光源位置的向量。
+         *
+         * lightVector = lightPosition - fragmentPosition
+         */
+        vec3 lightVector = u_PointLights[pointLightIndex].Position - v_WorldPosition;
+
+        /**
+         * r² = lightVector · lightVector
+         *
+         * 使用较小的下限，避免着色点恰好位于光源位置时除以0。
+         */
+        float distanceSquared = max(
+            dot(lightVector, lightVector),
+            0.0001
+        );
+
+        /**
+         * l：从当前着色点指向点光源的单位方向。
+         *
+         * lightVector / length(lightVector)
+         * 等价于：
+         * lightVector * 1 / sqrt(distanceSquared)
+         */
+        vec3 pointLightDirection = lightVector * inversesqrt(distanceSquared);
+
+        /**
+         * GAMES101中的距离平方反比衰减：
+         *
+         * I / r²
+         */
+        vec3 pointLightIntensity =
+        u_PointLights[pointLightIndex].Color *
+        u_PointLights[pointLightIndex].Intensity /
+        distanceSquared;
+
+        float pointLightNDotL = max(dot(n,pointLightDirection),0.0);
+
+        pointLightDiffuse += k_d * pointLightIntensity * pointLightNDotL;
+    }
+
+    color = vec4(ambient + diffuse + specular + pointLightDiffuse, albedoSample.a);
 }

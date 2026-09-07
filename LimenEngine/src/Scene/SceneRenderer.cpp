@@ -108,8 +108,15 @@ namespace Limen
         if (!m_RenderPass->IsActive())
             return;
 
-        //开始逻辑场景 Bind FBO, Set Viewport, Clear Color/Depth/Sentil attachment
-        Renderer::BeginScene(camera,scene.GetDirectionalLight());
+        /*
+         * 把Scene中的相机、主平行光和全部点光源，
+         * 交给Renderer建立本次渲染的场景快照。
+         */
+        Renderer::BeginScene(
+            camera,
+            scene.GetDirectionalLight(),
+            scene.GetPointLights()
+        );
 
         /*
          * Scene 只保存对象数据，SceneRenderer 负责遍历并提交。

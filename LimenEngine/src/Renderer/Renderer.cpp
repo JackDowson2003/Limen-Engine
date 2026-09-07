@@ -14,12 +14,27 @@ namespace Limen
 {
     namespace
     {
+        /**
+         * Renderer第一版能够上传给普通Uniform数组的最大点光源数量。
+         *
+         * 必须与BlinnPhong.frag中的LIMEN_MAX_POINT_LIGHTS保持一致。
+         * 后续建立Shader配置系统后，再消除这份重复定义。
+         */
+        constexpr uint32_t MaxPointLightCount = 4;
+
         struct SceneData
         {
             bool IsActive = false;
             glm::mat4 ViewProjection{1.0f};
             glm::vec3 CameraPosition{0.0f};
             DirectionalLight MainDirectionalLight;
+            /**
+             * @brief 当前活动场景中的全部点光源快照。
+             *
+             * BeginScene时从Scene复制进来，
+             * 后续所有Submit读取同一份光源数据。
+             */
+            std::vector<PointLight> PointLights;
         };
 
         SceneData s_SceneData;
@@ -28,34 +43,43 @@ namespace Limen
     void Renderer::BeginScene(const Camera &camera)
     {
         // 2D 和旧路径暂时不提供光源 因此使用 DirectionalLight
-        BeginScene(camera,DirectionalLight{});
-
+        BeginScene(camera, DirectionalLight{}, {});
     }
 
     void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight)
     {
+        BeginScene(camera, directionalLight, {});
+    }
+
+    void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight,
+                              const std::vector<PointLight> &pointLights)
+    {
         if (s_SceneData.IsActive)
         {
-            LM_CORE_ERROR(
-                "Another scene is already active"
-            );
+            LM_CORE_ERROR("Another scene is already active");
             return;
         }
 
-        /**
-         * BeginScene 时复制本帧使用的场景快照
-         * 后面的每次 Submit 都读同一份快照
+        /*
+         * 在BeginScene时建立当前场景的帧内快照。
+         *
+         * 后续无论提交多少个Mesh，
+         * 每次Submit读取的都是同一套相机和光源数据。
          */
-        s_SceneData.ViewProjection = camera.GetViewProjectionMatrix();
-
         s_SceneData.CameraPosition = camera.GetPosition();
+        s_SceneData.ViewProjection = camera.GetViewProjectionMatrix();
+        s_SceneData.MainDirectionalLight = directionalLight;
 
-        s_SceneData.MainDirectionalLight =
-       directionalLight;
-
+        /*
+         * 这里有意复制vector。
+         *
+         * BeginScene参数使用const引用，避免传参时复制；
+         * Renderer再主动复制一份，保证BeginScene到EndScene期间
+         * 使用的光源数据不会被Scene外部修改。
+         */
+        s_SceneData.PointLights = pointLights;
 
         s_SceneData.IsActive = true;
-
     }
 
     void Renderer::OnWindowResize(const uint32_t width, const uint32_t height)
@@ -216,15 +240,15 @@ namespace Limen
          */
         material.Bind();
 
-        const GraphicsPipeline & pipeline = material.GetPipeline();
-        const auto & specification = pipeline.GetSpecification();
-        const auto& shader = specification.ShaderProgram;
+        const GraphicsPipeline &pipeline = material.GetPipeline();
+        const auto &specification = pipeline.GetSpecification();
+        const auto &shader = specification.ShaderProgram;
         if (!shader)
         {
             LM_CORE_ERROR(
-            "Material '{}' uses a pipeline without Shader",
-            material.GetDebugName()
-        );
+                "Material '{}' uses a pipeline without Shader",
+                material.GetDebugName()
+            );
             return;
         }
 
@@ -259,7 +283,7 @@ namespace Limen
          * Material::Bind() 已经绑定了正确的 Shader，
          * 因此现在可以把本帧缓存的光源参数写入该 Shader。
          */
-        const DirectionalLight & directionalLight = s_SceneData.MainDirectionalLight;
+        const DirectionalLight &directionalLight = s_SceneData.MainDirectionalLight;
 
         // 光线从光源射向场景的方向。
         shader->SetFloat3(
@@ -279,10 +303,48 @@ namespace Limen
             directionalLight.Intensity
         );
 
+        //GLSL 数组容量固定为4 Scene 可以保存更多点光源，但当前钱箱渲染路径只把前四个上传给Shader
+        const uint32_t pointLightCount = static_cast<uint32_t>(std::min<std::size_t>(
+            s_SceneData.PointLights.size(), MaxPointLightCount));
+
+        // Tell to shader what size of point lights we should deal
+        shader->SetInt("u_PointLightCount", pointLightCount);
+
+        /*
+         * 按GLSL结构体数组的成员名称，
+         * 逐个上传点光源数据。
+         */
+        for (uint32_t pointLightIndex = 0; pointLightIndex < pointLightCount; ++pointLightIndex)
+        {
+            const auto &[Position, Color, Intensity] = s_SceneData.PointLights[pointLightIndex];
+
+            /*
+             * pointLightIndex为0时，prefix为：
+             * u_PointLights[0].
+             */
+            const std::string uniformPrefix =
+                    "u_PointLights[" + std::to_string(pointLightIndex) + "].";
+
+            shader->SetFloat3(
+                (uniformPrefix + "Position").c_str(),
+                Position
+            );
+
+            shader->SetFloat3(
+                (uniformPrefix + "Color").c_str(),
+                Color
+            );
+
+            shader->SetFloat(
+                (uniformPrefix + "Intensity").c_str(),
+                Intensity
+            );
+        }
+
         //Mesh使用本次绘制所用的VAO VBO IBO
-        const VertexArray & vao = mesh.GetVertexArray();
+        const VertexArray &vao = mesh.GetVertexArray();
         vao.Bind();
 
-        RendererCommand::DrawIndexed(vao,specification.Topology);
+        RendererCommand::DrawIndexed(vao, specification.Topology);
     }
 }
