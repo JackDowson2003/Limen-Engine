@@ -2,15 +2,15 @@
 // Created by chenlong on 2026/8/20.
 //
 
-#include "Example3DLayer.h"
+#include <cmath>
 
 #include <glm/ext/matrix_transform.hpp>
-#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
+#include "Example3DLayer.h"
 #include "imgui.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
-#include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Texture.h"
 
@@ -108,26 +108,18 @@ namespace SandBox
             cubeData.Indices.emplace_back(cubeIndices[i]);
 
 
-        m_CubeMesh.reset(new Limen::Mesh(cubeData));
+        m_CubeMesh = Limen::CreateRef<Limen::Mesh>(cubeData);
 
-        // Create FBO
-        Limen::FramebufferSpecification spec;
-        spec.Width = 1280;
-        spec.Height = 720;
-        spec.Samples = 4;
+        // 创建负责当前 Scene Viewport 的场景渲染器。
+        Limen::SceneRendererSpecification sceneSpec;
 
-        m_SceneFramebuffer = Limen::Framebuffer::Create(spec);
-        LM_CORE_ASSERT(m_SceneFramebuffer, "Failed to create 3D scene Framebuffer");
-
-        // Create RenderPass
-        Limen::RenderPassSpecification sceneRenderPassSpec;
         // RenderPass 只借用 Framebuffer，不转移 unique_ptr 的所有权。
-        sceneRenderPassSpec.TargetFramebuffer = m_SceneFramebuffer.get();
-        sceneRenderPassSpec.ClearColor = {0.1f, 0.1f, 0.1f, 1.0f};
-        sceneRenderPassSpec.DebugName = "Example3D Render Pass";
-
-        m_SceneRenderPass = Limen::CreateScope<Limen::RenderPass>(sceneRenderPassSpec);
-
+        sceneSpec.Width = m_ViewportWidth;
+        sceneSpec.Height = m_ViewportHeight;
+        sceneSpec.Samples = 4;
+        sceneSpec.ClearColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+        sceneSpec.DebugName = "Example3D Scene Renderer";
+        m_SceneRenderer = Limen::CreateScope<Limen::SceneRenderer>(sceneSpec);
 
         /**
          * @brief 按当前RendererAPI加载3D Blinn-Phong Shader。
@@ -149,29 +141,14 @@ namespace SandBox
         Limen::GraphicsPipelineSpecification cubePipelineSpec;
 
         cubePipelineSpec.ShaderProgram = shader;
-        cubePipelineSpec.Topology =
-                Limen::PrimitiveTopology::TriangleList;
-
-        cubePipelineSpec.DepthTestEnabled =
-                true;
-
-        cubePipelineSpec.DepthWriteEnabled =
-                true;
-
-        cubePipelineSpec.DepthCompare =
-                Limen::CompareOperation::Less;
-
-        cubePipelineSpec.Blend =
-                Limen::BlendMode::Opaque;
-
-        cubePipelineSpec.Culling =
-                Limen::CullMode::Back;
-
-        cubePipelineSpec.FrontFaceWinding =
-                Limen::FrontFace::CounterClockwise;
-
-        cubePipelineSpec.DebugName =
-                "Example3D Cube Pipeline";
+        cubePipelineSpec.Topology = Limen::PrimitiveTopology::TriangleList;
+        cubePipelineSpec.DepthTestEnabled = true;
+        cubePipelineSpec.DepthWriteEnabled = true;
+        cubePipelineSpec.DepthCompare = Limen::CompareOperation::Less;
+        cubePipelineSpec.Blend = Limen::BlendMode::Opaque;
+        cubePipelineSpec.Culling = Limen::CullMode::Back;
+        cubePipelineSpec.FrontFaceWinding = Limen::FrontFace::CounterClockwise;
+        cubePipelineSpec.DebugName = "Example3D Cube Pipeline";
         //endregion
 
         const Limen::Ref<Limen::GraphicsPipeline> pipeline = Limen::GraphicsPipeline::Create(
@@ -231,20 +208,111 @@ namespace SandBox
 
         //初始时不允许鼠标控制
         m_CameraController.SetMouseLookEnabled(false);
+
+        /*
+         * 显式设置当前 Scene 的主平行光。
+         *
+         * 使用偏冷的蓝色，方便确认光源数据确实经过：
+         * Scene → SceneRenderer → Renderer → Shader。
+         */
+        Limen::DirectionalLight mainDirectionalLight;
+
+        // 光从右上前方射向场景。
+        mainDirectionalLight.Direction =
+                glm::vec3(1.0f, -1.0f, -1.0f);
+
+        // 偏冷色的线性 RGB。
+        mainDirectionalLight.Color =
+                glm::vec3(0.35f, 0.55f, 1.0f);
+
+        // 当前测试使用普通亮度倍率。
+        mainDirectionalLight.Intensity = 1.0f;
+
+        m_Scene.SetDirectionalLight(
+            mainDirectionalLight
+        );
+
+
+        /*
+         * SceneRenderObject 把资源和物体的世界变换组合起来。
+         *
+         * Mesh 和 Material 使用 Ref，共享的是同一个资源对象，
+         * 不会复制底层 VAO、VBO、IBO、Shader 或纹理。
+         */
+        Limen::SceneRenderObject cubeObject;
+
+        cubeObject.MeshResource = m_CubeMesh;
+        cubeObject.MaterialResource = m_CubeMaterial;
+        cubeObject.Transform = glm::mat4(1.0f);
+
+        m_CubeObjectHandle = m_Scene.AddRenderObject(cubeObject);
+
+        LM_CORE_ASSERT(
+            m_CubeObjectHandle.IsValid(),
+            "Failed to add cube object to Scene"
+        );
+
+        /*
+         * 第二个立方体共享第一份 Mesh 和 Material。
+         *
+         * 这里只创建新的 SceneRenderObject，
+         * 不会重新创建 VAO、VBO、IBO、Shader 或纹理。
+         */
+        Limen::SceneRenderObject secondCubeObject;
+
+        secondCubeObject.MeshResource = m_CubeMesh;
+        secondCubeObject.MaterialResource = m_CubeMaterial;
+        secondCubeObject.Transform = glm::translate(glm::mat4(1.0f),
+                                                    glm::vec3(1.5f, 0.0f, .0f));
+
+        /*
+         * 第二个立方体当前不需要每帧修改，
+         * 所以句柄只用于检查添加是否成功，不必保存为成员。
+         */
+        const Limen::SceneRenderObjectHandle secondCubeHandle =
+                m_Scene.AddRenderObject(secondCubeObject);
+
+        LM_CORE_ASSERT(
+            secondCubeHandle.IsValid(),
+            "Failed to add second cube object to Scene"
+        );
     }
 
+    /**
+     *
+     * 同步 Viewport 尺寸
+            ↓
+        处理相机输入
+            ↓
+        更新相机
+            ↓
+        把 Scene 和 Camera 交给 SceneRenderer
+     * @param deltaTime deltaTime
+     */
     void Example3DLayer::OnUpdate(Limen::DeltaTime &deltaTime)
     {
-        if (m_ViewportWidth > 0 && m_ViewportHeight > 0 && (
-                m_SceneFramebuffer->GetSpecification().Width != m_ViewportWidth ||
-                m_SceneFramebuffer->GetSpecification().Height != m_ViewportHeight))
+        LM_CORE_ASSERT(m_SceneRenderer, "Scene renderer is not initialized");
+
+        if (!m_SceneRenderer)
+            return;
+
+        /*
+         * ImGui Scene 面板尺寸改变时，需要同步更新两个不同的对象：
+         *
+         * SceneRenderer：修改 FBO 颜色、深度和 MSAA 附件尺寸；
+         * CameraController：修改透视投影矩阵的宽高比。
+         */
+        if (const auto &sceneRendererSpec = m_SceneRenderer->GetSpecification();
+            m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
+            (sceneRendererSpec.Width != m_ViewportWidth ||
+             sceneRendererSpec.Height != m_ViewportHeight)
+        )
         {
-            // 重新创建颜色、深度和 MSAA 附件。
-            m_SceneFramebuffer->Resize(
+            m_SceneRenderer->Resize(
                 m_ViewportWidth,
                 m_ViewportHeight
             );
-            // 更新透视投影矩阵（Camera）的宽高比。
+
             m_CameraController.OnResize(
                 static_cast<float>(m_ViewportWidth),
                 static_cast<float>(m_ViewportHeight)
@@ -268,55 +336,64 @@ namespace SandBox
         // 必须先更新相机，再让BeginScene复制本帧的ViewProjection。
         m_CameraController.OnUpdate(deltaTime);
 
-        // 绑定场景 Framebuffer，并清理本帧的颜色与深度附件。
-        /**
-         * 我们必选先从这开始
-         * 这里会bind FBO 我们的GPU需要知道
-         */
-        m_SceneRenderPass->Begin();
-
-        /**
-         * 使用透视相机开始3D场景。
+        /*
+         * 每帧增加的角度 =
+         * 每秒旋转角度 × 当前帧经过的秒数。
          *
-         * BeginScene会复制相机的ViewProjection矩阵和位置。
+         * 因此无论是 60 FPS 还是 120 FPS，
+         * 一秒累计旋转的角度都是 m_CubeRotationSpeed。
          */
-        Limen::Renderer::BeginScene(m_CameraController.GetCamera());
+        m_CubeRotationDegrees += m_CubeRotationSpeed * deltaTime.GetSeconds();
 
-        /**
-         * 创建立方体Model矩阵。
+        /*
+         * 防止程序长时间运行后角度不断增大，
+         * 造成浮点数精度逐渐下降。
          *
-         * 第一个参数：原始Model矩阵；
-         * 第二个参数：旋转角度，GLM要求弧度；
-         * 第三个参数：旋转轴，这里使用世界/局部Y轴。
+         * remainder 会把结果保持在大约 [-180, 180]。
          */
-        glm::mat4 cubeTransform{1.0f};
+        m_CubeRotationDegrees = std::remainder(m_CubeRotationDegrees, 360.0f);
 
-        // 绕世界/当前Y轴旋转。
+        // 从单位矩阵开始构造当前立方体的矩阵模型
+        glm::mat4 cubeTransform{1.f};
+
+        //围绕 Y 轴的旋转
         cubeTransform = glm::rotate(
             cubeTransform,
             glm::radians(m_CubeRotationDegrees),
             glm::vec3(0.0f, 1.0f, 0.0f)
         );
 
-        // 再绕X轴旋转一半的角度，便于观察上表面。
+        //组合绕 X 轴的旋转，方便观察立方体上表面
         cubeTransform = glm::rotate(
             cubeTransform,
             glm::radians(m_CubeRotationDegrees * 0.5f),
             glm::vec3(1.0f, 0.0f, 0.0f)
         );
 
-        // Material负责Pipeline、Shader参数和纹理，Mesh负责几何数据。
-        Limen::Renderer::Submit(
-            *m_CubeMaterial,
-            *m_CubeMesh,
-            cubeTransform
+        /*
+         * Layer 不直接访问 Scene 内部 vector，
+         * 而是通过创建立方体时取得的句柄修改 Transform。
+         */
+        const bool transformUpdated = m_Scene.SetRenderObjectTransform(m_CubeObjectHandle, cubeTransform);
+
+        LM_CORE_ASSERT(transformUpdated, "Transform update failed");
+
+        if (!transformUpdated)
+            return;
+
+        /*
+         * SceneRenderer 内部执行：
+         *
+         * RenderPass::Begin()
+         * Renderer::BeginScene()
+         * 遍历 SceneRenderObject 并 Submit()
+         * Renderer::EndScene()
+         * RenderPass::End()
+         */
+        m_SceneRenderer->Render(
+            m_Scene,
+            m_CameraController.GetCamera()
         );
-
-        //此处只结束生命周期 暂时不改任何渲染
-        Limen::Renderer::EndScene();
-
-        // 解绑场景 Framebuffer，并把 MSAA 颜色解析到可采样的 2D 纹理。
-        m_SceneRenderPass->End();
     }
 
     void Example3DLayer::OnEvent(Limen::Event &event)
@@ -345,14 +422,93 @@ namespace SandBox
 
                 m_ViewportHeight = static_cast<uint32_t>(viewportSize.y);
 
-                const ImTextureID textureID = m_SceneFramebuffer->GetColorAttachmentHandle();
+                /*
+                 * SceneRenderer::Render() 返回前已经结束 RenderPass，
+                 * 因此 MSAA 颜色已经 Resolve 到可采样的单采样纹理。
+                 */
+                if (m_SceneRenderer)
+                {
+                    const std::uintptr_t colorAttachmentHandle =
+                            m_SceneRenderer->GetFinalColorAttachmentHandle();
 
-                ImGui::Image(ImTextureRef(textureID),
-                             viewportSize,
-                             // OpenGL 纹理原点与 ImGui 图像坐标原点相反，因此翻转 V。
-                             ImVec2(0.0f, 1.0f),
-                             ImVec2(1.0f, 0.0f)
+                    // 0 表示没有有效的纹理
+                    if (colorAttachmentHandle != 0)
+                    {
+                        /*
+                         * ImGui 的 OpenGL 后端把 ImTextureID 解释为纹理 ID。
+                         * 这层转换只出现在客户端 ImGui 显示代码中，
+                         * SceneRenderer 本身仍保持跨图形 API。
+                         */
+                        const ImTextureID textureID = colorAttachmentHandle;
+
+                        ImGui::Image(ImTextureRef(textureID),
+                                     viewportSize,
+                                     // OpenGL 纹理坐标原点位于左下角，
+                                     // ImGui 图像坐标原点位于左上角，因此翻转 V。
+                                     ImVec2(0.0f, 1.0f),
+                                     ImVec2(1.0f, 0.0f)
+                        );
+                    }
+                }
+            }
+        }
+        ImGui::End();
+
+        /*
+         * Lighting 面板与 Scene Viewport 分离，
+         * 避免光源控件占用场景画面的显示区域。
+         */
+        const bool lightingVisible = ImGui::Begin("Lighting");
+
+        if (lightingVisible)
+        {
+            /*
+             * Getter 返回 const 引用，不能直接交给 ImGui 修改。
+             * 因此先复制一份编辑中的光源数据，
+             * 修改成功后再通过 Setter 写回 Scene。
+             */
+            Limen::DirectionalLight editableLight = m_Scene.GetDirectionalLight();
+            bool lightChanged = false;
+
+            /*
+             * 使用 |= 而不是 ||：
+             * 每个 ImGui 控件都必须执行并绘制，
+             * 不能因为前一个控件返回 true 就短路后面的控件。
+             */
+            lightChanged |= ImGui::DragFloat3("Direction Light",
+                                              glm::value_ptr(editableLight.Direction),
+                                              0.05f, -1.f, 1.f
+            );
+
+            lightChanged |= ImGui::ColorEdit3(
+                "Color",
+                glm::value_ptr(editableLight.Color)
+            );
+
+            lightChanged |= ImGui::DragFloat(
+                "Intensity",
+                &editableLight.Intensity,
+                0.05f,
+                0.0f,
+                10.0f,
+                "%.2f"
+            );
+
+            const float directionLengthSquared =
+                    glm::dot(
+                        editableLight.Direction,
+                        editableLight.Direction
+                    );
+            if (directionLengthSquared <= 0.000000001f)
+            {
+                ImGui::TextColored(
+                    ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+                    "Direction cannot be zero."
                 );
+            }
+            else if (lightChanged)
+            {
+                m_Scene.SetDirectionalLight(editableLight);
             }
         }
         ImGui::End();

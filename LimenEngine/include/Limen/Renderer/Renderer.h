@@ -14,6 +14,8 @@ namespace Limen
     class Material;
     class Mesh;
 
+    struct DirectionalLight;
+
     class LIMEN_API Renderer
     {
     public:
@@ -23,6 +25,17 @@ namespace Limen
          * BeginScene() 与 EndScene() 必须成对调用；同一时刻只能有一个活动场景。
          */
         static void BeginScene(const Camera& camera);
+
+        /**
+         * @brief 使用指定相机和主平行光开始渲染场景。
+         *
+         * @param camera 本次场景使用的相机。
+         * @param directionalLight 本次场景使用的主平行光。
+         */
+        static void BeginScene(
+            const Camera& camera,
+            const DirectionalLight& directionalLight
+        );
 
         /**
          * @brief 更新Renderer输出使用的GPU Viewport。

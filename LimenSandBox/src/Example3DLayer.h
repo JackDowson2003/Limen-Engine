@@ -6,9 +6,9 @@
 #include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
-#include "Limen/Renderer/RenderPass.h"
-#include "Limen/RHI/Framebuffer.h"
 #include "Limen/RHI/Shader.h"
+#include "Limen/Scene/Scene.h"
+#include "Limen/Scene/SceneRenderer.h"
 
 namespace SandBox
 {
@@ -55,16 +55,11 @@ namespace SandBox
          */
         Limen::Ref<Limen::ShaderLibrary> m_ShaderLib = Limen::CreateRef<Limen::ShaderLibrary>();
 
-        Limen::Scope<Limen::Framebuffer> m_SceneFramebuffer;
-
-        // RenderPass 非拥有地引用 Framebuffer；逆序析构会先销毁 RenderPass。
-        Limen::Scope<Limen::RenderPass> m_SceneRenderPass;
-
         // 透视相机控制器，默认相机位置为 (0, 0, 3)。
         Limen::PerspectiveCameraController m_CameraController;
 
         //Mesh
-        Limen::Scope<Limen::Mesh> m_CubeMesh;
+        Limen::Ref<Limen::Mesh> m_CubeMesh;
 
         /**
          * @brief 立方体绘制使用的材质。
@@ -73,6 +68,35 @@ namespace SandBox
          * Mesh仍然只负责几何数据。
          */
         Limen::Ref<Limen::Material> m_CubeMaterial;
+
+        /**
+         * @brief 当前测试层的场景数据。
+         *
+         * Scene 保存场景中的 Mesh、Material 和 Transform，
+         * 但它本身不会调用任何渲染接口。
+         *
+         * Scene 由 Example3DLayer 独占，不需要使用指针。
+         */
+        Limen::Scene m_Scene;
+
+        /**
+         * @brief 负责将 m_Scene 渲染到独立 Framebuffer。
+         *
+         * 使用 Scope 是因为：
+         * 1. SceneRenderer 不允许复制；
+         * 2. 它独占内部 Framebuffer 和 RenderPass；
+         * 3. 生命周期完全属于当前 Layer；
+         * 4. 需要等构造器中准备好规格后再创建。
+         */
+        Limen::Scope<Limen::SceneRenderer> m_SceneRenderer;
+
+        /**
+         * @brief m_Scene 中立方体对象的句柄。
+         *
+         * Layer 不保存 vector 元素的指针或引用，
+         * 而是通过该句柄请求 Scene 修改立方体。
+         */
+        Limen::SceneRenderObjectHandle m_CubeObjectHandle;
 
         // 当前立方体旋转角度，单位为度。
         float m_CubeRotationDegrees = 0.0f;

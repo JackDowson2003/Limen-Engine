@@ -4,6 +4,10 @@ file(GLOB_RECURSE LIMEN_ENGINE_COMMON_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Core/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Application/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/*.cpp"
+
+        # 场景数据、场景对象以及后续的 SceneRenderer 实现。
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Scene/*.cpp"
+
         "${CMAKE_CURRENT_SOURCE_DIR}/src/RHI/Common/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Editor/ImGui/*.cpp"
 )

@@ -8,6 +8,7 @@
 #include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/Camera.h"
+#include "Limen/Scene/Light.h"
 
 namespace Limen
 {
@@ -18,6 +19,7 @@ namespace Limen
             bool IsActive = false;
             glm::mat4 ViewProjection{1.0f};
             glm::vec3 CameraPosition{0.0f};
+            DirectionalLight MainDirectionalLight;
         };
 
         SceneData s_SceneData;
@@ -25,18 +27,35 @@ namespace Limen
 
     void Renderer::BeginScene(const Camera &camera)
     {
+        // 2D 和旧路径暂时不提供光源 因此使用 DirectionalLight
+        BeginScene(camera,DirectionalLight{});
+
+    }
+
+    void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight)
+    {
         if (s_SceneData.IsActive)
         {
-            LM_CORE_ERROR("Another scene is already active");
+            LM_CORE_ERROR(
+                "Another scene is already active"
+            );
             return;
         }
-        s_SceneData.ViewProjection =
-                camera.GetViewProjectionMatrix();
 
-        s_SceneData.CameraPosition =
-                camera.GetPosition();
+        /**
+         * BeginScene 时复制本帧使用的场景快照
+         * 后面的每次 Submit 都读同一份快照
+         */
+        s_SceneData.ViewProjection = camera.GetViewProjectionMatrix();
+
+        s_SceneData.CameraPosition = camera.GetPosition();
+
+        s_SceneData.MainDirectionalLight =
+       directionalLight;
+
 
         s_SceneData.IsActive = true;
+
     }
 
     void Renderer::OnWindowResize(const uint32_t width, const uint32_t height)
@@ -168,6 +187,7 @@ namespace Limen
             s_SceneData.CameraPosition
         );
 
+
         vertexArray.Bind();
         RendererCommand::DrawIndexed(
             vertexArray,
@@ -231,6 +251,32 @@ namespace Limen
         shader->SetFloat3(
             "u_CameraPosition",
             s_SceneData.CameraPosition
+        );
+
+        /*
+         * 平行光属于场景数据，不属于某个 Material 或 Mesh。
+         *
+         * Material::Bind() 已经绑定了正确的 Shader，
+         * 因此现在可以把本帧缓存的光源参数写入该 Shader。
+         */
+        const DirectionalLight & directionalLight = s_SceneData.MainDirectionalLight;
+
+        // 光线从光源射向场景的方向。
+        shader->SetFloat3(
+            "u_DirectionalLightDirection",
+            directionalLight.Direction
+        );
+
+        // 光源的线性 RGB 颜色。
+        shader->SetFloat3(
+            "u_DirectionalLightColor",
+            directionalLight.Color
+        );
+
+        // 独立的亮度倍率。
+        shader->SetFloat(
+            "u_DirectionalLightIntensity",
+            directionalLight.Intensity
         );
 
         //Mesh使用本次绘制所用的VAO VBO IBO

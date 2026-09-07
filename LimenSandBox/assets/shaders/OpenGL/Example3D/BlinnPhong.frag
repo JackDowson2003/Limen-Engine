@@ -17,6 +17,23 @@ in vec2 v_TexCoord;
 uniform vec3 u_CameraPosition;
 
 /**
+ * 主平行光的光线传播方向。
+ *
+ * 它表示光从光源射向场景的方向。
+ */
+uniform vec3 u_DirectionalLightDirection;
+
+/**
+ * 主平行光的线性 RGB 颜色。
+ */
+uniform vec3 u_DirectionalLightColor;
+
+/**
+ * 主平行光的亮度倍率。
+ */
+uniform float u_DirectionalLightIntensity;
+
+/**
  * 当前材质的Albedo纹理。
  *
  * 当前约定从纹理槽0读取。
@@ -73,13 +90,17 @@ void main()
      *
      * 当前使用平行光，所以没有1/r²距离衰减。
      */
-    const vec3 lightIntensity = vec3(1.0, 0.95, 0.85);
+    vec3 lightIntensity = u_DirectionalLightColor * u_DirectionalLightIntensity;
 
     // n：世界空间中的单位表面法线。
     vec3 n = normalize(v_WorldNormal);
 
-    // l：从着色点指向光源的单位方向。
-    vec3 l = normalize(vec3(-1.0, 1.0, 1.0));
+    /*
+     * Direction 表示光从光源射向场景；
+     * Blinn-Phong 中的 l 表示从表面点指向光源，
+     * 因此两者方向相反。
+     */
+    vec3 l = normalize(-u_DirectionalLightDirection);
 
     float nDotL = max(dot(n, l), 0.0);
 
