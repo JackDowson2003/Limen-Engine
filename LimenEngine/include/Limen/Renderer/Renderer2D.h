@@ -9,7 +9,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-
+#include "Limen/Renderer/Camera.h"
 namespace Limen
 {
     // Renderer2D 的公共接口只保存这两个类型的引用，

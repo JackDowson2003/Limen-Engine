@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <cstdint>
 
 #include "glm/vec4.hpp"
 #include "Limen/Core/Core.h"
@@ -14,10 +15,56 @@ namespace Limen
     class Framebuffer;
 
     /**
+     * @brief RendererPass开始如何处理附件原有内容
+     */
+    enum class AttachmentLoadOperation : uint8_t
+    {
+        /**
+         * 保留原有附件中的内容
+         *
+         *用于第二个Pass继续读取或叠加第一个Pass的渲染结果。
+         */
+        Load = 0,
+
+        /**
+         * 使用RenderPassSpecification中指定的清理值清除附件。
+         */
+        Clear,
+
+        /**
+         * 不关心附件原有内容。
+         *
+         * 后端可以直接丢弃旧数据；之后不能依赖附件原来的像素。
+         */
+        DontCare
+    };
+
+    /**
+     * @brief RenderPass结束时是否需要保留附件内容
+     */
+    enum class AttachmentStoreOperation : uint8_t
+    {
+        /**
+         * 保留本次Pass产生的结果。
+         *
+         * 后续Pass采样、ImGui显示或Present时必须使用Store。
+         */
+        Store = 0,
+
+        /**
+         * Pass结束后不再需要该附件内容，允许后端丢弃。
+         */
+        DontCare
+    };
+
+    /**
      * @brief 描述一个渲染阶段的目标、清屏值与调试名称。
      *
-     * 当前版本在 Begin() 时固定清除颜色和深度，在 End() 时执行 MSAA
-     * Resolve。未来会增加 Load/Clear/DontCare 与 Store/DontCare 操作。
+     *  Begin() 根据 LoadOperation 决定保留、清理或忽略附件原有内容；
+     *  End() 根据 StoreOperation 决定是否保留颜色结果并执行 MSAA Resolve。
+     *
+     *  当前 OpenGL 4.1 后端无法显式丢弃附件，因此 DontCare 作为生命周期
+     *  语义使用：调用者不能再依赖该附件内容，支持显式丢弃的后端可以进一步优化。
      */
     struct RenderPassSpecification
     {
@@ -29,6 +76,36 @@ namespace Limen
          * 所以不额外使用 Ref 共享所有权。
          */
         Framebuffer *TargetFramebuffer = nullptr;
+
+        /**
+         * @brief Pass开始时如何处理颜色附件。
+         *
+         * 当前Scene Pass每帧重新绘制整个画面，所以默认为Clear。
+         */
+        AttachmentLoadOperation ColorLoadOperation =
+                AttachmentLoadOperation::Clear;
+
+        /**
+         * @brief Pass结束时是否保留颜色附件。
+         *
+         * Scene颜色需要交给ImGui::Image显示，所以默认为Store。
+         */
+        AttachmentStoreOperation ColorStoreOperation =
+                AttachmentStoreOperation::Store;
+
+        /**
+         * @brief Pass开始时如何处理Depth24Stencil8附件。
+         */
+        AttachmentLoadOperation DepthStencilLoadOperation =
+                AttachmentLoadOperation::Clear;
+
+        /**
+         * @brief Pass结束时是否保留Depth24Stencil8附件。
+         *
+         * 当前场景绘制完成后不会采样深度，所以默认为DontCare。
+         */
+        AttachmentStoreOperation DepthStencilStoreOperation =
+                AttachmentStoreOperation::DontCare;
 
         /** @brief Begin() 时用于清理颜色附件的颜色。 */
         glm::vec4 ClearColor{0.1f, 0.1f, 0.1f, 1.f};
@@ -54,6 +131,7 @@ namespace Limen
         ~RenderPass() = default;
 
         RenderPass(const RenderPass &) = delete;
+
         RenderPass &operator=(const RenderPass &) = delete;
 
         /** @brief 开始当前渲染阶段。 */

@@ -3,15 +3,12 @@
 //
 #pragma once
 #include "Limen/Application/Layer.h"
+#include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Renderer/RenderPass.h"
 #include "Limen/RHI/Framebuffer.h"
-#include "Limen/RHI/GraphicsPipeline.h"
-#include "Limen/RHI/IndexBuffer.h"
 #include "Limen/RHI/Shader.h"
-#include "Limen/RHI/Texture.h"
-#include "Limen/RHI/VertexArray.h"
 
 namespace SandBox
 {
@@ -66,37 +63,16 @@ namespace SandBox
         // 透视相机控制器，默认相机位置为 (0, 0, 3)。
         Limen::PerspectiveCameraController m_CameraController;
 
-        Limen::Scope<Limen::VertexArray> m_CubeVAO;
-
         //Mesh
         Limen::Scope<Limen::Mesh> m_CubeMesh;
 
-        // 保存立方体24条顶点记录，每条记录包含Position、Normal和TexCoord。
-        Limen::Ref<Limen::VertexBuffer> m_CubeVBO;
-
-        // 保存立方体6个面、12个三角形的36个索引。
-        Limen::Ref<Limen::IndexBuffer> m_CubeIBO;
-
-        // 负责将立方体顶点变换到裁剪空间并输出调试颜色。
-        Limen::Ref<Limen::Shader> m_CubeShader;
-
         /**
-         * @brief 立方体绘制使用的完整图形管线。
+         * @brief 立方体绘制使用的材质。
          *
-         * 它组合Shader、深度测试、混合、剔除和图元拓扑状态。
+         * Material组合Pipeline、Shader普通参数和纹理绑定；
+         * Mesh仍然只负责几何数据。
          */
-        // 声明在 Shader 之后，因此成员逆序析构时会先释放 Pipeline。
-        Limen::Ref<Limen::GraphicsPipeline> m_CubePipeline;
-
-        /**
-         * @brief 立方体材质使用的Albedo纹理。
-         *
-         * Albedo描述物体表面的基础颜色。
-         * Fragment Shader会采样它，并把采样结果作为Blinn-Phong中的k_d。
-         *
-         * Ref表示该纹理资源可以被多个物体或材质共享。
-         */
-        Limen::Ref<Limen::Texture2D> m_AlbedoTexture;
+        Limen::Ref<Limen::Material> m_CubeMaterial;
 
         // 当前立方体旋转角度，单位为度。
         float m_CubeRotationDegrees = 0.0f;

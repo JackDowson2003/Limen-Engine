@@ -31,7 +31,12 @@ namespace Limen
             METAL = 5,
         };
 
-        virtual void Clear() = 0;
+        /**
+         * @brief 清理当前绑定 Framebuffer 中指定的附件。
+         *
+         * @param flags 指定需要清理颜色、深度或模板附件。
+         */
+        virtual void Clear(ClearFlags flags) = 0;
 
         virtual void SetClearColor(const glm::vec4 &color) = 0;
 

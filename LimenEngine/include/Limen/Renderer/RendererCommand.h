@@ -10,10 +10,18 @@ namespace Limen
     class LIMEN_API RendererCommand
     {
     public:
-        static void Clear()
+        /**
+         * @brief 清理当前绑定 Framebuffer 中指定的附件。
+         *
+         * 默认清理颜色和深度，保持之前 RendererCommand::Clear() 的行为。
+         */
+        static void Clear(
+            const ClearFlags flags =
+                ClearFlags::Color | ClearFlags::Depth
+        )
         {
             if (RendererAPI *api = GetRendererAPI())
-                api->Clear();
+                api->Clear(flags);
         }
 
         static void SetClearColor(const glm::vec4 &color)

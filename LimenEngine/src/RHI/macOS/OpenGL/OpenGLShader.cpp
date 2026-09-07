@@ -157,6 +157,36 @@ namespace Limen
         UploadUniformInt(name, value);
     }
 
+    void OpenGLShader::SetFloat(const char *name, const float value)
+    {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform name is null");
+            return;
+        }
+        UploadUniformFloat(name, value);
+    }
+
+    void OpenGLShader::SetFloat2(const char *name, const glm::vec2 &value)
+    {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform name is null");
+            return;
+        }
+        UploadUniformFloat2(name,value);
+    }
+
+    void OpenGLShader::SetFloat4(const char *name, const glm::vec4 &value)
+    {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform name is null");
+            return;
+        }
+        UploadUniformFloat4(name,value);
+    }
+
     void OpenGLShader::SetInt(const char *name, const uint32_t value)
     {
         SetInt(name,static_cast<int>(value));
@@ -193,6 +223,11 @@ namespace Limen
 
     void OpenGLShader::UploadUniformMat4(const char* name,const glm::mat4& val)
     {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform buffer block name is null");
+            return;
+        }
         const GLint location = GetUniformLocation(name);
         glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(val));
     }
@@ -201,18 +236,33 @@ namespace Limen
 
     void OpenGLShader::UploadUniformMat3(const char *name, const glm::mat3 &val)
     {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform buffer block name is null");
+            return;
+        }
         const GLint location = GetUniformLocation(name);
         glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(val));
     }
 
-    void OpenGLShader::UploadUniformInt(const char *name, int value)
+    void OpenGLShader::UploadUniformInt(const char *name, const int value)
     {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform buffer block name is null");
+            return;
+        }
         const GLint location = GetUniformLocation(name);
         glUniform1i(location, value);
     }
 
     void OpenGLShader::UploadUniformFloat(const char *name, const float value)
     {
+        if (name == nullptr)
+        {
+            LM_CORE_ERROR("Uniform buffer block name is null");
+            return;
+        }
         const GLint location = GetUniformLocation(name);
         glUniform1f(location, value);
     }

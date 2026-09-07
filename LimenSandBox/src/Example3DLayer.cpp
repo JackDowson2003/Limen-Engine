@@ -11,6 +11,8 @@
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
 #include "Limen/Renderer/Renderer.h"
+#include "Limen/RHI/GraphicsPipeline.h"
+#include "Limen/RHI/Texture.h"
 
 namespace SandBox
 {
@@ -108,6 +110,7 @@ namespace SandBox
 
         m_CubeMesh.reset(new Limen::Mesh(cubeData));
 
+        // Create FBO
         Limen::FramebufferSpecification spec;
         spec.Width = 1280;
         spec.Height = 720;
@@ -116,6 +119,7 @@ namespace SandBox
         m_SceneFramebuffer = Limen::Framebuffer::Create(spec);
         LM_CORE_ASSERT(m_SceneFramebuffer, "Failed to create 3D scene Framebuffer");
 
+        // Create RenderPass
         Limen::RenderPassSpecification sceneRenderPassSpec;
         // RenderPass 只借用 Framebuffer，不转移 unique_ptr 的所有权。
         sceneRenderPassSpec.TargetFramebuffer = m_SceneFramebuffer.get();
@@ -125,7 +129,6 @@ namespace SandBox
         m_SceneRenderPass = Limen::CreateScope<Limen::RenderPass>(sceneRenderPassSpec);
 
 
-
         /**
          * @brief 按当前RendererAPI加载3D Blinn-Phong Shader。
          *
@@ -133,19 +136,19 @@ namespace SandBox
          * 自动选择OpenGL/Example3D/BlinnPhong.vert和.frag；以后选择
          * Direct3D 12时会改为DirectX12目录中的.vs.hlsl和.ps.hlsl。
          */
-        m_CubeShader = m_ShaderLib->Load(
-            "Example3D/BlinnPhong"
-        );
-
+        const Limen::Ref<Limen::Shader> shader =
+                m_ShaderLib->Load(
+                    "Example3D/BlinnPhong"
+                );
         LM_CORE_ASSERT(
-            m_CubeShader,
+            shader,
             "Failed to create Example3D BlinnPhong shader"
         );
 
-        //region FBO config
+        //region Pipeline config
         Limen::GraphicsPipelineSpecification cubePipelineSpec;
 
-        cubePipelineSpec.ShaderProgram = m_CubeShader;
+        cubePipelineSpec.ShaderProgram = shader;
         cubePipelineSpec.Topology =
                 Limen::PrimitiveTopology::TriangleList;
 
@@ -169,16 +172,16 @@ namespace SandBox
 
         cubePipelineSpec.DebugName =
                 "Example3D Cube Pipeline";
+        //endregion
 
-        m_CubePipeline = Limen::GraphicsPipeline::Create(
+        const Limen::Ref<Limen::GraphicsPipeline> pipeline = Limen::GraphicsPipeline::Create(
             cubePipelineSpec
         );
 
         LM_CORE_ASSERT(
-            m_CubePipeline,
+            pipeline,
             "Failed to create Example3D cube graphics pipeline"
         );
-        //endregion
 
 
         /**
@@ -188,12 +191,45 @@ namespace SandBox
          * CMake会把LimenSandBox/assets复制到可执行文件目录，
          * 因此运行时可以通过assets/textures/...访问。
          */
-        m_AlbedoTexture = Limen::Texture2D::Create(
+        const Limen::Ref<Limen::Texture2D> texture = Limen::Texture2D::Create(
             "assets/textures/checkerboard.png"
         );
 
-        LM_CORE_ASSERT(m_AlbedoTexture, "Failed to create cube albedo texture");
+        LM_CORE_ASSERT(texture, "Failed to create cube albedo texture");
 
+        //使用立方体Pipeline的材质
+        m_CubeMaterial = Limen::CreateRef<Limen::Material>(
+            pipeline,
+            "Example3D Cube Material"
+        );
+
+        LM_CORE_ASSERT(
+            m_CubeMaterial,
+            "Failed to create Example3D cube material"
+        );
+
+        if (m_CubeMaterial)
+        {
+            m_CubeMaterial->SetTexture(
+                "u_AlbedoTexture",
+                texture,
+                0
+            );
+
+            // 设置Blinn-Phong高光指数p。
+            m_CubeMaterial->SetFloat(
+                "u_Shininess",
+                128.f
+            );
+
+            // 设置GAMES101中的材质镜面反射系数k_s。
+            m_CubeMaterial->SetFloat3(
+                "u_SpecularColor",
+                glm::vec3(0.35f)
+            );
+        }
+
+        //初始时不允许鼠标控制
         m_CameraController.SetMouseLookEnabled(false);
     }
 
@@ -208,7 +244,7 @@ namespace SandBox
                 m_ViewportWidth,
                 m_ViewportHeight
             );
-            // 更新透视投影矩阵的宽高比。
+            // 更新透视投影矩阵（Camera）的宽高比。
             m_CameraController.OnResize(
                 static_cast<float>(m_ViewportWidth),
                 static_cast<float>(m_ViewportHeight)
@@ -269,19 +305,14 @@ namespace SandBox
             glm::vec3(1.0f, 0.0f, 0.0f)
         );
 
-        // Shader 中的 u_AlbedoTexture 约定从纹理槽 0 采样。
-        m_AlbedoTexture->Bind(0);
-        // Limen::Renderer::Submit(
-        //     *m_CubePipeline,
-        //     *m_CubeVAO, //记住了Albedo_Texture
-        //     cubeTransform
-        // );
-
+        // Material负责Pipeline、Shader参数和纹理，Mesh负责几何数据。
         Limen::Renderer::Submit(
-            *m_CubePipeline,
-            m_CubeMesh->GetVertexArray(), //记住了Albedo_Texture
+            *m_CubeMaterial,
+            *m_CubeMesh,
             cubeTransform
         );
+
+        //此处只结束生命周期 暂时不改任何渲染
         Limen::Renderer::EndScene();
 
         // 解绑场景 Framebuffer，并把 MSAA 颜色解析到可采样的 2D 纹理。

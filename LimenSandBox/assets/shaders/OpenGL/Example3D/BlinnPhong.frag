@@ -1,6 +1,6 @@
 #version 410 core
 
-layout(location = 0) out vec4 color;
+layout (location = 0) out vec4 color;
 
 /**
  * Vertex Shader输出并经过光栅化插值的数据。
@@ -23,9 +23,24 @@ uniform vec3 u_CameraPosition;
  */
 uniform sampler2D u_AlbedoTexture;
 
+/**
+ * Blinn-Phong高光指数p。
+ *
+ * 数值越大，高光范围越小、越集中；
+ * 数值越小，高光范围越大、越柔和。
+ */
+uniform float u_Shininess;
+
+/**
+ * GAMES101中的材质镜面反射系数k_s。
+ *
+ * RGB分别控制三个颜色通道反射镜面光的强度。
+ */
+uniform vec3 u_SpecularColor;
+
 void main()
 {
-     /**
+/**
      * 对Albedo纹理进行采样。
      *
      * RGB用于材质漫反射系数k_d；
@@ -40,20 +55,20 @@ void main()
     vec3 k_a = 0.15 * k_d;
 
     // 材质镜面反射系数。
-    const vec3 k_s = vec3(0.35);
+    vec3 k_s = u_SpecularColor;
 
-     /**
+    /**
      * Blinn-Phong高光指数。
      *
      * 越大，高光越集中；
      * 越小，高光越宽。
      */
-    const float p = 64.0;
+    float p = u_Shininess;
 
     // 环境光强度I_a。
     const vec3 ambientLightIntensity = vec3(1.0);
 
-     /**
+    /**
      * 平行光强度I。
      *
      * 当前使用平行光，所以没有1/r²距离衰减。
@@ -68,12 +83,12 @@ void main()
 
     float nDotL = max(dot(n, l), 0.0);
 
-     /**
+    /**
      * v：从着色点指向相机的单位方向。
      */
     vec3 v = normalize(u_CameraPosition - v_WorldPosition);
 
-     /**
+    /**
      * h：光照方向l与观察方向v之间的半程向量。
      */
     vec3 h = normalize(l + v);
@@ -86,7 +101,7 @@ void main()
     // L_d = k_d * I * max(0, n dot l)
     vec3 diffuse = k_d * lightIntensity * nDotL;
 
-     /**
+    /**
      * 当光源位于表面背面时，不允许产生镜面高光。
      */
     float specularStrength = nDotL > 0.0 ? pow(nDotH, p) : 0.0;

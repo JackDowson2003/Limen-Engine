@@ -46,9 +46,23 @@ namespace Limen
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
-    inline void OpenGLRendererAPI::Clear()
+    inline void OpenGLRendererAPI::Clear(const ClearFlags flags)
     {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // OpenGL 使用一个位掩码表示需要清理哪些缓冲区 类型为OpenGL类型
+        GLbitfield clearMask = 0;
+
+        if (HasClearFlag(flags, ClearFlags::Color))
+            clearMask |= GL_COLOR_BUFFER_BIT;
+
+        if (HasClearFlag(flags, ClearFlags::Depth))
+            clearMask |= GL_DEPTH_BUFFER_BIT;
+
+        if (HasClearFlag(flags, ClearFlags::Stencil))
+            clearMask |= GL_STENCIL_BUFFER_BIT;
+
+        // ClearFlags::None 时不需要想GPU发出清理指令
+        if (clearMask != 0)
+            glClear(clearMask);
     }
 
     inline void OpenGLRendererAPI::SetClearColor(const glm::vec4 &color)
@@ -64,7 +78,11 @@ namespace Limen
             glDisable(GL_DEPTH_TEST);
     }
 
-    void OpenGLRendererAPI::DrawIndexed(const VertexArray &vertexArray, const PrimitiveTopology topology, const uint32_t indexCount)
+    void OpenGLRendererAPI::DrawIndexed(
+        const VertexArray &vertexArray,
+        const PrimitiveTopology topology,
+        const uint32_t indexCount
+    )
     {
         // 获取 VAO 当前绑定的 IndexBuffer。
         const Ref<IndexBuffer> &indexBuffer = vertexArray.GetIndexBuffer();
@@ -79,9 +97,9 @@ namespace Limen
         // indexCount 为0时，保持旧行为：
         // 绘制 IndexBuffer 中的全部索引。
         const uint32_t actualIndexCount =
-            indexCount == 0
-                ? indexBuffer->GetCount()
-                : indexCount;
+                indexCount == 0
+                    ? indexBuffer->GetCount()
+                    : indexCount;
 
         // 防止绘制数量超过 IndexBuffer 实际容量。
         LM_CORE_ASSERT(
@@ -98,11 +116,11 @@ namespace Limen
 
         //按照我给的这张‘索引地图’，从你现有的顶点数据里，把指定的顶点取出来，画成我想要的图形
         glDrawElements(
-                ToOpenGLPrimitiveTopology(topology),
-                static_cast<GLsizei>(actualIndexCount),
-                GL_UNSIGNED_INT,
-                nullptr
-            );
+            ToOpenGLPrimitiveTopology(topology),
+            static_cast<GLsizei>(actualIndexCount),
+            GL_UNSIGNED_INT,
+            nullptr
+        );
     }
 
 

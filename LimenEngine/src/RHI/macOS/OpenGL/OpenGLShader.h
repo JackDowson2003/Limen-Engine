@@ -30,8 +30,23 @@ namespace Limen
             int value
         ) override;
 
+        void SetFloat(
+            const char *name,
+            float value
+        ) override;
+
+        void SetFloat2(
+            const char *name,
+            const glm::vec2 &value
+        ) override;
+
+        void SetFloat4(
+            const char *name,
+            const glm::vec4 &value
+        ) override;
+
         void SetInt(
-            const char* name,
+            const char *name,
             uint32_t value
         ) override;
 
@@ -63,7 +78,7 @@ namespace Limen
         int GetUniformLocation(const char *name);
 
     private:
-        uint32_t m_RendererID = 0;
+        uint32_t m_RendererID;
         std::unordered_map<std::string, int> m_UniformLocations;
         std::string m_Name;
     };

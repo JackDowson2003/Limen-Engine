@@ -4,13 +4,16 @@
 #pragma once
 
 #include "Limen/Core/Core.h"
-#include "Limen/Renderer/Camera.h"
 #include "Limen/Renderer/RendererCommand.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Shader.h"
 
 namespace Limen
 {
+    class Camera;
+    class Material;
+    class Mesh;
+
     class LIMEN_API Renderer
     {
     public:
@@ -67,6 +70,23 @@ namespace Limen
         static void Submit(
             const GraphicsPipeline& pipeline,
             const VertexArray& vertexArray,
+            const glm::mat4& transform = glm::mat4(1.0f)
+        );
+
+        /**
+         * @brief 使用材质和Mesh提交一次3D索引绘制。
+         *
+         * Material提供Pipeline、Shader参数和纹理；
+         * Mesh提供VAO、VBO和IBO所表示的几何数据；
+         * Renderer负责上传相机与物体数据并发出绘制命令。
+         *
+         * @param material 本次绘制使用的材质。
+         * @param mesh 本次绘制使用的几何数据。
+         * @param transform Mesh从模型空间变换到世界空间的矩阵。
+         */
+        static void Submit(
+            const Material& material,
+            const Mesh& mesh,
             const glm::mat4& transform = glm::mat4(1.0f)
         );
 

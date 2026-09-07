@@ -52,6 +52,23 @@ namespace Limen
             int value
         ) = 0;
 
+        virtual void SetFloat(
+            const char* name,
+            float value
+        ) = 0;
+
+        virtual void SetFloat2(
+            const char* name,
+            const glm::vec2 &value
+        ) = 0;
+
+
+        virtual void SetFloat4(
+            const char* name,
+            const glm::vec4 &value
+        ) = 0;
+
+
         virtual void SetInt(
             const char* name,
             uint32_t value

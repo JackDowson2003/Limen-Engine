@@ -14,7 +14,7 @@ namespace Limen
 
         void Init() override;
 
-        void Clear() override;
+        void Clear(ClearFlags flags) override;
 
         void SetClearColor(const glm::vec4 &color) override;
 

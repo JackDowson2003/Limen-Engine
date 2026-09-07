@@ -16,7 +16,9 @@ namespace Limen
 
     protected:
         explicit KeyEvent(const KeyCode keyCode)
-            : m_KeyCode(keyCode) {}
+            : m_KeyCode(keyCode)
+        {
+        }
 
         KeyCode m_KeyCode;
     };
@@ -25,7 +27,9 @@ namespace Limen
     {
     public:
         explicit KeyPressedEvent(const KeyCode keyCode, const int repeatCount = 0)
-            : KeyEvent(keyCode), m_RepeatCount(repeatCount) {}
+            : KeyEvent(keyCode), m_RepeatCount(repeatCount)
+        {
+        }
 
         [[nodiscard]] bool IsRepeat() const { return m_RepeatCount > 0; }
 
@@ -33,7 +37,7 @@ namespace Limen
         {
             std::stringstream stream;
             stream << "KeyPressedEvent: " << static_cast<int>(m_KeyCode)
-                   << " (repeatCount = " << m_RepeatCount << ')';
+                    << " (repeatCount = " << m_RepeatCount << ')';
             return stream.str();
         }
 
@@ -47,7 +51,9 @@ namespace Limen
     {
     public:
         explicit KeyReleasedEvent(const KeyCode keyCode)
-            : KeyEvent(keyCode) {}
+            : KeyEvent(keyCode)
+        {
+        }
 
         [[nodiscard]] std::string ToString() const override
         {
@@ -64,14 +70,18 @@ namespace Limen
     {
     public:
         explicit KeyTypedEvent(const char32_t codepoint)
-            : m_Codepoint(codepoint) {}
+            : m_Codepoint(codepoint)
+        {
+        }
 
         [[nodiscard]] char32_t GetCodepoint() const { return m_Codepoint; }
 
         [[nodiscard]] std::string ToString() const override
         {
             std::stringstream stream;
-            stream << "KeyTypedEvent: " << m_Codepoint;
+            // char32_t 不能直接写入普通字符流，这里输出它的 Unicode 码点数值。
+            stream << "KeyTypedEvent: "
+                    << static_cast<uint32_t>(m_Codepoint);
             return stream.str();
         }
 

@@ -20,6 +20,7 @@
 //     -> Flush：上传 VBO、绑定纹理和 Pipeline、执行 DrawIndexed
 //
 #include "Limen/Renderer/Renderer2D.h"
+#include "Limen/Renderer/Camera.h"
 
 // glm::translate 和 glm::scale 的定义。
 #include <glm/gtc/matrix_transform.hpp>
@@ -448,7 +449,6 @@ namespace Limen
      */
     void Renderer2D::Init()
     {
-
         // 防止重复初始化覆盖尚未释放的 GPU 资源。
         LM_CORE_ASSERT(!s_Data, "Renderer2D already initialized!");
 
@@ -594,7 +594,6 @@ namespace Limen
         // IndexBuffer::Create() 的第二个参数是索引数量，不是字节数。
         s_Data->QuadIndexBuffer.reset(IndexBuffer::Create(quadIndices.get(), MaxIndices));
 
-
         LM_CORE_ASSERT(s_Data->QuadIndexBuffer, "Renderer2D,Failed to create Renderer2D quad IndexBuffer");
 
         if (!s_Data->QuadIndexBuffer)
@@ -602,6 +601,7 @@ namespace Limen
             s_Data.reset();
             return;
         }
+
         // VAO 同时记录该 IBO，之后绑定 VAO 就能恢复对应索引数据。
         s_Data->QuadVertexArray->SetIndexBuffer(s_Data->QuadIndexBuffer);
 
@@ -624,6 +624,7 @@ namespace Limen
             s_Data.reset();
             return;
         }
+
         // SetInt() 会修改当前 Shader Program 的 uniform，设置前先绑定。
         s_Data->TextureShader->Bind();
 
@@ -655,7 +656,6 @@ namespace Limen
          * 所以这里只保留状态说明，并没有用它创建 GraphicsPipeline。
          */
         GraphicsPipelineSpecification flatColorPipelineSpec;
-
 
         flatColorPipelineSpec.Topology = PrimitiveTopology::TriangleList;
 
@@ -708,8 +708,7 @@ namespace Limen
                 "Renderer2D Texture Pipeline";
 
         // 工厂根据当前 RendererAPI 创建对应后端的 Pipeline 实现。
-        s_Data->TexturePipeline =
-                GraphicsPipeline::Create(texturePipelineSpecification);
+        s_Data->TexturePipeline = GraphicsPipeline::Create(texturePipelineSpecification);
 
         LM_CORE_ASSERT(
             s_Data->TexturePipeline,
@@ -1026,10 +1025,7 @@ namespace Limen
              textureSlot < s_Data->TextureSlotCount;
              ++textureSlot)
         {
-            if (
-                s_Data->TextureSlots[textureSlot] ==
-                texture
-            )
+            if (s_Data->TextureSlots[textureSlot] == texture)
             {
                 // 找到后复用槽位，多个 Quad 不会重复占用纹理单元。
                 textureIndex = textureSlot;

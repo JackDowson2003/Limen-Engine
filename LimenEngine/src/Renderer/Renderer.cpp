@@ -5,6 +5,9 @@
 #include "Limen/Renderer/Renderer.h"
 
 #include "Limen/Core/Log.h"
+#include "Limen/Renderer/Material.h"
+#include "Limen/Renderer/Mesh.h"
+#include "Limen/Renderer/Camera.h"
 
 namespace Limen
 {
@@ -170,5 +173,70 @@ namespace Limen
             vertexArray,
             specification.Topology
         );
+    }
+
+    void Renderer::Submit(const Material &material, const Mesh &mesh, const glm::mat4 &transform)
+    {
+        // 绘制只能发生在BeginScene和EndScene之间。
+        if (!s_SceneData.IsActive)
+        {
+            LM_CORE_ERROR(
+                "Renderer::Submit(Material, Mesh) must be called "
+                "between BeginScene and EndScene"
+            );
+            return;
+        }
+
+        /**
+         * Material::Bind() 负责：
+         *
+         * 1. 绑定pipeline和Shader
+         * 2. 上传材质的普通参数
+         * 3. 绑定纹理并设置sampler槽位
+         */
+        material.Bind();
+
+        const GraphicsPipeline & pipeline = material.GetPipeline();
+        const auto & specification = pipeline.GetSpecification();
+        const auto& shader = specification.ShaderProgram;
+        if (!shader)
+        {
+            LM_CORE_ERROR(
+            "Material '{}' uses a pipeline without Shader",
+            material.GetDebugName()
+        );
+            return;
+        }
+
+        /*
+        * 这些参数属于Renderer，而不属于Material：
+        *
+        * ViewProjection：当前场景相机；
+        * Transform：当前绘制物体；
+        * CameraPosition：当前场景相机位置。
+        *
+        * 放在Material::Bind()之后上传，可以保证Renderer拥有的
+        * 每帧、每物体参数不会被材质参数意外覆盖。
+        */
+        shader->SetMat4(
+            "u_ViewProjection",
+            s_SceneData.ViewProjection
+        );
+
+        shader->SetMat4(
+            "u_Transform",
+            transform
+        );
+
+        shader->SetFloat3(
+            "u_CameraPosition",
+            s_SceneData.CameraPosition
+        );
+
+        //Mesh使用本次绘制所用的VAO VBO IBO
+        const VertexArray & vao = mesh.GetVertexArray();
+        vao.Bind();
+
+        RendererCommand::DrawIndexed(vao,specification.Topology);
     }
 }
