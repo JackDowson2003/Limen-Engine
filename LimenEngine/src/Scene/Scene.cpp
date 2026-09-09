@@ -59,9 +59,9 @@ namespace Limen
 
         const bool intensityIsValid = light.Intensity >= 0.f;
         LM_CORE_ASSERT(
-                directionIsValid,
-                "DirectionalLight direction cannot be zero"
-            );
+            directionIsValid,
+            "DirectionalLight direction cannot be zero"
+        );
 
         LM_CORE_ASSERT(
             intensityIsValid,
@@ -75,24 +75,112 @@ namespace Limen
         m_DirectionalLight = light;
     }
 
-    void Scene::AddPointLight(const PointLight &light)
+    void Scene::SetAmbientLight(const AmbientLight &light)
+    {
+        const bool intensityIsValid =
+        light.Intensity >= 0.0f;
+        LM_CORE_ASSERT(intensityIsValid, "AmbientLight intensity cannot be negative");
+
+        if (!intensityIsValid)
+            return;
+
+        m_AmbientLight = light;
+    }
+
+    const AmbientLight & Scene::GetAmbientLight() const noexcept
+    {
+        return m_AmbientLight;
+    }
+
+    ScenePointLightHandle Scene::AddPointLight(const PointLight &light)
     {
         const bool intensityIsValid = light.Intensity >= 0.f;
 
         LM_CORE_ASSERT(intensityIsValid, "PointLight intensity cannot be negative");
 
         if (!intensityIsValid)
-            return;
+            return {};
 
+        /*
+         * InvalidIndex被保留为“无效句柄”，
+         * 所以不能让有效元素使用这个下标。
+         */
+        LM_CORE_ASSERT(
+            m_PointLights.size() <
+            ScenePointLightHandle::InvalidIndex,
+            "Scene contains too many point lights"
+        );
+        if (m_PointLights.size() >= ScenePointLightHandle::InvalidIndex)
+            return {};
+        ScenePointLightHandle handle;
+        handle.Index = static_cast<uint32_t>(m_PointLights.size());
         m_PointLights.push_back(light);
+        return handle;
     }
 
-    const std::vector<PointLight> & Scene::GetPointLights() const noexcept
+    bool Scene::SetPointLight(const ScenePointLightHandle handle, const PointLight &light)
+    {
+        const bool handleIsValid = handle.IsValid() && handle.Index < m_PointLights.size();
+
+        LM_CORE_ASSERT(
+            handleIsValid,
+            "Scene cannot update invalid point light handle '{}'",
+            handle.Index
+        );
+        if (!handleIsValid)
+            return false;
+
+        const bool intensityIsValid =
+        light.Intensity >= 0.0f;
+
+        LM_CORE_ASSERT(
+            intensityIsValid,
+            "PointLight intensity cannot be negative"
+        );
+
+        // Release构建仍然需要阻止无效光源数据写入Scene。
+        if (!intensityIsValid)
+            return false;
+
+        /*
+         * 使用句柄找到对应元素，
+         * 将Position、Color和Intensity整体更新。
+         */
+        m_PointLights[handle.Index] = light;
+
+        return true;
+    }
+
+    bool Scene::TryGetPointLight(const ScenePointLightHandle handle, PointLight &outLight) const noexcept
+    {
+        const bool handleIsValid =
+        handle.IsValid() &&
+        handle.Index < m_PointLights.size();
+
+        /*
+         * 函数名使用Try，表示查询失败属于正常结果，
+         * 因此这里不触发断言，只返回false。
+         */
+        if (!handleIsValid)
+            return false;
+
+        /*
+         * 将Scene中的光源数据复制到调用者自己的对象中。
+         *
+         * 调用者之后修改outLight，
+         * 不会绕过SetPointLight直接修改Scene。
+         */
+        outLight = m_PointLights[handle.Index];
+
+        return true;
+    }
+
+    const std::vector<PointLight> &Scene::GetPointLights() const noexcept
     {
         return m_PointLights;
     }
 
-    const DirectionalLight & Scene::GetDirectionalLight() const noexcept
+    const DirectionalLight &Scene::GetDirectionalLight() const noexcept
     {
         return m_DirectionalLight;
     }

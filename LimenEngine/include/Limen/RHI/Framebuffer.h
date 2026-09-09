@@ -3,9 +3,78 @@
 //
 #pragma once
 #include "Limen/Core/Core.h"
+#include <initializer_list>
+#include <vector>
+
 
 namespace Limen
 {
+    /**
+     * @brief Framebuffer附件的跨图形API格式。
+     *
+     * 上层只描述需要什么数据，
+     * 具体映射到GLenum、DXGI_FORMAT或MTLPixelFormat，
+     * 由对应图形API后端负责。
+     */
+    enum class FramebufferAttachmentFormat : uint8_t
+    {
+        None = 0,
+
+        /**
+         * 8位RGBA颜色附件。
+         *
+         * OpenGL对应GL_RGBA8。
+         */
+        RGBA8,
+
+        /**
+         * 24位深度加8位模板附件。
+         *
+         * 用于当前主场景的深度测试与模板测试。
+         */
+        Depth24Stencil8,
+
+        /**
+         * 32位浮点深度附件。
+         *
+         * 主要用于Shadow Map：
+         * 第一遍保存光源视角下最近表面的深度，
+         * 第二遍由场景Shader采样并进行深度比较。
+         */
+        Depth32F
+    };
+
+    /**
+     * @brief 描述一个Framebuffer需要创建哪些附件。
+     */
+    struct FramebufferAttachmentSpecification
+    {
+        FramebufferAttachmentSpecification() = default;
+
+        /**
+         * 允许使用下面这种形式描述附件：
+         *
+         * { RGB, RGB8, RGBA8, Depth24Stencil8 }
+         *
+         * 或者：
+         *
+         * { Depth32F }
+         */
+        FramebufferAttachmentSpecification(std::initializer_list<FramebufferAttachmentFormat> formats)
+            : Formats(formats)
+        {
+        }
+
+        /**
+         * @brief Framebuffer所需的全部附件格式。
+         *
+         * 第一版允许：
+         * - 一个颜色附件；
+         * - 一个深度或深度模板附件。
+         */
+        std::vector<FramebufferAttachmentFormat> Formats;
+    };
+
     /**
     * @brief Framebuffer 的创建参数。
      *
@@ -38,6 +107,17 @@ namespace Limen
          * 后端会检查硬件是否支持该采样数。
          */
         uint32_t Samples = 4;
+
+        /**
+         * @brief 当前Framebuffer需要的附件。
+         *
+         * 默认值保持现有主场景行为：
+         * 一个RGBA8颜色附件和一个Depth24Stencil8附件。
+         */
+        FramebufferAttachmentSpecification Attachments = {
+            FramebufferAttachmentFormat::RGBA8,
+            FramebufferAttachmentFormat::Depth24Stencil8
+        };
     };
 
     /**
@@ -90,6 +170,20 @@ namespace Limen
          */
         [[nodiscard]]
         virtual std::uintptr_t GetColorAttachmentHandle() const noexcept = 0;
+
+        /**
+         * @brief 取得可采样深度附件的后端原生句柄。
+         *
+         * Shadow Pass 把光源视角下的深度写入该附件；
+         * 主场景渲染时，Shader 再将它作为 Shadow Map 采样。
+         *
+         * 如果当前 Framebuffer 没有可采样深度纹理，
+         * 例如使用的是 Depth24Stencil8 Renderbuffer，
+         * 则返回 0。
+         */
+        [[nodiscard]]
+        virtual std::uintptr_t
+        GetDepthAttachmentHandle() const noexcept = 0;
 
         /**
          * @brief 将多采样颜色结果解析到可采样的普通颜色纹理。

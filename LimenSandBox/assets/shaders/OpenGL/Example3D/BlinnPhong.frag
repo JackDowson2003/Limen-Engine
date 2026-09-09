@@ -24,6 +24,18 @@ in vec2 v_TexCoord;
  */
 uniform vec3 u_CameraPosition;
 
+uniform vec3 u_AmbientReflectance;
+
+/**
+ * GAMES101常量环境光I_a的RGB颜色。
+ */
+uniform vec3 u_AmbientLightColor;
+
+/**
+ * GAMES101常量环境光I_a的强度倍率。
+ */
+uniform float u_AmbientLightIntensity;
+
 /**
  * 主平行光的光线传播方向。
  *
@@ -93,6 +105,83 @@ uniform float u_Shininess;
  */
 uniform vec3 u_SpecularColor;
 
+/**
+ * @brief 计算一个光源对当前着色点产生的Blinn-Phong直接光照。
+ *
+ * 这个函数不计算环境光，因为环境光只应在整个片元中计算一次，
+ * 不能跟随光源数量重复累加。
+ *
+ * @param k_d
+ * 材质漫反射系数。
+ *
+ * @param k_s
+ * 材质镜面反射系数。
+ *
+ * @param p
+ * Blinn-Phong高光指数。
+ *
+ * @param n
+ * 当前着色点的单位法线。
+ *
+ * @param l
+ * 从当前着色点指向光源的单位方向。
+ *
+ * @param v
+ * 从当前着色点指向相机的单位方向。
+ *
+ * @param lightIntensityAtPoint
+ * 实际到达当前着色点的RGB光照强度。
+ *
+ * 平行光传入：
+ * Color * Intensity
+ *
+ * 点光源传入：
+ * Color * Intensity / r²
+ *
+ * @return
+ * 当前光源产生的漫反射与镜面反射之和。
+ */
+vec3 EvaluateBlinnPhongDirectLight(
+    vec3 k_d,
+    vec3 k_s,
+    float p,
+    vec3 n,
+    vec3 l,
+    vec3 v,
+    vec3 lightIntensityAtPoint
+)
+{
+    float nDotL = max(0.0, dot(n, l));
+
+    // 如果光线在表面背面时，直接光照贡献为0
+    if (nDotL <= 0.0)
+    return vec3(0.0);
+
+    vec3 h = normalize(v + l);
+
+    // L_d = k_d * I * max(0, n·l)
+    vec3 diffuse = k_d * lightIntensityAtPoint * nDotL;
+
+    float nDotH = max(0.0, dot(n, h));
+
+    // L_s = k_s * I * max(0, n·h) ^p
+    vec3 specular = k_s * lightIntensityAtPoint * pow(nDotH, p);
+
+    return diffuse + specular;
+
+}
+
+/**
+    u_AmbientReflectance
+        = k_a
+        = 材质属性
+        = 物体能反射多少环境光
+
+    u_AmbientLightColor × u_AmbientLightIntensity
+        = I_a
+        = 场景属性
+        = 场景中存在多少环境光
+*/
 void main()
 {
 /**
@@ -107,7 +196,7 @@ void main()
     vec3 k_d = albedoSample.rgb;
 
     // 当前使用Albedo的15%近似环境光反射系数。
-    vec3 k_a = 0.15 * k_d;
+    vec3 k_a = u_AmbientReflectance;
 
     // 材质镜面反射系数。
     vec3 k_s = u_SpecularColor;
@@ -121,7 +210,7 @@ void main()
     float p = u_Shininess;
 
     // 环境光强度I_a。
-    const vec3 ambientLightIntensity = vec3(1.0);
+    vec3 ambientLightIntensity = u_AmbientLightColor * u_AmbientLightIntensity;
 
     /**
      * 平行光强度I。
@@ -140,40 +229,23 @@ void main()
      */
     vec3 l = normalize(-u_DirectionalLightDirection);
 
-    float nDotL = max(dot(n, l), 0.0);
-
     /**
      * v：从着色点指向相机的单位方向。
      */
     vec3 v = normalize(u_CameraPosition - v_WorldPosition);
 
-    /**
-     * h：光照方向l与观察方向v之间的半程向量。
-     */
-    vec3 h = normalize(l + v);
-
-    float nDotH = max(dot(n, h), 0.0);
-
     // L_a = k_a * I_a
     vec3 ambient = k_a * ambientLightIntensity;
 
-    // L_d = k_d * I * max(0, n dot l)
-    vec3 diffuse = k_d * lightIntensity * nDotL;
+    vec3 directionalLightContribution = EvaluateBlinnPhongDirectLight(k_d, k_s, p, n, l, v, lightIntensity);
 
     /**
-     * 当光源位于表面背面时，不允许产生镜面高光。
-     */
-    float specularStrength = nDotL > 0.0 ? pow(nDotH, p) : 0.0;
-
-    // L_s = k_s * I * max(0, n dot h)^p
-    vec3 specular = k_s * lightIntensity * specularStrength;
-
-    /**
-     * 所有点光源产生的漫反射总和。
+     * 所有点光源产生的直接光照总和。
      *
-     * 从黑色开始，每处理一个点光源就累加一次贡献。
+     * 每个点光源的直接光照包含：
+     * 漫反射 + 镜面反射。
      */
-    vec3 pointLightDiffuse = vec3(0.0);
+    vec3 pointLightContribution = vec3(0.0);
 
     for (int pointLightIndex = 0; pointLightIndex < u_PointLightCount; pointLightIndex++)
     {
@@ -213,10 +285,25 @@ void main()
         u_PointLights[pointLightIndex].Intensity /
         distanceSquared;
 
-        float pointLightNDotL = max(dot(n,pointLightDirection),0.0);
-
-        pointLightDiffuse += k_d * pointLightIntensity * pointLightNDotL;
+        /**
+         * 当前点光源的l和I/r²已经计算完成，
+         * 交给通用函数计算漫反射与镜面反射。
+         */
+        pointLightContribution +=
+        EvaluateBlinnPhongDirectLight(
+            k_d,
+            k_s,
+            p,
+            n,
+            pointLightDirection,
+            v,
+            pointLightIntensity
+        );
     }
 
-    color = vec4(ambient + diffuse + specular + pointLightDiffuse, albedoSample.a);
+    color = vec4(ambient
+        + directionalLightContribution
+        + pointLightContribution,
+        albedoSample.a
+    );
 }

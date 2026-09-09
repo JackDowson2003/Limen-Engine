@@ -192,6 +192,13 @@ namespace SandBox
                 texture,
                 0
             );
+            /*
+             * 设置GAMES101中的材质环境光反射系数k_a。
+             *
+             * 这是材质属性，表示材质能够反射多少环境光，
+             * 因此由Material负责，不属于Scene中的AmbientLight。
+             */
+            m_CubeMaterial->SetFloat3("u_AmbientReflectance",glm::vec3(0.15f));
 
             // 设置Blinn-Phong高光指数p。
             m_CubeMaterial->SetFloat(
@@ -208,6 +215,23 @@ namespace SandBox
 
         //初始时不允许鼠标控制
         m_CameraController.SetMouseLookEnabled(false);
+
+        /*
+         * 显式设置GAMES101中的常量环境光I_a。
+         *
+         * 这里使用略微偏冷的颜色和较低强度，
+         * 让没有受到直接光照的表面仍然可见，
+         * 但不会被环境光整体照得过亮。
+         */
+        Limen::AmbientLight ambientLight;
+
+        // 环境光的线性 RGB 颜色
+        ambientLight.Color = glm::vec3(0.9f, 0.95f, 1.0f);
+
+        // 环境光的整体强度。
+        ambientLight.Intensity = 0.35f;
+
+        m_Scene.SetAmbientLight(ambientLight);
 
         /*
          * 显式设置当前 Scene 的主平行光。
@@ -247,7 +271,43 @@ namespace SandBox
         // 后续使用平方衰减
         pointLight.Intensity = 10.0f;
 
-        m_Scene.AddPointLight(pointLight);
+        m_PointLightHandle = m_Scene.AddPointLight(pointLight);
+
+        LM_CORE_ASSERT(
+            m_PointLightHandle.IsValid(),
+            "Failed to add point light to Scene"
+        );
+
+        /*
+         * 第二个点光源用于验证：
+         *
+         * 1. Scene能够保存多个点光源；
+         * 2. Renderer能够上传多个结构体Uniform；
+         * 3. Shader能够累加多个点光源的贡献。
+         */
+        Limen::PointLight secondPointLight;
+
+        // 放在场景左上前方，与第一个点光源形成位置差异。
+        secondPointLight.Position =
+                glm::vec3(-2.0f, 2.0f, 2.0f);
+
+        // 使用偏红色，方便区分两个点光源的贡献。
+        secondPointLight.Color =
+                glm::vec3(1.0f, 0.15f, 0.05f);
+
+        secondPointLight.Intensity = 10.0f;
+
+        /*
+         * 第二个点光源暂时不需要通过ImGui修改，
+         * 所以句柄只用来检查添加是否成功，不保存为成员。
+         */
+        const Limen::ScenePointLightHandle secondPointLightHandle =
+                m_Scene.AddPointLight(secondPointLight);
+
+        LM_CORE_ASSERT(
+            secondPointLightHandle.IsValid(),
+            "Failed to add second point light to Scene"
+        );
 
         /*
          * SceneRenderObject 把资源和物体的世界变换组合起来。
@@ -419,6 +479,7 @@ namespace SandBox
 
     void Example3DLayer::OnImGuiRender()
     {
+        //region Scene
         const bool sceneVisible = ImGui::Begin("Scene");
 
         m_ViewportFocused = sceneVisible && ImGui::IsWindowFocused();
@@ -469,15 +530,47 @@ namespace SandBox
             }
         }
         ImGui::End();
+        //endregion
 
-        /*
-         * Lighting 面板与 Scene Viewport 分离，
-         * 避免光源控件占用场景画面的显示区域。
-         */
-        const bool lightingVisible = ImGui::Begin("Lighting");
-
-        if (lightingVisible)
+        if (ImGui::Begin("Lighting")) //初始化ImGUI
         {
+            //region Ambient Light
+            ImGui::TextUnformatted("Ambient Light");
+            /*
+             * Scene始终拥有一个AmbientLight，
+             * 因此可以直接取得当前数据的副本，不需要句柄。
+             */
+            Limen::AmbientLight editableAmbientLight = m_Scene.GetAmbientLight();
+
+            bool ambientLightChanged = false;
+
+            ambientLightChanged |= ImGui::ColorEdit3(
+                "Color##AmbientLight",
+                glm::value_ptr(editableAmbientLight.Color)
+            );
+
+            ambientLightChanged |= ImGui::DragFloat(
+                "Intensity##AmbientLight",
+                &editableAmbientLight.Intensity,
+                0.01f,
+                0.0f,
+                10.0f,
+                "%.2f"
+            );
+
+            if (ambientLightChanged)
+            {
+                m_Scene.SetAmbientLight(
+                    editableAmbientLight
+                );
+            }
+
+            //endregion
+
+            //region directional light
+            ImGui::Separator();
+            ImGui::TextUnformatted("Directional Light");
+
             /*
              * Getter 返回 const 引用，不能直接交给 ImGui 修改。
              * 因此先复制一份编辑中的光源数据，
@@ -485,48 +578,95 @@ namespace SandBox
              */
             Limen::DirectionalLight editableLight = m_Scene.GetDirectionalLight();
             bool lightChanged = false;
-
             /*
              * 使用 |= 而不是 ||：
              * 每个 ImGui 控件都必须执行并绘制，
              * 不能因为前一个控件返回 true 就短路后面的控件。
              */
-            lightChanged |= ImGui::DragFloat3("Direction Light",
+            lightChanged |= ImGui::DragFloat3("Direction##DirectionalLight",
                                               glm::value_ptr(editableLight.Direction),
                                               0.05f, -1.f, 1.f
             );
-
             lightChanged |= ImGui::ColorEdit3(
-                "Color",
+                "Color##DirectionalLight",
                 glm::value_ptr(editableLight.Color)
             );
-
             lightChanged |= ImGui::DragFloat(
-                "Intensity",
+                "Intensity##DirectionalLight",
                 &editableLight.Intensity,
                 0.05f,
                 0.0f,
                 10.0f,
                 "%.2f"
             );
-
-            const float directionLengthSquared =
-                    glm::dot(
-                        editableLight.Direction,
-                        editableLight.Direction
-                    );
+            const float directionLengthSquared = glm::dot(editableLight.Direction, editableLight.Direction);
             if (directionLengthSquared <= 0.000000001f)
             {
                 ImGui::TextColored(
                     ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
                     "Direction cannot be zero."
                 );
-            }
-            else if (lightChanged)
-            {
+            } else if (lightChanged)
                 m_Scene.SetDirectionalLight(editableLight);
+            //endregion
+
+            //region Point Light
+            ImGui::Separator();
+            ImGui::TextUnformatted("Point Light");
+            Limen::PointLight light;
+
+            /*
+             * 通过句柄取得点光源数据副本。
+             * ImGui只修改副本，修改成功后再通过SetPointLight写回Scene。
+             */
+            if (m_Scene.TryGetPointLight(m_PointLightHandle, light))
+            {
+                bool pointLightChanged = false;
+
+                /*
+                 * Position不设置最小值和最大值，
+                 * 因为点光源可以位于世界空间中的任意位置。
+                 */
+                pointLightChanged |= ImGui::DragFloat3(
+                    "Position##PointLight",
+                    glm::value_ptr(light.Position),
+                    0.05f
+                );
+
+                pointLightChanged |= ImGui::ColorEdit3(
+                    "Color##PointLight",
+                    glm::value_ptr(light.Color)
+                );
+
+                pointLightChanged |= ImGui::DragFloat(
+                    "Intensity##PointLight",
+                    &light.Intensity,
+                    0.05f,
+                    0.0f,
+                    100.0f,
+                    "%.2f"
+                );
+
+                if (pointLightChanged)
+                {
+                    const bool pointLightUpdated = m_Scene.SetPointLight(m_PointLightHandle, light);
+
+                    LM_CORE_ASSERT(
+                        pointLightUpdated,
+                        "Failed to update point light"
+                    );
+                }
+            } else
+            {
+                ImGui::TextColored(
+                    ImVec4(1.0f, 0.35f, 0.35f, 1.0f),
+                    "Point light handle is invalid."
+                );
             }
+            //endregion
         }
+
+
         ImGui::End();
     }
 } // SandBox

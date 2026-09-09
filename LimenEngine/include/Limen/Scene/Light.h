@@ -70,4 +70,31 @@ namespace Limen
         float Intensity = 1.0f;
 
     };
+
+    /**
+     * @brief 常量环境光
+     *
+     * 它用于近似场景中来自四面八方的间接光照，
+     * 不具有位置或方向。
+     *
+     * 这并不是真实的环境贴图光照或IBL，
+     * 只是GAMES101局部光照模型中的常量I_a。
+     *
+     */
+    struct AmbientLight
+    {
+        // 环境光的线性 RGB 颜色
+        glm::vec3 Color{1.f};
+
+        /**
+         * 环境光的整体强度倍率
+         *
+         * 默认值为 1，可以保持当前 Shader 中的结果：
+         *
+         * k_a = 0.15 * k_d
+         * I_a = vec3(1.0)
+         * L_a = k_a * I_a
+         */
+        float Intensity = 1.0f;
+    };
 }

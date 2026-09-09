@@ -90,6 +90,37 @@ namespace Limen
     };
 
     /**
+     * @brief 标识Scene中的一个点光源
+     *
+     * 当前第一版使用m_PointLights中的vector下标作为句柄。
+     * 由于暂时不支持删除和重新排序，点光源加入Scene后，
+     * 对应下标在Scene生命周期内保持不变。
+     *
+     * 后续支持删除时，需要扩展为Index + Generation，
+     * 避免旧句柄访问到后来占用同一位置的新光源。
+     */
+    struct ScenePointLightHandle
+    {
+        // 表示 Handle 没有只想有效点光源 初始为 四字节全1
+        static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
+
+        // 点光源在 Scene::m_PointLights中的下标
+        uint32_t Index = InvalidIndex;
+
+        /**
+         * @brief 判断句柄是否至少拥有一个有效形式的下标。
+         *
+         * 这里只排除InvalidIndex；
+         * Scene访问时还必须继续检查是否越过vector边界。
+         */
+        [[nodiscard]]
+        bool IsValid() const noexcept
+        {
+            return Index != InvalidIndex;
+        }
+    };
+
+    /**
      * @brief 保存一个场景中的对象数据
      *
      * Scene 只负责拥有和组织厂家数据，不负责发出任何渲染指令
@@ -127,12 +158,69 @@ namespace Limen
         void SetDirectionalLight(const DirectionalLight& light);
 
         /**
+         * @brief 设置当前场景的常量环境光。
+         *
+         * @param light
+         * 环境光的RGB颜色和整体强度。
+         */
+        void SetAmbientLight(const AmbientLight& light);
+
+        /**
+         * @brief 获取当前场景的常量环境光。
+         *
+         * 返回const引用，避免复制并禁止外部绕过Scene直接修改。
+         */
+        [[nodiscard]]
+        const AmbientLight&
+        GetAmbientLight() const noexcept;
+
+        /**
          * @brief 向场景中添加一个点光源。
          *
          * @param light
          * 点光源的位置、RGB颜色和强度。
          */
-        void AddPointLight(const PointLight& light);
+        [[nodiscard]]
+        ScenePointLightHandle AddPointLight(const PointLight& light);
+
+        /**
+         * @brief 修改Scene中指定的点光源。
+         *
+         * @param handle
+         * AddPointLight()返回的点光源句柄。
+         * 句柄按值传递，因为它目前只包含一个uint32_t。
+         *
+         * @param light
+         * 需要写入Scene的新点光源数据。
+         *
+         * @return
+         * 修改成功返回true；
+         * 句柄无效、越界或光源数据无效时返回false。
+         */
+        [[nodiscard]]
+        bool SetPointLight(
+            ScenePointLightHandle handle,
+            const PointLight& light
+        );
+
+        /**
+         * @brief 尝试读取Scene中指定的点光源。
+         *
+         * @param handle
+         * AddPointLight()返回的点光源句柄。
+         *
+         * @param outLight
+         * 读取成功时，将对应点光源的数据复制到这里。
+         *
+         * @return
+         * 句柄有效且未越界时返回true；
+         * 否则返回false，并且不修改outLight。
+         */
+        [[nodiscard]]
+        bool TryGetPointLight(
+            ScenePointLightHandle handle,
+            PointLight& outLight
+        ) const noexcept;
 
         /**
          * @brief 获取场景中的全部点光源。
@@ -208,5 +296,13 @@ namespace Limen
          * 最终由Renderer累加。
          */
         std::vector<PointLight> m_PointLights;
+
+        /**
+         * @brief 当前场景的常量环境光。
+         *
+         * AmbientLight是普通CPU数据，不拥有GPU资源，
+         * 因此直接按值保存。
+         */
+        AmbientLight m_AmbientLight;
     };
 }

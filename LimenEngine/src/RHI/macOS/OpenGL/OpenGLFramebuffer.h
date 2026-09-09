@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-
 #include "Limen/RHI/Framebuffer.h"
 
 namespace Limen
@@ -9,6 +8,7 @@ namespace Limen
     class OpenGLFramebuffer final : public Framebuffer
     {
     public:
+
         /**
          * @param specification Framebuffer 的创建参数。
          */
@@ -43,6 +43,18 @@ namespace Limen
             return m_ColorAttachment;
         }
 
+        /**
+         * @brief 返回 OpenGL 深度纹理 ID。
+         *
+         * 只有 Depth32F 附件会创建可采样深度纹理。
+         */
+        [[nodiscard]]
+        std::uintptr_t
+        GetDepthAttachmentHandle() const noexcept override
+        {
+            return m_DepthAttachment;
+        }
+
     private:
         /**
          * 删除旧附件，再按当前 Specification 重建
@@ -63,6 +75,24 @@ namespace Limen
          * 超过显卡上限，Invalidate() 会把它限制到硬件支持的最大值。
          */
         FramebufferSpecification m_Specification;
+
+        /**
+         * @brief 当前颜色附件的跨API格式。
+         *
+         * None表示当前Framebuffer没有颜色附件，
+         * 例如只有Depth32F的Shadow Map。
+         */
+        FramebufferAttachmentFormat m_ColorAttachmentFormat = FramebufferAttachmentFormat::None;
+
+        /**
+         * @brief 当前深度附件的跨API格式。
+         *
+         * 可以是：
+         * - None；
+         * - Depth24Stencil8；
+         * - Depth32F。
+         */
+        FramebufferAttachmentFormat m_DepthAttachmentFormat = FramebufferAttachmentFormat::None;
 
         /**
          * 场景渲染 FBO 的 OpenGL 对象 ID。
@@ -106,6 +136,15 @@ namespace Limen
          * Samples > 1：它接收 Resolve 后的最终颜色。
          */
         uint32_t m_ColorAttachment = 0;
+
+        /**
+         * @brief 可供 Shader 采样的深度纹理 ID。
+         *
+         * Depth32F 时创建，用作 Shadow Map。
+         * Depth24Stencil8 当前仍使用 Renderbuffer，
+         * 因此该字段保持为 0。
+         */
+        uint32_t m_DepthAttachment = 0;
 
         /**
          * 多采样颜色 Renderbuffer 的 OpenGL 对象 ID。

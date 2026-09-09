@@ -9,9 +9,70 @@
 
 namespace Limen
 {
+    namespace
+    {
+        /**
+         * @brief 判断一个Framebuffer附件格式是否属于深度格式。
+         */
+        bool IsDepthAttachmentFormat(const FramebufferAttachmentFormat format) noexcept
+        {
+            return format == FramebufferAttachmentFormat::Depth24Stencil8 || format ==
+                   FramebufferAttachmentFormat::Depth32F;
+        }
+    }
+
     OpenGLFramebuffer::OpenGLFramebuffer(const FramebufferSpecification &specification)
         : m_Specification(specification)
     {
+        /*
+         * 把通用附件描述拆分为：
+         * 一个颜色格式和一个深度格式。
+         */
+        for (const FramebufferAttachmentFormat &format: m_Specification.Attachments.Formats)
+        {
+            if (format == FramebufferAttachmentFormat::None)
+                continue;
+
+            if (IsDepthAttachmentFormat(format))
+            {
+                /*
+                 * 当前第一版只允许一个深度附件。
+                 */
+                LM_CORE_ASSERT(m_DepthAttachmentFormat == FramebufferAttachmentFormat::None,
+                               "OpenGLFramebuffer supports only one depth attachment"
+                );
+
+                if (m_DepthAttachmentFormat != FramebufferAttachmentFormat::None)
+                    continue;
+
+                m_DepthAttachmentFormat = format;
+            } else
+            {
+                /*
+                 * 当前唯一支持的颜色附件格式是RGBA8。
+                 */
+                LM_CORE_ASSERT(format == FramebufferAttachmentFormat::RGBA8,
+                               "Unsupported OpenGL color attachment format"
+                );
+
+                LM_CORE_ASSERT(
+                    m_ColorAttachmentFormat ==
+                    FramebufferAttachmentFormat::None,
+                    "OpenGLFramebuffer currently supports only one color attachment"
+                );
+
+                if (format != FramebufferAttachmentFormat::RGBA8 || m_ColorAttachmentFormat !=
+                    FramebufferAttachmentFormat::None)
+                    continue;
+
+                m_ColorAttachmentFormat = format;
+            }
+        }
+        /*
+         * 分类完成后，仍然调用现有创建逻辑。
+         * 目前Invalidate尚未使用这两个格式字段，
+         * 所以主场景行为不会改变。
+         */
         Invalidate();
     }
 
@@ -37,9 +98,11 @@ namespace Limen
 
     void OpenGLFramebuffer::Resolve() const
     {
-        // 单采样直接渲染到可采样的颜色纹理，不需要 Resolve。
-        if (m_Specification.Samples <= 1)
+        // 单采样或者没有颜色附件时，都不需要颜色Resolve。
+        if (m_Specification.Samples <= 1 || m_ColorAttachmentFormat == FramebufferAttachmentFormat::None)
+        {
             return;
+        }
 
         /*
          * 保存调用者原本绑定的 Read / Draw Framebuffer，
@@ -121,37 +184,65 @@ namespace Limen
 
         const int height = static_cast<int>(m_Specification.Height);
 
-        // m_ColorAttachment 始终是普通 Texture2D：单采样时直接接收场景颜色，
-        // 多采样时接收 Resolve 结果，随后可交给 ImGui::Image 显示。
-        glGenTextures(1, &m_ColorAttachment);
+        /*
+         * 主场景需要RGBA8颜色附件；
+         * Shadow Map只有Depth32F，不需要颜色附件。
+         */
+        const bool hasColorAttachment = m_ColorAttachmentFormat != FramebufferAttachmentFormat::None;
 
-        // 场景是 2D 还是 3D 不影响渲染目标的维度；屏幕颜色结果仍是二维纹理。
-        // 多采样 Renderbuffer 不能直接作为普通 Texture2D 交给当前的 ImGui::Image() 使用。
-        // 所以还需要：m_ColorAttachment
-        glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
-
-        // 渲染目标不生成 Mipmap，因此缩小过滤不能选择 Mipmap 模式。
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-
-        // 只分配 GPU 存储；Framebuffer 渲染阶段才会写入像素。
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            static_cast<GLint>(GL_RGBA8),
-            width,
-            height,
-            0,
-            GL_RGBA,
-            GL_UNSIGNED_BYTE,
-            nullptr
+        /*
+         * 当前Depth32F专门用作Shadow Map。
+         * Shadow Map不通过MSAA抗锯齿，因此必须使用单采样。
+         */
+        LM_CORE_ASSERT(
+            m_DepthAttachmentFormat != FramebufferAttachmentFormat::Depth32F || m_Specification.Samples == 1,
+            "Depth32F framebuffer currently requires Samples == 1"
         );
 
+        /*
+         * 当前第一版只支持单采样的Depth-Only Framebuffer。
+         *
+         * Shadow Map不使用MSAA；阴影边缘平滑以后通过PCF等阴影过滤完成。
+         */
+        LM_CORE_ASSERT(
+            hasColorAttachment || m_Specification.Samples == 1,
+            "Depth-only framebuffer currently requires Samples == 1"
+        );
 
-        glBindTexture(GL_TEXTURE_2D, 0);
+        if (hasColorAttachment)
+        {
+            // m_ColorAttachment 始终是普通 Texture2D：单采样时直接接收场景颜色，
+            // 多采样时接收 Resolve 结果，随后可交给 ImGui::Image 显示。
+            glGenTextures(1, &m_ColorAttachment);
+
+            // 场景是 2D 还是 3D 不影响渲染目标的维度；屏幕颜色结果仍是二维纹理。
+            // 多采样 Renderbuffer 不能直接作为普通 Texture2D 交给当前的 ImGui::Image() 使用。
+            // 所以还需要：m_ColorAttachment
+            glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
+
+            // 渲染目标不生成 Mipmap，因此缩小过滤不能选择 Mipmap 模式。
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+
+            // 只分配 GPU 存储；Framebuffer 渲染阶段才会写入像素。
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                static_cast<GLint>(GL_RGBA8),
+                width,
+                height,
+                0,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                nullptr
+            );
+
+
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
 
         // m_RendererID 是场景绘制时绑定的主 FBO。
         glGenFramebuffers(1, &m_RendererID);
@@ -159,24 +250,115 @@ namespace Limen
 
         if (m_Specification.Samples == 1)
         {
-            // 单采样：普通颜色纹理直接挂载到主 FBO (默认生成的)。
-            glFramebufferTexture2D(
-                GL_FRAMEBUFFER,
-                GL_COLOR_ATTACHMENT0,
-                GL_TEXTURE_2D,
-                m_ColorAttachment,
-                0
-            );
+            if (hasColorAttachment)
+            {
+                // 单采样：普通颜色纹理直接挂载到主 FBO (默认生成的)。
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D,
+                    m_ColorAttachment,
+                    0
+                );
+            }
 
-            glGenRenderbuffers(1, &m_DepthStencilRenderbuffer);
-            glBindRenderbuffer(GL_RENDERBUFFER, m_DepthStencilRenderbuffer);
+            if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth24Stencil8)
+            {
+                glGenRenderbuffers(1, &m_DepthStencilRenderbuffer);
+                glBindRenderbuffer(GL_RENDERBUFFER, m_DepthStencilRenderbuffer);
 
-            // 分配 24 位深度和 8 位模板存储，稍后统一挂载到主 FBO。
-            glRenderbufferStorage(GL_RENDERBUFFER,
-                                  GL_DEPTH24_STENCIL8,
-                                  width, height);
-        }
-        else
+                // 分配 24 位深度和 8 位模板存储，稍后统一挂载到主 FBO。
+                glRenderbufferStorage(GL_RENDERBUFFER,
+                                      GL_DEPTH24_STENCIL8,
+                                      width, height);
+
+                glFramebufferRenderbuffer(
+                    GL_FRAMEBUFFER,
+                    GL_DEPTH_STENCIL_ATTACHMENT,
+                    GL_RENDERBUFFER,
+                    m_DepthStencilRenderbuffer
+                );
+            } else if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth32F)
+            {
+                /*
+                 * Shadow Map的深度必须在第二遍渲染时被Shader采样，
+                 * 因此这里必须创建Texture，而不是Renderbuffer。
+                 */
+                glGenTextures(1, &m_DepthAttachment);
+                glBindTexture(GL_TEXTURE_2D, m_DepthAttachment);
+
+                /**
+                 * 深度比较明确要求读取明确的深度值
+                 * 第一版要求使用NEAREST, 不存在纹理采样阶段插值
+                 */
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_MIN_FILTER,
+                    GL_NEAREST
+                );
+
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_MAG_FILTER,
+                    GL_NEAREST
+                );
+
+                /*
+                 * 光源视锥之外使用边界值1.0。
+                 * 深度1.0表示最远处，可以避免视锥外产生错误阴影。
+                 */
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_WRAP_S,
+                    GL_CLAMP_TO_BORDER
+                );
+
+                glTexParameteri(
+                    GL_TEXTURE_2D,
+                    GL_TEXTURE_WRAP_T,
+                    GL_CLAMP_TO_BORDER
+                );
+
+                constexpr float borderColor[] = {1.f, 1.f, 1.f, 1.f};
+
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                /*
+                 * 分配32位浮点深度纹理空间。
+                 *
+                 * GL_DEPTH_COMPONENT32F：GPU内部存储格式；
+                 * GL_DEPTH_COMPONENT：输入数据表示深度；
+                 * GL_FLOAT：单个深度值的数据类型；
+                 * nullptr：只分配空间，目前没有CPU像素需要上传。
+                 */
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_DEPTH_COMPONENT32F,
+                    width,
+                    height,
+                    0,
+                    GL_DEPTH_COMPONENT,
+                    GL_FLOAT,
+                    nullptr
+                );
+
+                /*
+                 * 把深度纹理挂到当前FBO的深度附件位置。
+                 * 后续Draw产生的深度值就会写入这张纹理。
+                 */
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_DEPTH_ATTACHMENT,
+                    GL_TEXTURE_2D,
+                    m_DepthAttachment,
+                    0
+                );
+
+                glBindTexture(GL_TEXTURE_2D, 0);
+
+            }
+        } else
         {
             // 多采样：颜色与深度/模板附件必须使用相同的样本数。
             glGenRenderbuffers(1, &m_MultisampleColorRenderbuffer);
@@ -188,6 +370,8 @@ namespace Limen
                                              GL_RGBA8,
                                              width, height
             );
+
+
 
             // 把多采样颜色 Renderbuffer 挂到场景 FBO 的颜色附件 0。
             glFramebufferRenderbuffer(GL_FRAMEBUFFER,
@@ -205,21 +389,38 @@ namespace Limen
                                              static_cast<GLsizei>(m_Specification.Samples),
                                              GL_DEPTH24_STENCIL8,
                                              width, height);
+
+            /*
+             * 将多采样深度/模板Renderbuffer
+             * 挂载到主场景FBO。
+             */
+            glFramebufferRenderbuffer(
+                GL_FRAMEBUFFER,
+                GL_DEPTH_STENCIL_ATTACHMENT,
+                GL_RENDERBUFFER,
+                m_DepthStencilRenderbuffer
+            );
         }
 
-        // 无论是否启用 MSAA，都把深度/模板 Renderbuffer 挂到主 FBO。
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-                                  GL_DEPTH_STENCIL_ATTACHMENT,
-                                  GL_RENDERBUFFER,
-                                  m_DepthStencilRenderbuffer
-        );
+
+        if (!hasColorAttachment)
+        {
+            /*
+             * 当前是Depth-Only Framebuffer。
+             *
+             * 告诉OpenGL该FBO不会输出或读取任何颜色，
+             * 否则OpenGL仍可能寻找GL_COLOR_ATTACHMENT0。
+             */
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+        }
         LM_CORE_ASSERT(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE,
                        "OpenGL scene Framebuffer is incomplete");
 
         //但采样的时候我们不去create FBO
         //让默认的FBO去接受他
         //如果是离屏的 就必须要创建 FBO
-        if (m_Specification.Samples > 1)
+        if (m_Specification.Samples > 1 && hasColorAttachment)
         {
             glGenFramebuffers(1, &m_ResolveFramebufferID);
             glBindFramebuffer(GL_FRAMEBUFFER, m_ResolveFramebufferID);
@@ -248,6 +449,12 @@ namespace Limen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        if (m_DepthAttachment != 0)
+        {
+            glDeleteTextures(1, &m_DepthAttachment);
+            m_DepthAttachment = 0;
+        }
 
         if (m_DepthStencilRenderbuffer != 0)
         {

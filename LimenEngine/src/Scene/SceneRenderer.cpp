@@ -114,6 +114,7 @@ namespace Limen
          */
         Renderer::BeginScene(
             camera,
+            scene.GetAmbientLight(),
             scene.GetDirectionalLight(),
             scene.GetPointLights()
         );
@@ -125,10 +126,7 @@ namespace Limen
          * - 不增加 Mesh 和 Material 的 Ref 引用计数；
          * - 不复制 Transform 矩阵。
          */
-        for (const auto &[
-            MeshResource,
-            MaterialResource,
-            Transform]
+        for (const auto &[MeshResource,MaterialResource,Transform]
             : scene.GetRenderObjects())
         {
             /*

@@ -98,6 +98,16 @@ namespace SandBox
          */
         Limen::SceneRenderObjectHandle m_CubeObjectHandle;
 
+        /**
+         * @brief 测试点光源在m_Scene中的句柄。
+         *
+         * 构造器创建点光源后保存该句柄，
+         * OnImGuiRender后续通过它修改对应点光源。
+         *
+         * 句柄本身不拥有光源，只记录光源在Scene中的位置。
+         */
+        Limen::ScenePointLightHandle m_PointLightHandle;
+
         // 当前立方体旋转角度，单位为度。
         float m_CubeRotationDegrees = 0.0f;
 

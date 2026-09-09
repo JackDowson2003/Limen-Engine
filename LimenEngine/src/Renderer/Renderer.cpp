@@ -28,6 +28,10 @@ namespace Limen
             glm::mat4 ViewProjection{1.0f};
             glm::vec3 CameraPosition{0.0f};
             DirectionalLight MainDirectionalLight;
+
+            // 当前活动场景的常量环境光。
+            AmbientLight SceneAmbientLight;
+
             /**
              * @brief 当前活动场景中的全部点光源快照。
              *
@@ -43,40 +47,39 @@ namespace Limen
     void Renderer::BeginScene(const Camera &camera)
     {
         // 2D 和旧路径暂时不提供光源 因此使用 DirectionalLight
-        BeginScene(camera, DirectionalLight{}, {});
+        BeginScene(camera, AmbientLight{}, DirectionalLight{}, {});
     }
 
     void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight)
     {
-        BeginScene(camera, directionalLight, {});
+        BeginScene(camera, AmbientLight{}, directionalLight, {});
     }
 
     void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight,
                               const std::vector<PointLight> &pointLights)
     {
+        BeginScene(camera, AmbientLight{}, directionalLight, pointLights);
+    }
+
+    void Renderer::BeginScene(const Camera &camera, const AmbientLight &ambientLight,
+                              const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights)
+    {
         if (s_SceneData.IsActive)
         {
-            LM_CORE_ERROR("Another scene is already active");
+            LM_CORE_ERROR(
+                "Another scene is already active"
+            );
             return;
         }
-
         /*
-         * 在BeginScene时建立当前场景的帧内快照。
-         *
-         * 后续无论提交多少个Mesh，
-         * 每次Submit读取的都是同一套相机和光源数据。
+         * 建立本次BeginScene到EndScene期间使用的场景快照。
          */
-        s_SceneData.CameraPosition = camera.GetPosition();
         s_SceneData.ViewProjection = camera.GetViewProjectionMatrix();
+        s_SceneData.CameraPosition = camera.GetPosition();
+        s_SceneData.SceneAmbientLight = ambientLight;
         s_SceneData.MainDirectionalLight = directionalLight;
 
-        /*
-         * 这里有意复制vector。
-         *
-         * BeginScene参数使用const引用，避免传参时复制；
-         * Renderer再主动复制一份，保证BeginScene到EndScene期间
-         * 使用的光源数据不会被Scene外部修改。
-         */
+        // 主动复制光源数组 保证本次 Scene Submit 期间数据稳定
         s_SceneData.PointLights = pointLights;
 
         s_SceneData.IsActive = true;
@@ -276,6 +279,17 @@ namespace Limen
             "u_CameraPosition",
             s_SceneData.CameraPosition
         );
+
+        /**
+         * 环境光属于整个 Scene, 不属于某个 Material 或 Mesh
+         *
+         * Meterial::Bind() 已经绑定正确的 Shader,
+         * 因此这里可以上传当前场景的环境光数据
+         */
+        const auto&[Color, Intensity] = s_SceneData.SceneAmbientLight;
+
+        shader->SetFloat3("u_AmbientLightColor", Color);
+        shader->SetFloat("u_AmbientLightIntensity", Intensity);
 
         /*
          * 平行光属于场景数据，不属于某个 Material 或 Mesh。

@@ -58,6 +58,28 @@ namespace Limen
         );
 
         /**
+         * @brief 使用完整的GAMES101场景光照数据开始场景。
+         *
+         * @param camera
+         * 当前场景使用的相机。
+         *
+         * @param ambientLight
+         * 当前场景的常量环境光I_a。
+         *
+         * @param directionalLight
+         * 当前场景的主平行光。
+         *
+         * @param pointLights
+         * 当前场景中的全部点光源。
+         */
+        static void BeginScene(
+            const Camera& camera,
+            const AmbientLight& ambientLight,
+            const DirectionalLight& directionalLight,
+            const std::vector<PointLight>& pointLights
+        );
+
+        /**
          * @brief 更新Renderer输出使用的GPU Viewport。
          *
          * 该函数不修改Camera的投影矩阵；CameraController会独立处理宽高比。
