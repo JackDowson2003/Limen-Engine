@@ -52,11 +52,14 @@ namespace Limen
             clearFlags |= ClearFlags::Color;
         }
 
-        // 当前FBO使用的是打包的Depth24Stencil8附件
-        // 因此要求清理深度模版时，同时清理Depth和Stencil
-        if (m_Specification.DepthStencilLoadOperation == AttachmentLoadOperation::Clear)
+        // 深度与模板是两个独立的清理目标。
+        if (m_Specification.DepthLoadOperation == AttachmentLoadOperation::Clear)
         {
             clearFlags |= ClearFlags::Depth;
+        }
+
+        if (m_Specification.StencilLoadOperation == AttachmentLoadOperation::Clear)
+        {
             clearFlags |= ClearFlags::Stencil;
         }
 

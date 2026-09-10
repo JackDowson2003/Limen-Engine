@@ -199,6 +199,15 @@ namespace Limen
         virtual void Resolve() const = 0;
 
         /**
+         * @brief 把可采样深度附件绑定到指定纹理槽。
+         *
+         * Shadow Pass结束后，主场景Shader通过该纹理槽采样Shadow Map。
+         *
+         * @param slot Shader使用的纹理槽编号。
+         */
+        virtual void BindDepthAttachment(uint32_t slot) const = 0;
+
+        /**
          * @brief 按当前 RendererAPI 创建对应后端的 Framebuffer。
          */
         [[nodiscard]]

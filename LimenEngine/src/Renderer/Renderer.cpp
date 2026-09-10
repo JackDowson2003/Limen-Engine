@@ -39,6 +39,20 @@ namespace Limen
              * 后续所有Submit读取同一份光源数据。
              */
             std::vector<PointLight> PointLights;
+
+            /**
+             * 世界空间到平行光裁剪空间的矩阵。
+             *
+             * 主场景Shader使用它计算当前片元在Shadow Map中的位置。
+             */
+            glm::mat4 DirectionalLightViewProjection{1.0f};
+
+            /**
+             * Shadow Map绑定的纹理槽。
+             *
+             * 当前槽0用于Albedo，所以Shadow Map使用槽1。
+             */
+            uint32_t ShadowMapTextureSlot = 1;
         };
 
         SceneData s_SceneData;
@@ -64,23 +78,39 @@ namespace Limen
     void Renderer::BeginScene(const Camera &camera, const AmbientLight &ambientLight,
                               const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights)
     {
+        BeginScene(camera,ambientLight,directionalLight,pointLights,glm::mat4(1.0f),1);
+    }
+
+    void Renderer::BeginScene(const Camera &camera, const AmbientLight &ambientLight,
+        const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights,
+        const glm::mat4 &directionalLightViewProjection, const uint32_t shadowMapTextureSlot)
+    {
         if (s_SceneData.IsActive)
         {
-            LM_CORE_ERROR(
-                "Another scene is already active"
-            );
+            LM_CORE_ERROR("Another scene is already active");
             return;
         }
-        /*
-         * 建立本次BeginScene到EndScene期间使用的场景快照。
-         */
-        s_SceneData.ViewProjection = camera.GetViewProjectionMatrix();
-        s_SceneData.CameraPosition = camera.GetPosition();
-        s_SceneData.SceneAmbientLight = ambientLight;
-        s_SceneData.MainDirectionalLight = directionalLight;
 
-        // 主动复制光源数组 保证本次 Scene Submit 期间数据稳定
-        s_SceneData.PointLights = pointLights;
+        s_SceneData.ViewProjection =
+            camera.GetViewProjectionMatrix();
+
+        s_SceneData.CameraPosition =
+            camera.GetPosition();
+
+        s_SceneData.SceneAmbientLight =
+            ambientLight;
+
+        s_SceneData.MainDirectionalLight =
+            directionalLight;
+
+        s_SceneData.PointLights =
+            pointLights;
+
+        s_SceneData.DirectionalLightViewProjection =
+            directionalLightViewProjection;
+
+        s_SceneData.ShadowMapTextureSlot =
+            shadowMapTextureSlot;
 
         s_SceneData.IsActive = true;
     }
@@ -280,6 +310,18 @@ namespace Limen
             s_SceneData.CameraPosition
         );
 
+        // 主场景顶点需要用它计算光源空间位置。
+        shader->SetMat4(
+            "u_LightViewProjection",
+            s_SceneData.DirectionalLightViewProjection
+        );
+
+        // 告诉Fragment Shader从纹理槽1采样Shadow Map。
+        shader->SetInt(
+            "u_ShadowMap",
+            s_SceneData.ShadowMapTextureSlot
+        );
+
         /**
          * 环境光属于整个 Scene, 不属于某个 Material 或 Mesh
          *
@@ -360,5 +402,41 @@ namespace Limen
         vao.Bind();
 
         RendererCommand::DrawIndexed(vao, specification.Topology);
+    }
+
+    void Renderer::SubmitDepth(const GraphicsPipeline &pipeline, const Mesh &mesh, const glm::mat4 &lightViewProjection,
+        const glm::mat4 &transform)
+    {
+        const GraphicsPipelineSpecification& specification =
+        pipeline.GetSpecification();
+
+        LM_CORE_ASSERT(
+            specification.ShaderProgram,
+            "Renderer::SubmitDepth received a pipeline without Shader"
+        );
+
+        if (!specification.ShaderProgram)
+            return;
+
+        // 绑定Shadow Shader，并设置深度测试、剔除等Pipeline状态。
+        pipeline.Bind();
+
+        const Ref<Shader>& shader = specification.ShaderProgram;
+
+        // 世界空间变换到光源裁剪空间
+        shader->SetMat4("u_LightViewProjection", lightViewProjection);
+
+        shader->SetMat4("u_Transform", transform);
+
+        // 获取Mesh内部保存的VAO、VBO和IBO组合。
+        const VertexArray& vertexArray = mesh.GetVertexArray();
+
+        vertexArray.Bind();
+
+        // 使用Shadow Pipeline指定的图元类型提交绘制。
+        RendererCommand::DrawIndexed(
+            vertexArray,
+            specification.Topology
+        );
     }
 }

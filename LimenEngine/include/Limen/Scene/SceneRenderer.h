@@ -8,6 +8,7 @@
 #include <string>
 
 #include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
 #include "Limen/Core/Core.h"
 
 namespace Limen
@@ -16,6 +17,10 @@ namespace Limen
     class Scene;
     class Framebuffer; //FBO
     class RenderPass; //负责渲染的开始和结束
+    struct DirectionalLight;
+
+    class Shader;
+    class GraphicsPipeline;
 
     /**
      * @brief 创建 SceneRenderer 所需的配置。
@@ -41,6 +46,15 @@ namespace Limen
             0.1f,
             1.0f
         };
+
+        /**
+         * 平行光Shadow Map的单边分辨率。
+         *
+         * Shadow Map通常使用正方形纹理。
+         * 该尺寸独立于Scene Viewport，因为它描述的是
+         * 从光源视角保存深度时使用的精度。
+         */
+        uint32_t ShadowMapResolution = 2048;
 
         // 用于日志、调试器和未来 GPU 标记的名称。
         std::string DebugName = "Scene Renderer";
@@ -121,8 +135,49 @@ namespace Limen
         }
 
     private:
+        /**
+         * 根据平行光方向计算光源的view matrix和 ortho matrix
+         *
+         * 最终结果用于把世界坐标变换到光源裁剪空间(world -> local)
+         * 是Shadow Mapping第一遍和第二遍共同使用的矩阵。
+         */
+        void RecalculateDirectionalLightViewProjection(
+            const DirectionalLight& directionalLight
+        );
+
+    private:
         // 保存创建尺寸、MSAA采样数和清屏颜色
         SceneRendererSpecification m_Spec;
+
+        /**
+         * 世界空间到平行光裁剪空间的变换矩阵。
+         *
+         * 等于：
+         * LightProjection × LightView
+         *
+         * 每个物体还需要继续乘自己的Model矩阵。
+         */
+        glm::mat4 m_DirectionalLightViewProjectionMatrix{1.0f};
+
+        /**
+         * Shadow Pass 使用的深度Shader
+         *
+         * 它只把模型点点变换到光源的clip space
+         * 不计算Material, texture and lighting color
+         */
+        Ref<Shader> m_ShadowShader;
+
+        /**
+         * Graphics pipeline of Shadow pass
+         *
+         * It's responsible for specifying:
+         * - use Shadow Shader
+         * - open Depth Test
+         * - open Depth Write
+         * - close color mixed
+         * - draw Mesh in Triangle
+         */
+        Ref<GraphicsPipeline> m_ShadowPipeline;
 
         /**
          * SceneRenderer 独占场景渲染目标
@@ -137,5 +192,26 @@ namespace Limen
          * RenderPass 内部非拥有地引用 m_Framebuffer。
          */
         Scope<RenderPass> m_RenderPass;
+        /**
+         * 平行光阴影使用的Depth-Only Framebuffer。
+         *
+         * 它没有颜色附件，只拥有一张可供Shader采样的
+         * Depth32F深度纹理。
+         */
+        Scope<Framebuffer> m_ShadowFramebuffer;
+
+        /**
+         * 管理Shadow Map深度渲染阶段。
+         *
+         * 它非拥有地引用m_ShadowFramebuffer：
+         * Begin()负责绑定并清除旧深度；
+         * End()负责结束Pass并保留生成的深度。
+         *
+         * 声明在m_ShadowFramebuffer后面，
+         * 可以保证析构时先销毁RenderPass，再销毁Framebuffer。
+         */
+        Scope<RenderPass> m_ShadowRenderPass;
+
+
     };
 }

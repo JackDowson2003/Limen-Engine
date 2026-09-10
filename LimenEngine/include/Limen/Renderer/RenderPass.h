@@ -82,30 +82,42 @@ namespace Limen
          *
          * 当前Scene Pass每帧重新绘制整个画面，所以默认为Clear。
          */
-        AttachmentLoadOperation ColorLoadOperation =
-                AttachmentLoadOperation::Clear;
+        AttachmentLoadOperation ColorLoadOperation = AttachmentLoadOperation::Clear;
 
         /**
          * @brief Pass结束时是否保留颜色附件。
          *
          * Scene颜色需要交给ImGui::Image显示，所以默认为Store。
          */
-        AttachmentStoreOperation ColorStoreOperation =
-                AttachmentStoreOperation::Store;
+        AttachmentStoreOperation ColorStoreOperation = AttachmentStoreOperation::Store;
 
         /**
-         * @brief Pass开始时如何处理Depth24Stencil8附件。
-         */
-        AttachmentLoadOperation DepthStencilLoadOperation =
-                AttachmentLoadOperation::Clear;
-
-        /**
-         * @brief Pass结束时是否保留Depth24Stencil8附件。
+         * Pass开始时如何处理深度附件。
          *
-         * 当前场景绘制完成后不会采样深度，所以默认为DontCare。
+         * 主场景和Shadow Pass通常都需要先清除旧深度。
          */
-        AttachmentStoreOperation DepthStencilStoreOperation =
-                AttachmentStoreOperation::DontCare;
+        AttachmentLoadOperation DepthLoadOperation = AttachmentLoadOperation::Clear;
+
+        /**
+         * Pass结束后是否保留深度。
+         *
+         * 主场景完成后通常不再使用深度；
+         * Shadow Pass则必须保留，供主场景Shader采样。
+         */
+        AttachmentStoreOperation DepthStoreOperation = AttachmentStoreOperation::DontCare;
+
+        /**
+         * Pass开始时如何处理模板附件。
+         *
+         * 主场景的Depth24Stencil8拥有模板；
+         * Depth32F Shadow Map没有模板。
+         */
+        AttachmentLoadOperation StencilLoadOperation = AttachmentLoadOperation::Clear;
+
+        /**
+         * Pass结束后是否保留模板附件。
+         */
+        AttachmentStoreOperation StencilStoreOperation = AttachmentStoreOperation::DontCare;
 
         /** @brief Begin() 时用于清理颜色附件的颜色。 */
         glm::vec4 ClearColor{0.1f, 0.1f, 0.1f, 1.f};

@@ -17,6 +17,9 @@ in vec3 v_WorldNormal;
 in vec3 v_WorldPosition;
 in vec2 v_TexCoord;
 
+// 当前片元在光源裁剪空间中的位置。
+in vec4 v_LightSpacePosition;
+
 /**
  * 相机在世界空间中的位置。
  *
@@ -52,6 +55,9 @@ uniform vec3 u_DirectionalLightColor;
  * 主平行光的亮度倍率。
  */
 uniform float u_DirectionalLightIntensity;
+
+// Shadow Pass生成的深度纹理。
+uniform sampler2D u_ShadowMap;
 
 /**
  * @brief GAMES101 Blinn-Phong模型中的点光源。
@@ -172,6 +178,40 @@ vec3 EvaluateBlinnPhongDirectLight(
 }
 
 /**
+ * @return
+ * 0.0：当前片元被光源照亮；
+ * 1.0：当前片元处于阴影中。
+ */
+float CalculateDirectionalShadow(
+    vec4 lightSpacePosition,
+    vec3 normal,
+    vec3 lightDirection
+)
+{
+    // 裁剪空间经过透视除法，得到NDC坐标。
+    vec3 projectedCoordinates = lightSpacePosition.xyz / lightSpacePosition.w;
+
+    // OpenGL NDC范围[-1, 1]转换到纹理范围[0, 1]。
+    projectedCoordinates = projectedCoordinates * 0.5 + 0.5;
+
+    // 超过光源远平面的片元不计算阴影。
+    if (projectedCoordinates.z > 1.0)
+        return 0.0;
+
+    // Shadow Map中光源当时看到的最近深度。
+    float closestDepth = texture(u_ShadowMap, projectedCoordinates.xy).r;
+
+    // 当前主场景片元到光源的深度。
+    float currentDepth = projectedCoordinates.z;
+
+    // 减少浮点误差造成的Shadow Acne。
+    float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0005);
+
+    return currentDepth - bias > closestDepth ? 1.0 : 0.0;
+}
+
+
+/**
     u_AmbientReflectance
         = k_a
         = 材质属性
@@ -237,7 +277,24 @@ void main()
     // L_a = k_a * I_a
     vec3 ambient = k_a * ambientLightIntensity;
 
-    vec3 directionalLightContribution = EvaluateBlinnPhongDirectLight(k_d, k_s, p, n, l, v, lightIntensity);
+    float directionalShadow =
+    CalculateDirectionalShadow(
+        v_LightSpacePosition,
+        n,
+        l
+    );
+
+    vec3 directionalLightContribution =
+    (1.0 - directionalShadow) *
+    EvaluateBlinnPhongDirectLight(
+        k_d,
+        k_s,
+        p,
+        n,
+        l,
+        v,
+        lightIntensity
+    );
 
     /**
      * 所有点光源产生的直接光照总和。

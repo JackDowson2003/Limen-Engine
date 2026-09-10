@@ -29,6 +29,8 @@ namespace Limen
             uint32_t height
         ) override;
 
+        void BindDepthAttachment(uint32_t slot) const override;
+
         [[nodiscard]]
         const FramebufferSpecification&
         GetSpecification() const noexcept override

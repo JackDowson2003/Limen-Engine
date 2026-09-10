@@ -1,6 +1,14 @@
 //
 // Created by chenlong on 2026/9/7.
 //
+
+#include <cmath>
+
+#include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "Limen/Scene/Light.h"
+
 #include "Limen/Scene/Scene.h"
 #include "Limen/Scene/SceneRenderer.h"
 
@@ -12,7 +20,7 @@
 namespace Limen
 {
     SceneRenderer::SceneRenderer(const SceneRendererSpecification &spec)
-        :m_Spec(spec)
+        : m_Spec(spec)
     {
         /*
          * 创建 Framebuffer 时宽、高和采样数都必须有效。
@@ -34,8 +42,12 @@ namespace Limen
             m_Spec.Samples > 0,
             "SceneRenderer sample count must be at least one"
         );
+        LM_CORE_ASSERT(
+            m_Spec.ShadowMapResolution > 0,
+            "SceneRenderer shadow map resolution must be greater than zero"
+        );
 
-        if (m_Spec.Width == 0 ||m_Spec.Height == 0 ||m_Spec.Samples == 0)
+        if (m_Spec.Width == 0 || m_Spec.Height == 0 || m_Spec.Samples == 0 || m_Spec.ShadowMapResolution == 0)
             return;
 
         /**
@@ -51,10 +63,108 @@ namespace Limen
 
         m_Framebuffer = Framebuffer::Create(framebufferSpec);
 
-        LM_CORE_ASSERT(m_Framebuffer,"SceneRenderer '{}' failed to create Framebuffer",m_Spec.DebugName);
+        LM_CORE_ASSERT(m_Framebuffer, "SceneRenderer '{}' failed to create Framebuffer", m_Spec.DebugName);
 
         if (!m_Framebuffer)
             return;
+
+        /*
+         * 创建平行光Shadow Map使用的Depth-Only Framebuffer。
+         *
+         * Shadow Map只记录光源视角下的最近深度：
+         * - 不需要颜色附件；
+         * - 不使用MSAA；
+         * - 深度必须是可供Shader采样的Texture2D。
+         */
+        FramebufferSpecification shadowFramebufferSpec;
+
+        shadowFramebufferSpec.Width = m_Spec.ShadowMapResolution;
+        shadowFramebufferSpec.Height = m_Spec.ShadowMapResolution;
+        shadowFramebufferSpec.Samples = 1;
+
+        shadowFramebufferSpec.Attachments = {FramebufferAttachmentFormat::Depth32F};
+
+        m_ShadowFramebuffer = Framebuffer::Create(shadowFramebufferSpec);
+
+        LM_CORE_ASSERT(m_ShadowFramebuffer,
+                       "SceneRenderer '{}' failed to create shadow Framebuffer",
+                       m_Spec.DebugName
+        );
+
+        if (!m_ShadowFramebuffer)
+            return;
+
+        /*
+         * 描述Shadow Map的深度渲染阶段。
+         *
+         * 这个Pass没有颜色附件，只负责生成并保留光源视角深度。
+         */
+        RenderPassSpecification shadowRenderPassSpec;
+
+        shadowRenderPassSpec.TargetFramebuffer = m_ShadowFramebuffer.get();
+        /*
+         * Shadow Framebuffer没有颜色附件，
+         * 所以不需要读取、清理或者保存颜色。
+         */
+        shadowRenderPassSpec.ColorLoadOperation =
+                AttachmentLoadOperation::DontCare;
+
+        shadowRenderPassSpec.ColorStoreOperation =
+                AttachmentStoreOperation::DontCare;
+
+        // 每帧都要重新生成 Shadow Map, 因此开始时清楚上一帧留下的深度
+        shadowRenderPassSpec.DepthLoadOperation = AttachmentLoadOperation::Clear;
+
+        // 主场景 Shader随后需要采样该深度纹理 因此 Pass 结束后必须保留深度
+        shadowRenderPassSpec.DepthStoreOperation = AttachmentStoreOperation::Store;
+
+        /*
+         * Depth32F没有模板分量，
+         * 所以模板附件不参与这个Pass。
+         */
+        shadowRenderPassSpec.StencilLoadOperation = AttachmentLoadOperation::DontCare;
+        shadowRenderPassSpec.StencilStoreOperation = AttachmentStoreOperation::DontCare;
+
+        shadowRenderPassSpec.DebugName = m_Spec.DebugName + " Shadow RenderPass";
+
+        m_ShadowRenderPass = CreateScope<RenderPass>(shadowRenderPassSpec);
+
+        ShaderLibrary shaderLibrary;
+
+        m_ShadowShader = shaderLibrary.Load("Renderer3D/ShadowDepth");
+
+        LM_CORE_ASSERT(
+            m_ShadowShader,
+            "SceneRenderer '{}' failed to load ShadowDepth shader",
+            m_Spec.DebugName
+        );
+
+        if (!m_ShadowShader)
+            return;
+
+        // Specification of Shadow Pipeline
+        GraphicsPipelineSpecification shadowPPSpec;
+
+        shadowPPSpec.ShaderProgram = m_ShadowShader;
+
+        // Use triangles to build Mesh
+        shadowPPSpec.Topology = PrimitiveTopology::TriangleList;
+
+        // The purpose of "Shadow Map" is to obtain the depth closest to the light source
+        shadowPPSpec.DepthTestEnabled = true;
+        shadowPPSpec.DepthWriteEnabled = true;
+        shadowPPSpec.DepthCompare = CompareOperation::Less;
+
+        // Shadow Pass don't have color attachment, don't need to blend
+        shadowPPSpec.Blend = BlendMode::Opaque;
+
+        // 第一版继续剔除背面。
+        // 后面处理 Shadow Acne 时，再讨论是否切换为正面剔除和添加 Depth Bias。
+        shadowPPSpec.Culling = CullMode::Back;
+
+        shadowPPSpec.FrontFaceWinding = FrontFace::CounterClockwise;
+
+        shadowPPSpec.DebugName = m_Spec.DebugName + " Shadow Pipeline";
 
         /*
         * 第二步：描述主场景 RenderPass。
@@ -79,13 +189,116 @@ namespace Limen
          */
         m_RenderPass = CreateScope<RenderPass>(renderPassSpec);
 
+        m_ShadowPipeline = GraphicsPipeline::Create(shadowPPSpec);
+
+        LM_CORE_ASSERT(
+            m_ShadowPipeline,
+            "SceneRenderer '{}' failed to create Shadow Pipeline",
+            m_Spec.DebugName
+        );
+
+        if (!m_ShadowPipeline)
+            return;
+    }
+
+    void SceneRenderer::RecalculateDirectionalLightViewProjection(const DirectionalLight &directionalLight)
+    {
+        /*
+         * Direction约定为光从光源射向场景的传播方向。
+         *
+         * 必须先归一化，否则后面乘LightDistance时，
+         * 光源距离会受到Direction长度影响。
+         */
+        constexpr float minDirectionLengthSquared = 1e-6f;
+
+        const float directionLengthSquared = glm::dot(directionalLight.Direction, directionalLight.Direction);
+
+        LM_CORE_ASSERT(
+            directionLengthSquared > minDirectionLengthSquared,
+            "Directional light direction must not be zero"
+        );
+
+
+        if (directionLengthSquared <= minDirectionLengthSquared)
+        {
+            // 防止保留之前计算出的无效光源矩阵。
+            m_DirectionalLightViewProjectionMatrix = glm::mat4(1.0f);
+            return;
+        }
+
+        const glm::vec3 lightDirection = glm::normalize(directionalLight.Direction);
+
+        /*
+         * 第一版让Shadow Map覆盖世界原点附近的场景。
+         *
+         * 当前两个立方体都在原点附近，因此先使用原点。
+         * 后面实现稳定阴影和CSM时，再改成跟随相机视锥。
+         */
+        constexpr glm::vec3 focusPoint{0.0f, 0.0f, 0.0f};
+
+        /*
+        * 平行光本身没有真实位置。
+        *
+        * 但glm::lookAt需要一个观察位置，所以沿光线传播方向
+        * 的反方向，构造一个虚拟光源相机位置。
+        */
+        constexpr float lightDistance = 15.0f;
+
+        const glm::vec3 lightPosition = focusPoint - lightDirection * lightDistance;
+
+        /*
+         * lookAt需要一个Up方向。
+         *
+         * 如果光线方向几乎与世界Y轴平行，
+         * 两个方向的叉积接近零，观察矩阵会失效。
+         * 此时改用世界Z轴作为Up。
+         */
+        glm::vec3 lightUp{0.0f, 1.0f, 0.0f};
+
+        if (std::abs(glm::dot(lightDirection, lightUp)) > 0.99f) // l // up
+        {
+            lightUp = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+
+        /*
+         * 构造世界空间到光源观察空间的View Matrix。
+         *
+         * glm::lookAt内部完成的正是刚才推导的过程：
+         * 1. 计算g、r、t；
+         * 2. 构造世界到观察空间的旋转；
+         * 3. 将lightPosition移动到观察空间原点；
+         * 4. 得到View = R × T。
+         */
+        const glm::mat4 lightView = glm::lookAt(lightPosition, focusPoint, lightUp);
+
+        /*
+         * 平行光没有透视近大远小，因此使用正交投影。
+         *
+         * 当前第一版覆盖光源观察空间中：
+         * x ∈ [-10, 10]
+         * y ∈ [-10, 10]
+         * 深度距离 ∈ [0.1, 50]
+         */
+        constexpr float shadowHalfExtent = 10.0f;
+        constexpr float shadowNearPlane = 0.1f;
+        constexpr float shadowFarPlane = 50.0f;
+        const glm::mat4 lightProj = glm::ortho(
+            -shadowHalfExtent,
+            shadowHalfExtent,
+            -shadowHalfExtent,
+            shadowHalfExtent,
+            shadowNearPlane,
+            shadowFarPlane
+        );
+
+        m_DirectionalLightViewProjectionMatrix = lightProj * lightView;
     }
 
     SceneRenderer::~SceneRenderer() = default;
 
     void SceneRenderer::Render(const Scene &scene, const Camera &camera)
     {
-        LM_CORE_ASSERT(m_RenderPass,"SceneRenderer '{}' has no RenderPass",m_Spec.DebugName);
+        LM_CORE_ASSERT(m_RenderPass, "SceneRenderer '{}' has no RenderPass", m_Spec.DebugName);
 
         if (!m_RenderPass)
             return;
@@ -101,6 +314,68 @@ namespace Limen
             return;
         }
 
+        /*
+        * 平行光方向可能在运行时被编辑，
+        * 因此当前第一版每帧重新计算光源View-Projection矩阵。
+        *
+        * 后续可以使用Dirty Flag，只在光源或阴影范围变化时重算。
+        */
+        RecalculateDirectionalLightViewProjection(scene.GetDirectionalLight());
+
+        LM_CORE_ASSERT(
+            m_ShadowRenderPass,
+            "SceneRenderer '{}' has no Shadow RenderPass",
+            m_Spec.DebugName
+        );
+
+        if (!m_ShadowRenderPass)
+            return;
+
+        // 绑定 Shadow Framebuffer，并清除上一帧深度。
+        m_ShadowRenderPass->Begin();
+
+        if (!m_ShadowRenderPass->IsActive())
+            return;
+
+        LM_CORE_ASSERT(
+            m_ShadowPipeline,
+            "SceneRenderer '{}' has no Shadow Pipeline",
+            m_Spec.DebugName
+        );
+
+        if (!m_ShadowPipeline)
+        {
+            m_ShadowRenderPass->End();
+            return;
+        }
+
+        /*
+         * 遍历场景中的全部可渲染物体。
+         *
+         * Shadow Pass只需要Mesh和Transform，
+         * 不需要使用物体的Material。
+         */
+        for (const SceneRenderObject &renderObject: scene.GetRenderObjects())
+        {
+            LM_CORE_ASSERT(
+                renderObject.MeshResource,
+                "Shadow Pass encountered an object without Mesh"
+            );
+
+            if (!renderObject.MeshResource)
+                continue;
+
+            Renderer::SubmitDepth(
+                *m_ShadowPipeline,
+                *renderObject.MeshResource,
+                m_DirectionalLightViewProjectionMatrix,
+                renderObject.Transform
+            );
+        }
+
+
+        m_ShadowRenderPass->End();
+
         // 开始物理渲染阶段
         m_RenderPass->Begin();
 
@@ -108,15 +383,18 @@ namespace Limen
         if (!m_RenderPass->IsActive())
             return;
 
-        /*
-         * 把Scene中的相机、主平行光和全部点光源，
-         * 交给Renderer建立本次渲染的场景快照。
-         */
+        constexpr uint32_t shadowMapTextureSlot = 1;
+
+        m_ShadowFramebuffer->BindDepthAttachment(shadowMapTextureSlot);
+
+        // 把相机、光源和阴影数据交给Renderer。
         Renderer::BeginScene(
             camera,
             scene.GetAmbientLight(),
             scene.GetDirectionalLight(),
-            scene.GetPointLights()
+            scene.GetPointLights(),
+            m_DirectionalLightViewProjectionMatrix,
+            shadowMapTextureSlot
         );
 
         /*
@@ -127,7 +405,7 @@ namespace Limen
          * - 不复制 Transform 矩阵。
          */
         for (const auto &[MeshResource,MaterialResource,Transform]
-            : scene.GetRenderObjects())
+             : scene.GetRenderObjects())
         {
             /*
              * AddRenderObject() 已经禁止加入无效对象。
@@ -182,7 +460,7 @@ namespace Limen
         if (width == m_Spec.Width && height == m_Spec.Height)
             return;
 
-        LM_CORE_ASSERT(m_Framebuffer,"SceneRenderer '{}' has no Framebuffer",m_Spec.DebugName);
+        LM_CORE_ASSERT(m_Framebuffer, "SceneRenderer '{}' has no Framebuffer", m_Spec.DebugName);
 
         if (!m_Framebuffer)
             return;

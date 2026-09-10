@@ -161,6 +161,20 @@ namespace Limen
         Invalidate();
     }
 
+    void OpenGLFramebuffer::BindDepthAttachment(const uint32_t slot) const
+    {
+        LM_CORE_ASSERT(
+            m_DepthAttachment != 0,
+            "Framebuffer has no sampleable depth attachment"
+        );
+
+        if (m_DepthAttachment == 0)
+            return;
+
+        glActiveTexture(GL_TEXTURE0 + slot);
+        glBindTexture(GL_TEXTURE_2D, m_DepthAttachment);
+    }
+
     void OpenGLFramebuffer::Invalidate()
     {
         // 删除旧附件，再按当前 Specification 重建。
@@ -356,7 +370,6 @@ namespace Limen
                 );
 
                 glBindTexture(GL_TEXTURE_2D, 0);
-
             }
         } else
         {
@@ -370,7 +383,6 @@ namespace Limen
                                              GL_RGBA8,
                                              width, height
             );
-
 
 
             // 把多采样颜色 Renderbuffer 挂到场景 FBO 的颜色附件 0。

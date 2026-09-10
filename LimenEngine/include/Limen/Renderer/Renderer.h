@@ -80,6 +80,24 @@ namespace Limen
         );
 
         /**
+         * @brief 使用完整光照和阴影数据开始3D场景。
+         *
+         * @param directionalLightViewProjection
+         * 世界空间到平行光裁剪空间的矩阵。
+         *
+         * @param shadowMapTextureSlot
+         * Shadow Map当前绑定的纹理槽。
+         */
+        static void BeginScene(
+            const Camera& camera,
+            const AmbientLight& ambientLight,
+            const DirectionalLight& directionalLight,
+            const std::vector<PointLight>& pointLights,
+            const glm::mat4& directionalLightViewProjection,
+            uint32_t shadowMapTextureSlot
+        );
+
+        /**
          * @brief 更新Renderer输出使用的GPU Viewport。
          *
          * 该函数不修改Camera的投影矩阵；CameraController会独立处理宽高比。
@@ -145,6 +163,32 @@ namespace Limen
             const glm::mat4 &transform = glm::mat4(1.0f)
         );
 
+        /**
+         * @brief 提交一次只写深度的几何绘制。
+         *
+         *  普通 Submit：
+            Material + Mesh + Camera + Lighting → 输出颜色和深度
+
+            SubmitDepth：
+            ShadowPipeline + Mesh + LightVP → 只输出深度
+         *
+         * 不使用Material，因为Shadow Pass只需要：
+         * - 深度Pipeline；
+         * - Mesh几何数据；
+         * - 光源ViewProjection；
+         * - 物体Transform。
+         *
+         * @param pipeline Shadow Depth Pipeline。
+         * @param mesh 要绘制的Mesh。
+         * @param lightViewProjection 世界空间到光源裁剪空间的矩阵。
+         * @param transform 模型局部空间到世界空间的矩阵。
+         */
+        static void SubmitDepth(
+            const GraphicsPipeline& pipeline,
+            const Mesh& mesh,
+            const glm::mat4& lightViewProjection,
+            const glm::mat4& transform = glm::mat4(1.0f)
+        );
 
         static RendererAPI::API GetRenderAPI()
         {

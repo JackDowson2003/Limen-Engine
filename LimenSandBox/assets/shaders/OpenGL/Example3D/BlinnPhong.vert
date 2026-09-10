@@ -26,6 +26,11 @@ uniform mat4 u_ViewProjection;
 uniform mat4 u_Transform;
 
 /**
+ * 世界空间到光源裁剪空间的矩阵。
+ */
+uniform mat4 u_LightViewProjection;
+
+/**
  * 传递给Fragment Shader的世界空间法线。
  */
 out vec3 v_WorldNormal;
@@ -39,6 +44,13 @@ out vec3 v_WorldPosition;
  * 传递给Fragment Shader的纹理坐标。
  */
 out vec2 v_TexCoord;
+
+/**
+ * 当前顶点在光源裁剪空间中的位置。
+ *
+ * Fragment Shader会使用它查询Shadow Map。
+ */
+out vec4 v_LightSpacePosition;
 
 void main()
 {
@@ -59,6 +71,8 @@ void main()
     vec4 worldPosition = u_Transform * vec4(a_Position, 1.0);
 
     v_WorldPosition = worldPosition.xyz;
+
+    v_LightSpacePosition = u_LightViewProjection * worldPosition;
 
     gl_Position = u_ViewProjection * worldPosition;
 }

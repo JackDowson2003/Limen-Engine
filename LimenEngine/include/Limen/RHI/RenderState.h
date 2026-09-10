@@ -57,8 +57,11 @@ namespace Limen
      */
     enum class BlendMode
     {
+        // 表示不进行混合，新的颜色直接覆盖旧颜色：
         Opaque = 0,
+        // a * c1 + (1 - a ) c2 按照alpha 混合
         AlphaBlend,
+        // 表示把新的颜色直接加到已有颜色上
         Additive
     };
 
