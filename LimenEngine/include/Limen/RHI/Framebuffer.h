@@ -60,7 +60,7 @@ namespace Limen
          *
          * { Depth32F }
          */
-        FramebufferAttachmentSpecification(std::initializer_list<FramebufferAttachmentFormat> formats)
+        FramebufferAttachmentSpecification( std::initializer_list<FramebufferAttachmentFormat> formats)
             : Formats(formats)
         {
         }

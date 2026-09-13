@@ -404,22 +404,21 @@ namespace Limen
         RendererCommand::DrawIndexed(vao, specification.Topology);
     }
 
-    void Renderer::SubmitDepth(const GraphicsPipeline &pipeline, const Mesh &mesh, const glm::mat4 &lightViewProjection,
+    void Renderer::SubmitDepth(const GraphicsPipeline &shadowPipeline, const Mesh &mesh, const glm::mat4 &lightViewProjection,
         const glm::mat4 &transform)
     {
-        const GraphicsPipelineSpecification& specification =
-        pipeline.GetSpecification();
+        const GraphicsPipelineSpecification& specification = shadowPipeline.GetSpecification();
 
         LM_CORE_ASSERT(
             specification.ShaderProgram,
-            "Renderer::SubmitDepth received a pipeline without Shader"
+            "Renderer::SubmitDepth received a shadowPipeline without Shader"
         );
 
         if (!specification.ShaderProgram)
             return;
 
-        // 绑定Shadow Shader，并设置深度测试、剔除等Pipeline状态。
-        pipeline.Bind();
+        // 绑定Shadow Shader，并设置深度测试、剔除, 逆时针绘制哈斯顺时针。
+        shadowPipeline.Bind();
 
         const Ref<Shader>& shader = specification.ShaderProgram;
 

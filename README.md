@@ -431,7 +431,8 @@ assets/textures/checkerboard.png
 - Framebuffer、深度/模板附件与 MSAA Resolve；
 - RenderPass 作用域；
 - GraphicsPipeline 的深度、混合、剔除、绕序和拓扑状态；
-- 3D Blinn-Phong 测试与 ImGui Scene Viewport。
+- 3D Blinn-Phong 测试与 ImGui Scene Viewport
+- Shader Map :实时渲染无法像离线渲染那样追踪每条光线，所以做法是阴影贴图（Shadow Mapping）
 
 后续顺序：
 

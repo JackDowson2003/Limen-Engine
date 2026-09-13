@@ -178,13 +178,13 @@ namespace Limen
          * - 光源ViewProjection；
          * - 物体Transform。
          *
-         * @param pipeline Shadow Depth Pipeline。
+         * @param shadowPipeline Shadow Depth Pipeline。
          * @param mesh 要绘制的Mesh。
          * @param lightViewProjection 世界空间到光源裁剪空间的矩阵。
          * @param transform 模型局部空间到世界空间的矩阵。
          */
         static void SubmitDepth(
-            const GraphicsPipeline& pipeline,
+            const GraphicsPipeline& shadowPipeline,
             const Mesh& mesh,
             const glm::mat4& lightViewProjection,
             const glm::mat4& transform = glm::mat4(1.0f)

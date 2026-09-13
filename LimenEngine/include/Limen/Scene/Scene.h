@@ -123,7 +123,7 @@ namespace Limen
     /**
      * @brief 保存一个场景中的对象数据
      *
-     * Scene 只负责拥有和组织厂家数据，不负责发出任何渲染指令
+     * Scene 只负责拥有和组织厂家数据，不负责发出任何渲染指令，只负责拥有RenderObjects, lights
      * SceneRenderer 后续会通过 GetRendererObjects() 读取这些对象并提交渲染
      */
     class LIMEN_API Scene final

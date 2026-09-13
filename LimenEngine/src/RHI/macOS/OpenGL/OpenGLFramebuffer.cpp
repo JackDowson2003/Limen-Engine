@@ -46,7 +46,8 @@ namespace Limen
                     continue;
 
                 m_DepthAttachmentFormat = format;
-            } else
+            }
+            else
             {
                 /*
                  * 当前唯一支持的颜色附件格式是RGBA8。
@@ -292,7 +293,8 @@ namespace Limen
                     GL_RENDERBUFFER,
                     m_DepthStencilRenderbuffer
                 );
-            } else if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth32F)
+            }
+            else if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth32F)
             {
                 /*
                  * Shadow Map的深度必须在第二遍渲染时被Shader采样，
@@ -335,6 +337,7 @@ namespace Limen
 
                 constexpr float borderColor[] = {1.f, 1.f, 1.f, 1.f};
 
+                // 设置边缘颜色（Border Color）—— 这是 fv 版本最典型的用途
                 glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
                 /*

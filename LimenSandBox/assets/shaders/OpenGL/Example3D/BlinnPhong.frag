@@ -204,7 +204,9 @@ float CalculateDirectionalShadow(
     // 当前主场景片元到光源的深度。
     float currentDepth = projectedCoordinates.z;
 
-    // 减少浮点误差造成的Shadow Acne。
+    // 减少浮点误差造成的Shadow Acne
+    // 同一个表面在两次渲染中的深度可能有微小误差
+    // so we need to control error in what we can receive
     float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0005);
 
     return currentDepth - bias > closestDepth ? 1.0 : 0.0;

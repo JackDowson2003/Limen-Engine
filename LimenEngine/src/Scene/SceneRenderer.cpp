@@ -13,6 +13,7 @@
 #include "Limen/Scene/SceneRenderer.h"
 
 #include "Limen/Core/Log.h"
+#include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/Framebuffer.h"
 #include "Limen/Renderer/RenderPass.h"
@@ -112,7 +113,7 @@ namespace Limen
         shadowRenderPassSpec.ColorStoreOperation =
                 AttachmentStoreOperation::DontCare;
 
-        // 每帧都要重新生成 Shadow Map, 因此开始时清楚上一帧留下的深度
+        // 每帧都要重新生成 Shadow Map, 因此开始时清理上一帧留下的深度
         shadowRenderPassSpec.DepthLoadOperation = AttachmentLoadOperation::Clear;
 
         // 主场景 Shader随后需要采样该深度纹理 因此 Pass 结束后必须保留深度
@@ -244,6 +245,7 @@ namespace Limen
         */
         constexpr float lightDistance = 15.0f;
 
+        // 终点=起点+方向 * 距离 => 起点 = 终点 - 方向*距离
         const glm::vec3 lightPosition = focusPoint - lightDirection * lightDistance;
 
         /*
@@ -318,7 +320,7 @@ namespace Limen
         * 平行光方向可能在运行时被编辑，
         * 因此当前第一版每帧重新计算光源View-Projection矩阵。
         *
-        * 后续可以使用Dirty Flag，只在光源或阴影范围变化时重算。
+        * 后续可能使用Dirty Flag，只在光源或阴影范围变化时重算。
         */
         RecalculateDirectionalLightViewProjection(scene.GetDirectionalLight());
 
@@ -365,6 +367,9 @@ namespace Limen
             if (!renderObject.MeshResource)
                 continue;
 
+
+            // 在前面已经m_ShadowRenderPass->Begin();
+            // 这里会FBO.Bind()
             Renderer::SubmitDepth(
                 *m_ShadowPipeline,
                 *renderObject.MeshResource,
@@ -372,7 +377,6 @@ namespace Limen
                 renderObject.Transform
             );
         }
-
 
         m_ShadowRenderPass->End();
 
@@ -429,6 +433,8 @@ namespace Limen
             }
 
             /*
+             * 在上面的SubmitDepth已经提交并生成了Depth32F 深度附件
+             *
              * Material：提供 Shader、Pipeline、纹理和材质参数；
              * Mesh：提供 VAO、VBO 和 IBO；
              * Transform：描述该物体在世界中的位置、旋转和缩放。

@@ -72,6 +72,7 @@ void main()
 
     v_WorldPosition = worldPosition.xyz;
 
+    // calculate the position of fragment in light space 
     v_LightSpacePosition = u_LightViewProjection * worldPosition;
 
     gl_Position = u_ViewProjection * worldPosition;

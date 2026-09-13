@@ -63,6 +63,8 @@ namespace Limen
     /**
      * @brief 把 Scene 中的可渲染对象绘制到独立 Framebuffer。
      *
+     * 拥有FBO RenderPass pipeline shader
+     *
      * SceneRenderer 负责组织：
      *
      * 1. RenderPass::Begin()；
