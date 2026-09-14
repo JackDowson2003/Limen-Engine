@@ -666,6 +666,35 @@ namespace SandBox
             //endregion
         }
 
+        //region shadow Depth32F
+        // 显示平行光 Shadow Pass 生成的 Depth32F 深度纹理。
+        if (ImGui::Begin("Shadow Map"))
+        {
+            if (m_SceneRenderer)
+            {
+                const std::uintptr_t shadowMapHandle =
+                    m_SceneRenderer->GetShadowMapHandle();
+
+                if (shadowMapHandle != 0)
+                {
+                    const ImTextureID textureID = shadowMapHandle;
+
+                    ImGui::Image(
+                        ImTextureRef(textureID),
+                        ImVec2(256.0f, 256.0f),
+
+                        // OpenGL 和 ImGui 的纵向纹理坐标相反。
+                        ImVec2(0.0f, 1.0f),
+                        ImVec2(1.0f, 0.0f)
+                    );
+                }
+            }
+        }
+
+        // 无论 Begin() 返回 true 还是 false，都必须调用 End()。
+        ImGui::End();
+        //endregion
+
 
         ImGui::End();
     }

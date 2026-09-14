@@ -58,6 +58,14 @@ void main()
      * 法线矩阵：
      *
      * transpose(inverse(mat3(transform)))
+     * t' = Mt
+     * n' = Gn (端点处非线性变换)
+     * transpose(t) * n = 0
+     * make t'^T *n' = 0
+     * (Gn)^T * Mt = 0
+     * n^T GTM t = 0
+     * So G^T M = I
+     * G^T = M_-1 => G = (M_-1)^T
      *
      * 在物体存在非均匀缩放时，保证变换后的法线
      * 仍然垂直于对应表面。

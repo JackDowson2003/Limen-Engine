@@ -122,6 +122,15 @@ namespace Limen
         GetFinalColorAttachmentHandle() const noexcept;
 
         /**
+         * @brief 获取平行光 Shadow Map 的深度纹理Handle
+         *
+         * 主要用于编辑器调试显示，不允许调用者修改或拥有该纹理
+         * 当前 OpenGL 后端返回深度纹理的 Texture ID
+         */
+        [[nodiscard]]
+        std::uintptr_t GetShadowMapHandle() const noexcept;
+
+        /**
          * @brief 获取 SceneRenderer 当前使用的规格。
          *
          * 返回 const 引用：
@@ -135,6 +144,7 @@ namespace Limen
         {
             return m_Spec;
         }
+
 
     private:
         /**

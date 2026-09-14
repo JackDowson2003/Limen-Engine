@@ -195,8 +195,15 @@ float CalculateDirectionalShadow(
     projectedCoordinates = projectedCoordinates * 0.5 + 0.5;
 
     // 超过光源远平面的片元不计算阴影。
-    if (projectedCoordinates.z > 1.0)
+    if (projectedCoordinates.x < 0.0 ||
+        projectedCoordinates.x > 1.0 ||
+        projectedCoordinates.y < 0.0 ||
+        projectedCoordinates.y > 1.0 ||
+        projectedCoordinates.z < 0.0 ||
+        projectedCoordinates.z > 1.0)
+    {
         return 0.0;
+    }
 
     // Shadow Map中光源当时看到的最近深度。
     float closestDepth = texture(u_ShadowMap, projectedCoordinates.xy).r;
@@ -207,6 +214,8 @@ float CalculateDirectionalShadow(
     // 减少浮点误差造成的Shadow Acne
     // 同一个表面在两次渲染中的深度可能有微小误差
     // so we need to control error in what we can receive
+    // 法线与表面到光源方向越接近垂直，表面越倾斜，需要的 bias 越大。
+    // if n^t * l = 0, so they're vertical, we need to set a bias for some error caused by precision error
     float bias = max(0.005 * (1.0 - dot(normal, lightDirection)), 0.0005);
 
     return currentDepth - bias > closestDepth ? 1.0 : 0.0;
@@ -214,19 +223,19 @@ float CalculateDirectionalShadow(
 
 
 /**
-    u_AmbientReflectance
-        = k_a
-        = 材质属性
-        = 物体能反射多少环境光
+u_AmbientReflectance
+    = k_a
+    = 材质属性
+    = 物体能反射多少环境光
 
-    u_AmbientLightColor × u_AmbientLightIntensity
-        = I_a
-        = 场景属性
-        = 场景中存在多少环境光
+u_AmbientLightColor × u_AmbientLightIntensity
+    = I_a
+    = 场景属性
+    = 场景中存在多少环境光
 */
 void main()
 {
-/**
+    /**
      * 对Albedo纹理进行采样。
      *
      * RGB用于材质漫反射系数k_d；

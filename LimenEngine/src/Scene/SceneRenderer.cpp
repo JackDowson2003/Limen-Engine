@@ -13,7 +13,6 @@
 #include "Limen/Scene/SceneRenderer.h"
 
 #include "Limen/Core/Log.h"
-#include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/Framebuffer.h"
 #include "Limen/Renderer/RenderPass.h"
@@ -485,5 +484,12 @@ namespace Limen
         if (!m_Framebuffer)
             return 0;
         return m_Framebuffer->GetColorAttachmentHandle();
+    }
+
+    std::uintptr_t SceneRenderer::GetShadowMapHandle() const noexcept
+    {
+        if (!m_ShadowFramebuffer)
+            return 0;
+        return m_ShadowFramebuffer->GetDepthAttachmentHandle();
     }
 }
