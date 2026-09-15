@@ -30,6 +30,14 @@ uniform vec3 u_CameraPosition;
 uniform vec3 u_AmbientReflectance;
 
 /**
+ * GAMES101中的材质漫反射系数k_d。
+ *
+ * 它会与Albedo纹理颜色相乘；
+ * 使用白色时不会改变纹理原色。
+ */
+uniform vec3 u_DiffuseReflectance;
+
+/**
  * GAMES101常量环境光I_a的RGB颜色。
  */
 uniform vec3 u_AmbientLightColor;
@@ -244,7 +252,7 @@ void main()
     vec4 albedoSample = texture(u_AlbedoTexture, v_TexCoord);
 
     // GAMES101中的材质漫反射系数。
-    vec3 k_d = albedoSample.rgb;
+    vec3 k_d = albedoSample.rgb * u_DiffuseReflectance;
 
     // 当前使用Albedo的15%近似环境光反射系数。
     vec3 k_a = u_AmbientReflectance;

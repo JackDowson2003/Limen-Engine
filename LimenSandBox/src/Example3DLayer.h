@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "Limen/Application/Layer.h"
+#include "Limen/Asset/Model.h"
 #include "Limen/Renderer/Material.h"
 #include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
@@ -68,6 +69,17 @@ namespace SandBox
          * Mesh仍然只负责几何数据。
          */
         Limen::Ref<Limen::Material> m_CubeMaterial;
+
+        // 导入的 Model
+        Limen::Ref<Limen::Model> m_ImportModel;
+
+        /**
+         * @brief 导入模型各材质槽对应的运行时材质。
+         *
+         * 数组下标与ModelMaterialSlot下标保持一致：
+         * m_ImportedMaterials[0]对应模型的MaterialSlot 0。
+         */
+        std::vector<Limen::Ref<Limen::Material>> m_ImportedMaterials;
 
         /**
          * @brief 当前测试层的场景数据。

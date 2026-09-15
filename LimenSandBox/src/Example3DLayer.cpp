@@ -9,6 +9,7 @@
 
 #include "Example3DLayer.h"
 #include "imgui.h"
+#include "Limen/Asset/ModelImporter.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
 #include "Limen/RHI/GraphicsPipeline.h"
@@ -110,6 +111,14 @@ namespace SandBox
 
         m_CubeMesh = Limen::CreateRef<Limen::Mesh>(cubeData);
 
+        //导入外部数据
+        m_ImportModel = Limen::ModelImporter::Import("assets/models/TestTwoMaterials.obj");
+
+        LM_CORE_ASSERT(
+            m_ImportModel,
+            "Failed to import TestTwoMaterials.obj"
+        );
+
         // 创建负责当前 Scene Viewport 的场景渲染器。
         Limen::SceneRendererSpecification sceneSpec;
 
@@ -198,7 +207,7 @@ namespace SandBox
              * 这是材质属性，表示材质能够反射多少环境光，
              * 因此由Material负责，不属于Scene中的AmbientLight。
              */
-            m_CubeMaterial->SetFloat3("u_AmbientReflectance",glm::vec3(0.15f));
+            m_CubeMaterial->SetFloat3("u_AmbientReflectance", glm::vec3(0.15f));
 
             // 设置Blinn-Phong高光指数p。
             m_CubeMaterial->SetFloat(
@@ -206,10 +215,72 @@ namespace SandBox
                 128.f
             );
 
+            /*
+             * 白色漫反射系数不会改变Albedo纹理颜色。
+             */
+            m_CubeMaterial->SetFloat3(
+                "u_DiffuseReflectance",
+                glm::vec3(1.0f)
+            );
+
             // 设置GAMES101中的材质镜面反射系数k_s。
             m_CubeMaterial->SetFloat3(
                 "u_SpecularColor",
                 glm::vec3(0.35f)
+            );
+        }
+
+        const auto &importMaterialsSlots = m_ImportModel->GetMaterialSlots();
+        m_ImportedMaterials.reserve(importMaterialsSlots.size());
+
+        for (const Limen::ModelMaterialSlot &slot: importMaterialsSlots)
+        {
+            /*
+             * 所有导入材质暂时共享同一个Blinn-Phong Pipeline，
+             * 但每个Material拥有独立的参数表。
+             */
+            Limen::Ref<Limen::Material> importedMaterial =
+                    Limen::CreateRef<Limen::Material>(
+                        pipeline, "Imported Material: " + slot.Name
+                    );
+
+            LM_CORE_ASSERT(
+                importedMaterial,
+                "Failed to create imported material '{}'",
+                slot.Name
+            );
+            /*
+             * 当前尚未导入map_Kd纹理，
+             * 暂时复用棋盘格纹理观察Kd颜色调制效果。
+             */
+            importedMaterial->SetTexture(
+                "u_AlbedoTexture",
+                texture,
+                0
+            );
+
+            importedMaterial->SetFloat3(
+                "u_AmbientReflectance",
+                slot.AmbientReflectance
+            );
+
+            importedMaterial->SetFloat3(
+                "u_DiffuseReflectance",
+                slot.DiffuseReflectance
+            );
+
+            importedMaterial->SetFloat3(
+                "u_SpecularColor",
+                slot.SpecularReflectance
+            );
+
+            importedMaterial->SetFloat(
+                "u_Shininess",
+                slot.Shininess
+            );
+
+            m_ImportedMaterials.push_back(
+                std::move(importedMaterial)
             );
         }
 
@@ -352,6 +423,90 @@ namespace SandBox
             secondCubeHandle.IsValid(),
             "Failed to add second cube object to Scene"
         );
+
+        /*
+         * 导入模型整体在世界空间中的变换。
+         *
+         * TestCube本身以原点为中心；
+         * 这里只将它向左移动1.5个单位，与另外两个立方体分开显示。
+         */
+        const glm::mat4 importedModelTransform =
+                glm::translate(
+                    glm::mat4(1.0f),
+                    glm::vec3(-1.5f, 0.0f, 0.0f)
+                );
+
+        // 一个 Model 可以有多个ModelPart
+        // 一个 ModelPart 都需要是一个独立的 SceneRenderObject
+        for (const auto &[Name,
+            MeshResource,
+            MaterialSlot,
+            LocalTransform]: m_ImportModel->GetParts())
+        {
+            LM_CORE_ASSERT(
+                MeshResource,
+                "Imported model part has no Mesh"
+            );
+
+            Limen::SceneRenderObject importedObj;
+
+            // 使用 .OBJ 的data
+            importedObj.MeshResource = MeshResource;
+
+            /*
+             * 当前ModelImporter还没有转换MTL材质，
+             * 因此暂时复用立方体的Blinn-Phong材质。
+             */
+            if (MaterialSlot == Limen::ModelPart::InvalidMaterialSlot)
+            {
+                importedObj.MaterialResource = m_CubeMaterial;
+            } else
+            {
+                const uint32_t materialSlot = MaterialSlot;
+
+                LM_CORE_ASSERT(
+                    materialSlot < m_ImportedMaterials.size(),
+                    "Imported model part '{}' has invalid material slot {}",
+                    Name,
+                    materialSlot
+                );
+
+                /*
+                 * Release模式可能关闭断言，因此仍然保护数组访问。
+                 */
+                if (materialSlot >= m_ImportedMaterials.size())
+                {
+                    LM_CORE_ERROR(
+                        "Cannot assign material slot {} to model part '{}'",
+                        materialSlot,
+                        Name
+                    );
+
+                    continue;
+                }
+                importedObj.MaterialResource = m_ImportedMaterials[materialSlot];
+                LM_CORE_ASSERT(
+                    importedObj.MaterialResource,
+                    "Imported material slot {} is null",
+                    materialSlot
+                );
+
+                if (!importedObj.MaterialResource)
+                    continue;
+            }
+
+            /*
+             * 先执行ModelPart局部变换，
+             * 再执行整个Model的世界变换。
+             */
+            importedObj.Transform = importedModelTransform * LocalTransform;
+
+            const Limen::SceneRenderObjectHandle importedObjectHandle = m_Scene.AddRenderObject(importedObj);
+            LM_CORE_ASSERT(
+                importedObjectHandle.IsValid(),
+                "Failed to add imported model part to Scene"
+            );
+        }
     }
 
     /**
@@ -673,7 +828,7 @@ namespace SandBox
             if (m_SceneRenderer)
             {
                 const std::uintptr_t shadowMapHandle =
-                    m_SceneRenderer->GetShadowMapHandle();
+                        m_SceneRenderer->GetShadowMapHandle();
 
                 if (shadowMapHandle != 0)
                 {

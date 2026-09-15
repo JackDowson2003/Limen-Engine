@@ -3,6 +3,10 @@ file(GLOB_RECURSE LIMEN_ENGINE_COMMON_SOURCES
         CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Core/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Application/*.cpp"
+
+        # 模型、资源导入器以及后续的资源处理代码。
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Asset/*.cpp"
+        
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/*.cpp"
 
         # 场景数据、场景对象以及后续的 SceneRenderer 实现。
@@ -101,6 +105,18 @@ add_library(stb_image STATIC
         vendor/stb_image/stb_image.cpp
 )
 
+# tinyobjloader 只负责解析 OBJ/MTL 文件。
+# 单独编译为静态库，避免在多个翻译单元重复编译其实现。
+add_library(tinyobjloader STATIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader/tiny_obj_loader.cc"
+)
+
+# 将第三方头文件标记为 SYSTEM，避免其警告混入引擎警告。
+target_include_directories(tinyobjloader
+        SYSTEM PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/tinyobjloader"
+)
+
 target_include_directories(imgui
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui
@@ -140,6 +156,13 @@ target_link_libraries(LimenEngine
 
 # GLM 类型出现在公共头文件中，因此使用 PUBLIC 传播给客户端目标。
 target_link_libraries(LimenEngine PUBLIC glm::glm)
+
+# OBJ 解析只属于引擎内部的资源导入实现，
+# 不向 Sandbox 暴露 tinyobjloader 的类型和头文件。
+target_link_libraries(LimenEngine
+        PRIVATE
+        tinyobjloader
+)
 
 # 平台宏属于公共编译契约：客户端包含公共头文件时也需要看到相同宏。
 if (WIN32)
