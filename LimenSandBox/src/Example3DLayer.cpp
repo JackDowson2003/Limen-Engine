@@ -112,11 +112,11 @@ namespace SandBox
         m_CubeMesh = Limen::CreateRef<Limen::Mesh>(cubeData);
 
         //导入外部数据
-        m_ImportModel = Limen::ModelImporter::Import("assets/models/TestTwoMaterials.obj");
+        m_ImportModel = Limen::ModelImporter::Import("assets/models/TestHardEdgeNoNormals.obj");
 
         LM_CORE_ASSERT(
             m_ImportModel,
-            "Failed to import TestTwoMaterials.obj"
+            "Failed to import TestHardEdgeNoNormals.obj"
         );
 
         // 创建负责当前 Scene Viewport 的场景渲染器。
@@ -181,7 +181,31 @@ namespace SandBox
             "assets/textures/checkerboard.png"
         );
 
-        LM_CORE_ASSERT(texture, "Failed to create cube albedo texture");
+
+        /*
+         * 创建所有“没有map_Kd”的导入材质共享的1×1白纹理。
+         *
+         * Shader会计算：纹理颜色 × Kd。
+         * 白色(1,1,1)乘任何Kd都不会改变Kd本身。
+         */
+        Limen::Texture2DSpecification whiteTextureSpecification;
+        whiteTextureSpecification.Width = 1;
+        whiteTextureSpecification.Height = 1;
+        whiteTextureSpecification.Format = Limen::TextureFormat::RGBA8;
+        whiteTextureSpecification.GenerateMipmaps = false;
+
+        const Limen::Ref<Limen::Texture2D> defaultWhiteTexture =
+                Limen::Texture2D::Create(whiteTextureSpecification);
+
+        LM_CORE_ASSERT(
+            defaultWhiteTexture,
+            "Failed to create default white texture"
+        );
+
+        // RGBA四个通道都是255，即不透明白色。
+        constexpr uint32_t whitePixel = 0xffffffffu;
+
+        defaultWhiteTexture->SetData(&whitePixel, sizeof(whitePixel));
 
         //使用立方体Pipeline的材质
         m_CubeMaterial = Limen::CreateRef<Limen::Material>(
@@ -198,7 +222,7 @@ namespace SandBox
         {
             m_CubeMaterial->SetTexture(
                 "u_AlbedoTexture",
-                texture,
+                texture ? texture : defaultWhiteTexture,
                 0
             );
             /*
@@ -233,7 +257,12 @@ namespace SandBox
         const auto &importMaterialsSlots = m_ImportModel->GetMaterialSlots();
         m_ImportedMaterials.reserve(importMaterialsSlots.size());
 
-        for (const Limen::ModelMaterialSlot &slot: importMaterialsSlots)
+        for (const auto &[Name,
+            AmbientReflectance,
+            DiffuseReflectance,
+            SpecularReflectance,
+            AlbedoTexturePath,
+            Shininess]: importMaterialsSlots)
         {
             /*
              * 所有导入材质暂时共享同一个Blinn-Phong Pipeline，
@@ -241,42 +270,72 @@ namespace SandBox
              */
             Limen::Ref<Limen::Material> importedMaterial =
                     Limen::CreateRef<Limen::Material>(
-                        pipeline, "Imported Material: " + slot.Name
+                        pipeline, "Imported Material: " + Name
                     );
 
             LM_CORE_ASSERT(
                 importedMaterial,
                 "Failed to create imported material '{}'",
-                slot.Name
+                Name
             );
+
             /*
-             * 当前尚未导入map_Kd纹理，
-             * 暂时复用棋盘格纹理观察Kd颜色调制效果。
+             * 没有map_Kd时使用默认白纹理，
+             * 使Shader中的“纹理颜色 × Kd”保持为Kd本身。
              */
+            Limen::Ref<Limen::Texture2D> albedoTexture = defaultWhiteTexture;
+
+            if (!AlbedoTexturePath.empty())
+            {
+                const std::string texturePath = AlbedoTexturePath.string();
+
+                /*
+                 * 先保存加载结果，不要直接覆盖默认白纹理。
+                 * 加载失败时loadedTexture为nullptr。
+                 */
+                if (Limen::Ref<Limen::Texture2D> loadedTexture = Limen::Texture2D::Create(texturePath.c_str()))
+                    albedoTexture = loadedTexture;
+                else
+                {
+                    /*
+                     * 加载失败不终止程序。
+                     * albedoTexture仍然指向默认白纹理。
+                     */
+                    LM_CORE_WARN(
+                        "Using default white texture for material '{}' "
+                        "because '{}' could not be loaded",
+                        Name,
+                        texturePath
+                    );
+                }
+
+
+            }
+
             importedMaterial->SetTexture(
                 "u_AlbedoTexture",
-                texture,
+                albedoTexture,
                 0
             );
 
             importedMaterial->SetFloat3(
                 "u_AmbientReflectance",
-                slot.AmbientReflectance
+                AmbientReflectance
             );
 
             importedMaterial->SetFloat3(
                 "u_DiffuseReflectance",
-                slot.DiffuseReflectance
+                DiffuseReflectance
             );
 
             importedMaterial->SetFloat3(
                 "u_SpecularColor",
-                slot.SpecularReflectance
+                SpecularReflectance
             );
 
             importedMaterial->SetFloat(
                 "u_Shininess",
-                slot.Shininess
+                Shininess
             );
 
             m_ImportedMaterials.push_back(
@@ -439,9 +498,9 @@ namespace SandBox
         // 一个 Model 可以有多个ModelPart
         // 一个 ModelPart 都需要是一个独立的 SceneRenderObject
         for (const auto &[Name,
-            MeshResource,
-            MaterialSlot,
-            LocalTransform]: m_ImportModel->GetParts())
+                 MeshResource,
+                 MaterialSlot,
+                 LocalTransform]: m_ImportModel->GetParts())
         {
             LM_CORE_ASSERT(
                 MeshResource,

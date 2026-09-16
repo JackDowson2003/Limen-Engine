@@ -28,6 +28,13 @@ namespace Limen
             int PositionIndex = -1;
             int TexCoordIndex = -1;
             int NormalIndex = -1;
+            /**
+             * @brief 缺少源法线时，决定哪些面可以共享生成的顶点法线。
+             *
+             * 源OBJ提供法线时保持为0；
+             * 缺少法线时由平滑组或面编号生成。
+             */
+            uint64_t NormalGroupKey = 0;
 
             /*
              * C++20会依次比较三个成员。
@@ -48,8 +55,9 @@ namespace Limen
                 const std::size_t positionHash = std::hash<int>{}(key.PositionIndex);
                 const std::size_t texCoordHash = std::hash<int>{}(key.TexCoordIndex);
                 const std::size_t normalHash = std::hash<int>{}(key.NormalIndex);
+                const std::size_t normalGroupHash = std::hash<uint64_t>{}(key.NormalGroupKey);
 
-                return positionHash ^ (texCoordHash << 1) ^ (normalHash << 2);
+                return positionHash ^ (texCoordHash << 1) ^ (normalHash << 2) ^ (normalGroupHash << 3);
             }
         };
 
@@ -69,6 +77,14 @@ namespace Limen
             int SourceMaterialIndex = -1;
 
             /**
+             * @brief 当前材质分组是否存在缺少源法线的顶点。
+             *
+             * 只要有一个顶点缺少法线，就为整个Mesh重新生成法线，
+             * 避免一个Mesh中混合使用源法线和未初始化法线。
+             */
+            bool RequiresGeneratedNormals = false;
+
+            /**
              * 当前材质分组收集到的顶点和索引。
              */
             MeshData Geometry;
@@ -85,8 +101,11 @@ namespace Limen
         /**
          * @brief 将 tinyobjloader 的一组索引转换为 Limen 顶点。
          *
-         * 当前第一版要求模型提供 Position 和 Normal；
-         * TexCoord 可以缺失，缺失时保持默认值 (0, 0)。
+         * Position必须存在；
+         * Normal和TexCoord允许缺失。
+         *
+         * Normal缺失时先写入零向量，Mesh构建完成后统一生成；
+         * TexCoord缺失时保持默认值(0, 0)。
          */
         [[nodiscard]]
         std::optional<MeshVertex> TryCreateMeshVertex(
@@ -112,7 +131,7 @@ namespace Limen
                 attributes.vertices[positionOffset + 2]
             };
 
-            // 当前 Blinn-Phong Shader 必须使用法线,后续可以增加“缺少法线时自动生成”的功能。
+            // 当前Blinn-Phong Shader需要法线；存在源法线时直接读取
             if (sourceIndex.normal_index >= 0)
             {
                 /*
@@ -134,15 +153,10 @@ namespace Limen
             } else
             {
                 /*
-                 * 如果文件中存在法线数组，但当前顶点没有法线索引，
-                 * 说明它是“部分法线缺失”，第一版暂时认为数据无效。
-                 */
-                if (!attributes.normals.empty())
-                    return std::nullopt;
-
-                /*
-                 * 整个OBJ都没有法线时，先写入零向量。
-                 * 下一步会遍历三角形并累计计算顶点法线。
+                 * 当前顶点没有源法线时先写入零向量。
+                 *
+                 * AddOBJVertex会将RequiresGeneratedNormals设为true，
+                 * 完成Mesh构建后再为整个Mesh统一生成法线。
                  */
                 vertex.Normal = glm::vec3(0.0f);
             }
@@ -172,6 +186,7 @@ namespace Limen
         bool AddOBJVertex(
             const tinyobj::attrib_t &attributes,
             const tinyobj::index_t &sourceIndex,
+            const uint64_t normalGroupKey,
             OBJMeshBuildData &buildMeshData
         )
         {
@@ -179,7 +194,8 @@ namespace Limen
             {
                 .PositionIndex = sourceIndex.vertex_index,
                 .TexCoordIndex = sourceIndex.texcoord_index,
-                .NormalIndex = sourceIndex.normal_index
+                .NormalIndex = buildMeshData.RequiresGeneratedNormals ? -1 : sourceIndex.normal_index,
+                .NormalGroupKey = buildMeshData.RequiresGeneratedNormals ? normalGroupKey : 0
             };
 
             if (const auto existingVertex = buildMeshData.VertexLookup.find(vertexKey);
@@ -197,6 +213,7 @@ namespace Limen
 
             if (buildMeshData.Geometry.Vertices.size() >= std::numeric_limits<uint32_t>::max())
                 return false;
+
 
             const uint32_t newVertexIndex = static_cast<uint32_t>(buildMeshData.Geometry.Vertices.size());
 
@@ -401,7 +418,7 @@ namespace Limen
         std::vector<ModelMaterialSlot> materialSlots;
         materialSlots.reserve(materials.size());
 
-        for (const tinyobj::material_t& material :materials)
+        for (const tinyobj::material_t &material: materials)
         {
             ModelMaterialSlot slot;
 
@@ -410,7 +427,7 @@ namespace Limen
              * 名称处理与材质参数转换彼此独立。
              */
             if (material.name.empty())
-                slot.Name ="Material_" +std::to_string(materialSlots.size());
+                slot.Name = "Material_" + std::to_string(materialSlots.size());
             else
                 slot.Name = material.name;
 
@@ -437,6 +454,22 @@ namespace Limen
 
             // MTL的Ns。
             slot.Shininess = static_cast<float>(material.shininess);
+
+            /*
+             * tinyobjloader已经从map_Kd中解析出纹理文件名。
+             *
+             * 相对路径暂时以OBJ所在目录为基准；
+             * 后续AssetManager会统一负责更完整的路径解析。
+             */
+            if (!material.diffuse_texname.empty())
+            {
+                std::filesystem::path texturePath = material.diffuse_texname;
+
+                // 相对路径的情况下加上pre path
+                if (texturePath.is_relative())
+                    texturePath = sourcePath.parent_path() / texturePath;
+                slot.AlbedoTexturePath = texturePath.lexically_normal();
+            }
 
             materialSlots.push_back(std::move(slot));
         }
@@ -509,6 +542,34 @@ namespace Limen
                 return nullptr;
             }
 
+            /*
+             * 在正式创建顶点之前，先检查每个材质分组是否存在缺失法线。
+             *
+             * 如果一个分组中有任何顶点缺少法线，
+             * 后续构建该分组时就统一忽略所有源法线并重新生成。
+             */
+            std::unordered_map<int, bool> materialRequiresGeneratedNormals;
+
+            for (std::size_t i = 0; i < triangleCount; ++i)
+            {
+                const int materialIndex = shape.mesh.material_ids[i];
+
+                bool &requiresGeneratedNormal = materialRequiresGeneratedNormals[materialIndex];
+
+                const std::size_t indexOffset = i * 3;
+
+                for (std::size_t corner = 0; corner < 3; ++corner)
+                {
+                    const tinyobj::index_t &sourceIndex = shape.mesh.indices[indexOffset + corner];
+
+                    if (sourceIndex.normal_index < 0)
+                    {
+                        requiresGeneratedNormal = true;
+                        break;
+                    }
+                }
+            }
+
 
             /*
              * 一个Shape可能使用多个材质。
@@ -559,6 +620,9 @@ namespace Limen
 
                     OBJMeshBuildData newBuildData;
                     newBuildData.SourceMaterialIndex = sourceMaterialIndex;
+
+                    newBuildData.RequiresGeneratedNormals = materialRequiresGeneratedNormals[sourceMaterialIndex];
+
                     meshBuildDataList.push_back(std::move(newBuildData));
 
                     materialToBuildData.emplace(sourceMaterialIndex, buildDataIndex);
@@ -571,10 +635,23 @@ namespace Limen
                  */
                 const std::size_t triangleIndexOffset = i * 3;
 
+                // tinyobjloader 使用0 表示关闭平滑, 没有记录的时候按照关闭处理
+                const uint32_t smoothingGroup = i < shape.mesh.smoothing_group_ids.size()
+                                                    ? shape.mesh.smoothing_group_ids[i]
+                                                    : 0;
+
+                uint64_t normalGroupKey = 0;
+
+                if (smoothingGroup != 0)
+                    normalGroupKey = smoothingGroup;
+                else
+                    // 会与真实的平滑组编号冲突 所以引入高位1作为sign
+                    normalGroupKey = (uint64_t{1} << 63) | static_cast<uint64_t>(i);
+
                 for (std::size_t corner = 0; corner < 3; ++corner)
                 {
                     if (const tinyobj::index_t sourceIndex = shape.mesh.indices[triangleIndexOffset + corner];
-                        !AddOBJVertex(attributes, sourceIndex, buildData)
+                        !AddOBJVertex(attributes, sourceIndex, normalGroupKey, buildData)
                     )
                     {
                         LM_CORE_ERROR(
@@ -593,7 +670,7 @@ namespace Limen
                 if (buildData.Geometry.Vertices.empty() || buildData.Geometry.Indices.empty())
                     continue;
 
-                if (attributes.normals.empty() && !GenerateVertexNormals(buildData.Geometry))
+                if (buildData.RequiresGeneratedNormals && !GenerateVertexNormals(buildData.Geometry))
                 {
                     LM_CORE_ERROR(
                         "Failed to generate normals for OBJ shape '{}'",
@@ -622,6 +699,16 @@ namespace Limen
                     part.Name = basePartName;
                 }
 
+
+                LM_CORE_INFO(
+                    "Built OBJ part '{}': {} vertices, {} indices, normals={}",
+                    part.Name,
+                    buildData.Geometry.Vertices.size(),
+                    buildData.Geometry.Indices.size(),
+                    buildData.RequiresGeneratedNormals
+                    ? "generated"
+                    : "source"
+                );
                 part.MeshResource = CreateRef<Mesh>(buildData.Geometry);
                 part.LocalTransform = glm::mat4(1.0f);
                 modelParts.push_back(std::move(part));

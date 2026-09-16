@@ -6,9 +6,7 @@
 
 #include <glm/vec3.hpp>
 #include <limits>
-#include <vector>
-#include <cstdint>
-#include <string>
+#include <filesystem>
 
 #include <glm/mat4x4.hpp>
 
@@ -36,6 +34,14 @@ namespace Limen
 
         // MTL中的Ks：镜面反射系数。
         glm::vec3 SpecularReflectance{0.0f};
+
+        /**
+         * @brief MTL的map_Kd漫反射纹理路径。
+         *
+
+        * 空路径表示源材质没有指定纹理。
+         */
+        std::filesystem::path AlbedoTexturePath;
 
         // MTL中的Ns：Blinn-Phong高光指数。
         float Shininess = 32.0f;

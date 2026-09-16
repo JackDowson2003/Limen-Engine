@@ -24,3 +24,22 @@ Limen::Ref<Limen::Texture2D> Limen::Texture2D::Create(const char *path)
             return nullptr;
     }
 }
+
+Limen::Ref<Limen::Texture2D> Limen::Texture2D::Create(const Texture2DSpecification &specification)
+{
+    switch (Renderer::GetRenderAPI())
+    {
+        case RendererAPI::API::NONE:
+        {
+            LM_ERROR("Cannot create texture, the API is NONE type !!!");
+            return nullptr;
+        }
+        case RendererAPI::API::OPENGL:
+            return CreateRef<OpenGLTexture2D>(specification);
+        case RendererAPI::API::DIRECT12:
+            return nullptr;
+        default:
+            return nullptr;
+    }
+    return nullptr;
+}
