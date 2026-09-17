@@ -8,6 +8,7 @@
 #include "Editor/ImGui/ImGUILayer.h"
 #include "Limen/Core/Log.h"
 #include "GLFW/glfw3.h"
+#include "Limen/Asset/AssetManager.h"
 #include "Limen/Renderer/Renderer.h"
 
 namespace Limen
@@ -36,6 +37,8 @@ namespace Limen
 
         Renderer::Init();
 
+        AssetManager::Init("assets");
+
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
         // 编辑器 UI 由 Application 统一管理，客户端只需实现 OnImGuiRender()。
         m_ImGUILayer = new ImGUILayer();
@@ -49,6 +52,9 @@ namespace Limen
         // Layer 中的 GPU 资源必须先于 Renderer 后端与 Window/Context 释放。
         m_LayerStack.Clear();
         m_ImGUILayer = nullptr;
+
+        // 再释放资源管理器缓存中剩余的GPU资源。
+        AssetManager::Shutdown();
 
         Renderer::Shutdown();
 

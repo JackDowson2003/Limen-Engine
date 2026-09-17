@@ -9,7 +9,8 @@
 
 #include "Example3DLayer.h"
 #include "imgui.h"
-#include "Limen/Asset/ModelImporter.h"
+#include "Limen/Asset/AssetManager.h"
+#include "Limen/Asset/ModelMaterialBuilder.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
 #include "Limen/RHI/GraphicsPipeline.h"
@@ -112,11 +113,11 @@ namespace SandBox
         m_CubeMesh = Limen::CreateRef<Limen::Mesh>(cubeData);
 
         //导入外部数据
-        m_ImportModel = Limen::ModelImporter::Import("assets/models/TestHardEdgeNoNormals.obj");
+        m_ImportModel = Limen::AssetManager::LoadModel("models/TestTwoMaterials.obj");
 
         LM_CORE_ASSERT(
             m_ImportModel,
-            "Failed to import TestHardEdgeNoNormals.obj"
+            "Failed to import TestTwoMaterials.obj"
         );
 
         // 创建负责当前 Scene Viewport 的场景渲染器。
@@ -177,35 +178,20 @@ namespace SandBox
          * CMake会把LimenSandBox/assets复制到可执行文件目录，
          * 因此运行时可以通过assets/textures/...访问。
          */
-        const Limen::Ref<Limen::Texture2D> texture = Limen::Texture2D::Create(
-            "assets/textures/checkerboard.png"
+        const Limen::Ref<Limen::Texture2D> texture = Limen::AssetManager::LoadTexture2D(
+            "textures/checkerboard.png"
         );
 
-
         /*
-         * 创建所有“没有map_Kd”的导入材质共享的1×1白纹理。
-         *
-         * Shader会计算：纹理颜色 × Kd。
-         * 白色(1,1,1)乘任何Kd都不会改变Kd本身。
+         * 默认白纹理由AssetManager统一创建和管理，
+         * 所有没有map_Kd的材质都可以共享它。
          */
-        Limen::Texture2DSpecification whiteTextureSpecification;
-        whiteTextureSpecification.Width = 1;
-        whiteTextureSpecification.Height = 1;
-        whiteTextureSpecification.Format = Limen::TextureFormat::RGBA8;
-        whiteTextureSpecification.GenerateMipmaps = false;
-
-        const Limen::Ref<Limen::Texture2D> defaultWhiteTexture =
-                Limen::Texture2D::Create(whiteTextureSpecification);
+        const Limen::Ref<Limen::Texture2D> &defaultWhiteTexture = Limen::AssetManager::GetWhiteTexture();
 
         LM_CORE_ASSERT(
             defaultWhiteTexture,
-            "Failed to create default white texture"
+            "AssetManager default white texture is unavailable"
         );
-
-        // RGBA四个通道都是255，即不透明白色。
-        constexpr uint32_t whitePixel = 0xffffffffu;
-
-        defaultWhiteTexture->SetData(&whitePixel, sizeof(whitePixel));
 
         //使用立方体Pipeline的材质
         m_CubeMaterial = Limen::CreateRef<Limen::Material>(
@@ -254,94 +240,7 @@ namespace SandBox
             );
         }
 
-        const auto &importMaterialsSlots = m_ImportModel->GetMaterialSlots();
-        m_ImportedMaterials.reserve(importMaterialsSlots.size());
-
-        for (const auto &[Name,
-            AmbientReflectance,
-            DiffuseReflectance,
-            SpecularReflectance,
-            AlbedoTexturePath,
-            Shininess]: importMaterialsSlots)
-        {
-            /*
-             * 所有导入材质暂时共享同一个Blinn-Phong Pipeline，
-             * 但每个Material拥有独立的参数表。
-             */
-            Limen::Ref<Limen::Material> importedMaterial =
-                    Limen::CreateRef<Limen::Material>(
-                        pipeline, "Imported Material: " + Name
-                    );
-
-            LM_CORE_ASSERT(
-                importedMaterial,
-                "Failed to create imported material '{}'",
-                Name
-            );
-
-            /*
-             * 没有map_Kd时使用默认白纹理，
-             * 使Shader中的“纹理颜色 × Kd”保持为Kd本身。
-             */
-            Limen::Ref<Limen::Texture2D> albedoTexture = defaultWhiteTexture;
-
-            if (!AlbedoTexturePath.empty())
-            {
-                const std::string texturePath = AlbedoTexturePath.string();
-
-                /*
-                 * 先保存加载结果，不要直接覆盖默认白纹理。
-                 * 加载失败时loadedTexture为nullptr。
-                 */
-                if (Limen::Ref<Limen::Texture2D> loadedTexture = Limen::Texture2D::Create(texturePath.c_str()))
-                    albedoTexture = loadedTexture;
-                else
-                {
-                    /*
-                     * 加载失败不终止程序。
-                     * albedoTexture仍然指向默认白纹理。
-                     */
-                    LM_CORE_WARN(
-                        "Using default white texture for material '{}' "
-                        "because '{}' could not be loaded",
-                        Name,
-                        texturePath
-                    );
-                }
-
-
-            }
-
-            importedMaterial->SetTexture(
-                "u_AlbedoTexture",
-                albedoTexture,
-                0
-            );
-
-            importedMaterial->SetFloat3(
-                "u_AmbientReflectance",
-                AmbientReflectance
-            );
-
-            importedMaterial->SetFloat3(
-                "u_DiffuseReflectance",
-                DiffuseReflectance
-            );
-
-            importedMaterial->SetFloat3(
-                "u_SpecularColor",
-                SpecularReflectance
-            );
-
-            importedMaterial->SetFloat(
-                "u_Shininess",
-                Shininess
-            );
-
-            m_ImportedMaterials.push_back(
-                std::move(importedMaterial)
-            );
-        }
+        m_ImportedMaterials = Limen::ModelMaterialBuilder::BuildBlinnPhong(*m_ImportModel,pipeline);
 
         //初始时不允许鼠标控制
         m_CameraController.SetMouseLookEnabled(false);
