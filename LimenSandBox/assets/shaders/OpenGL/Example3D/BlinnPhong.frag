@@ -16,6 +16,7 @@ layout (location = 0) out vec4 color;
 in vec3 v_WorldNormal;
 in vec3 v_WorldPosition;
 in vec2 v_TexCoord;
+in vec4 v_WorldTangent;
 
 // 当前片元在光源裁剪空间中的位置。
 in vec4 v_LightSpacePosition;
@@ -278,8 +279,29 @@ void main()
      */
     vec3 lightIntensity = u_DirectionalLightColor * u_DirectionalLightIntensity;
 
-    // n：世界空间中的单位表面法线。
-    vec3 n = normalize(v_WorldNormal);
+    // 插值后的世界空间顶点法线。
+    vec3 N = normalize(v_WorldNormal);
+
+    // 插值后的T可能不再与N严格垂直，因此再次正交化
+    vec3 T = v_WorldTangent.xyz;
+    T = normalize(T - N * dot(N,T));
+
+    // w只表示方向，不使用插值后的值
+    float tangentHandedness =
+        v_WorldTangent.w < 0.0
+            ? -1.0
+            : 1.0;
+    // 使用N、T和手性重建世界空间Bitangent。
+    vec3 B = normalize(cross(N, T)) * tangentHandedness;
+
+    // GLSL矩阵构造参数是列，因此三列分别为T、B、N。
+    mat3 tangentToWorld = mat3(T, B, N);
+
+    /*
+     * 暂时使用切线空间默认法线(0,0,1)测试TBN。
+     * 转换结果应当仍然等于世界空间N，所以画面不应改变。
+     */
+    vec3 n = normalize(tangentToWorld * vec3(0.0, 0.0, 1.0));
 
     /*
      * Direction 表示光从光源射向场景；

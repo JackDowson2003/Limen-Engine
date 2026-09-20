@@ -16,6 +16,12 @@ layout(location = 1) in vec3 a_Normal;
 layout(location = 2) in vec2 a_TexCoord;
 
 /**
+ * xyz是模型局部空间切线；
+ * w是重建Bitangent所需的左右手性。
+ */
+layout(location = 3) in vec4 a_Tangent;
+
+/**
  * 当前相机的Projection × View矩阵。
  */
 uniform mat4 u_ViewProjection;
@@ -52,6 +58,11 @@ out vec2 v_TexCoord;
  */
 out vec4 v_LightSpacePosition;
 
+/**
+ * 传给Fragment Shader的世界空间切线和手性。
+ */
+out vec4 v_WorldTangent;
+
 void main()
 {
      /**
@@ -73,6 +84,14 @@ void main()
     mat3 normalMatrix = transpose(inverse(mat3(u_Transform)));
 
     v_WorldNormal = normalize(normalMatrix * a_Normal);
+
+    /*
+     * Tangent是位于模型表面上的方向向量，
+     * 因此使用Model矩阵的线性部分转换到世界空间。
+     */
+    vec3 worldTangent = normalize(mat3(u_Transform) * a_Tangent.xyz);
+
+    v_WorldTangent = vec4(worldTangent,a_Tangent.w);
 
     v_TexCoord = a_TexCoord;
 

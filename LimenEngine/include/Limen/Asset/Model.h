@@ -39,9 +39,18 @@ namespace Limen
          * @brief MTL的map_Kd漫反射纹理路径。
          *
 
-        * 空路径表示源材质没有指定纹理。
+         * 空路径表示源材质没有指定纹理。
          */
         std::filesystem::path AlbedoTexturePath;
+
+        /**
+         * @brief 源材质指定的切线空间法线纹理路径。
+         *
+         * 这里只保存CPU端的文件路径，不创建或拥有GPU纹理。
+         * 空路径表示源材质没有指定Normal Map。
+         */
+        std::filesystem::path NormalTexturePath;
+
 
         // MTL中的Ns：Blinn-Phong高光指数。
         float Shininess = 32.0f;
@@ -84,7 +93,7 @@ namespace Limen
      * @brief 可以由一个 或者多个 ModelPart 组成的完整资源模型
      *
      * Model 只负责拥有和组织模型的各个可绘制部分
-     * 它不负责读取 .obj, 也不直接诶发出渲染指令
+     * 它不负责读取 .obj, 也不直接发出渲染指令
      */
     class LIMEN_API Model final
     {
@@ -111,6 +120,15 @@ namespace Limen
         const std::vector<ModelPart> &GetParts() const noexcept;
 
         /**
+         * @brief 获取整个Model在模型局部空间中的包围盒。
+         *
+         * 该范围由所有ModelPart的Mesh局部包围盒，
+         * 经过各自LocalTransform变换后合并得到。
+         */
+        [[nodiscard]]
+        const AxisAlignedBoundingBox& GetLocalBounds() const noexcept;
+
+        /**
          * @brief 获取模型的材质槽列表。
          */
         [[nodiscard]]
@@ -122,5 +140,12 @@ namespace Limen
 
         // 每个ModelPart 的Material Slot
         std::vector<ModelMaterialSlot> m_MaterialSlots;
+
+        /**
+         * @brief 整个Model在模型局部空间中的包围盒。
+         *
+         * 不包含SceneRenderObject的世界Transform。
+         */
+        AxisAlignedBoundingBox m_LocalBounds;
     };
 }

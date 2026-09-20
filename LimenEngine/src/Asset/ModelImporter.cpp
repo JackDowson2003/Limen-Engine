@@ -4,6 +4,7 @@
 
 #include "Limen/Asset/ModelImporter.h"
 
+#include <cmath>
 #include <cctype>
 #include <limits>
 #include <optional>
@@ -288,6 +289,146 @@ namespace Limen
                 vertex.Normal = glm::normalize(vertex.Normal);
             }
 
+            return true;
+        }
+
+        /**
+         * @brief 根据三角形的位置、UV和法线生成每个顶点的切线。
+         *
+         * @param meshData 即将用于创建Mesh的顶点和索引数据。
+         * @return 是否成功生成切线。
+         */
+        [[nodiscard]]
+        bool GenerateVertexTangents(MeshData &meshData)
+        {
+            if (meshData.Vertices.empty() || meshData.Indices.size() % 3 != 0)
+            {
+                return false;
+            }
+
+            const std::size_t vertexCount = meshData.Vertices.size();
+
+            /*
+             * 一个顶点通常被多个三角形共享。
+             * 因此先累加相邻三角形贡献的T和B，
+             * 最后再统一正交化、归一化并计算手性。
+             */
+            std::vector tangentSums(vertexCount, glm::vec3(0.0f));
+
+            std::vector bitangentSums(vertexCount, glm::vec3(0.0f));
+
+            const std::size_t indexCount = meshData.Indices.size();
+
+            // 收集每个三角形顶点对 B T的贡献
+            for (std::size_t i = 0; i < indexCount; i += 3)
+            {
+                const uint32_t firstIndex = meshData.Indices[i + 0];
+                const uint32_t secondIndex = meshData.Indices[i + 1];
+                const uint32_t thirdIndex = meshData.Indices[i + 2];
+
+                if (firstIndex >= vertexCount
+                    || secondIndex >= vertexCount
+                    || thirdIndex >= vertexCount
+                )
+                    return false;
+
+                const MeshVertex &firstVertex = meshData.Vertices[firstIndex];
+                const MeshVertex &secondVertex = meshData.Vertices[secondIndex];
+                const MeshVertex &thirdVertex = meshData.Vertices[thirdIndex];
+
+                // 三维模型中的两条边
+                const glm::vec3 firstEdge = secondVertex.Position - firstVertex.Position;
+                const glm::vec3 secondEdge = thirdVertex.Position - firstVertex.Position;
+
+                // 同样两条边在UV空间中的变化
+                const glm::vec2 firstUVEdge = secondVertex.TexCoord - firstVertex.TexCoord;
+                const glm::vec2 secondUVEdge = thirdVertex.TexCoord - firstVertex.TexCoord;
+
+                // M      = u1 v1
+                //          u2 v2
+                //          (E1, E2) = M * (T B )
+                // E1 = Δu1 * T + Δv1 * B
+                // E2 = Δu2 * T + Δv2 * B
+                //
+                // 如果 M 可逆，则可以通过 E * M-1 得到(T B)
+                const float determinant = firstUVEdge.x * secondUVEdge.y - firstUVEdge.y * secondUVEdge.x;
+                /*
+                 * 行列式接近0，表示UV三角形退化成了线或点。
+                 * 此时无法从UV变化唯一地反推出T和B。
+                 */
+                if (std::abs(determinant) <= 1e-8f)
+                    continue;
+
+                const float inverseDeterminant = 1.0f / determinant;
+
+                const glm::vec3 triangleTangent =
+                        inverseDeterminant * (firstEdge * secondUVEdge.y - secondEdge * firstUVEdge.y);
+                const glm::vec3 triangleBitangent =
+                        inverseDeterminant * (secondEdge * firstUVEdge.x - firstEdge * secondUVEdge.x);
+
+                /*
+                 * 一个三角形内部的UV映射是线性的，因此该三角形的
+                 * 三个顶点共享同一份三角形T、B贡献。
+                 *
+                 * 顶点可能被多个三角形共享，所以这里只累加，
+                 * 暂时不归一化，也不直接写入MeshVertex::Tangent。
+                 */
+                tangentSums[firstIndex] += triangleTangent;
+                tangentSums[secondIndex] += triangleTangent;
+                tangentSums[thirdIndex] += triangleTangent;
+
+                bitangentSums[firstIndex] += triangleBitangent;
+                bitangentSums[secondIndex] += triangleBitangent;
+                bitangentSums[thirdIndex] += triangleBitangent;
+            }
+
+            // 整理并保存 T B
+            for (std::size_t i = 0; i < vertexCount; ++i)
+            {
+                MeshVertex &vertex = meshData.Vertices[i];
+
+                if (glm::dot(vertex.Normal, vertex.Normal) <= 1e-12f)
+                    return false;
+
+                // 创建单位法线
+                const glm::vec3 normal = glm::normalize(vertex.Normal);
+
+                glm::vec3 tangent = tangentSums[i];
+
+                // 如果n 和 t 不正交则矫正
+                // 删除T在N方向上的分量, 即进行施密特正交化
+                // n2 = n2 - (<n2, n1>/ <n1, n1>) * n1, 由于n 是标准化过的 所以n1带入为1, 就不写了
+                tangent -= normal * glm::dot(tangent, normal);
+
+                if (glm::dot(tangent, tangent) <= 1e-12f)
+                {
+                    /*
+                     * 当前顶点没有有效UV切线时，选择一个不与N平行的参考轴，
+                     * 再通过叉乘构造与N垂直的备用切线。
+                     */
+                    const glm::vec3 referenceAxis =
+                            std::abs(normal.z) < 0.999f
+                                ? glm::vec3(0.f, 0.f, 1.f)
+                                : glm::vec3(0.f, 1.f, 0.f);
+                    tangent = glm::normalize(glm::cross(referenceAxis, normal));
+                } else
+                {
+                    tangent = glm::normalize(tangent);
+                }
+                /*
+                 * N×T得到由当前正交基推导出的B方向。
+                 * 与UV计算出的累计B比较，确定切线空间的左右手性。
+                 *
+                 * 没有有效UV时bitangentSums[i]为零，
+                 * 点积结果为0，默认使用+1。
+                 */
+                const float handedness =
+                        glm::dot(glm::cross(normal, tangent), bitangentSums[i]) < 0.0f
+                            ? -1.0f
+                            : 1.0f;
+                // xyz 保存单位切线，w 保存重建 BitTangent所需的方位符号
+                vertex.Tangent = glm::vec4(tangent, handedness);
+            }
             return true;
         }
     }
@@ -674,6 +815,20 @@ namespace Limen
                 {
                     LM_CORE_ERROR(
                         "Failed to generate normals for OBJ shape '{}'",
+                        shape.name
+                    );
+
+                    return nullptr;
+                }
+
+                /**
+                 * 切线正交化依赖最终顶点的法线
+                 * 因此必须在读取或者生成法线后执行
+                 */
+                if (!GenerateVertexTangents(buildData.Geometry))
+                {
+                    LM_CORE_ERROR(
+                        "Failed to generate tangents for OBJ shape '{}'",
                         shape.name
                     );
 

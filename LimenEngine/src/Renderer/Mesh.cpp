@@ -33,6 +33,23 @@ namespace Limen
             );
         }
 
+        /**
+         * 根据全部顶点位置计算Mesh的局部空间包围盒
+         *
+         * 这里只读取Position:
+         * Normal描述表面朝向
+         * TexCoord描述纹理采样位置
+         * 二者都不会改变几何体占据的空间范围
+         */
+        for (const MeshVertex &vertex: data.Vertices)
+            m_LocalBounds.Expand(vertex.Position);
+
+
+        LM_CORE_ASSERT(
+            m_LocalBounds.IsValid(),
+            "Failed to calculate local bounds for Mesh"
+        );
+
         //2. 初始化VAO Obj
         m_VertexArray.reset(VertexArray::Create());
 
@@ -55,7 +72,9 @@ namespace Limen
         const VertexBufferLayout vertexLayout{
             {ShaderDataType::Float3, "a_Position"},
             {ShaderDataType::Float3, "a_Normal"},
-            {ShaderDataType::Float2, "a_TexCoord"}
+            {ShaderDataType::Float2, "a_TexCoord"},
+            // xyz 是切线方向，w 是切线空间的左右手性。
+            {ShaderDataType::Float4, "a_Tangent"}
         };
         vertexBuffer->SetLayout(vertexLayout);
 
@@ -102,5 +121,10 @@ namespace Limen
         );
 
         return *m_VertexArray;
+    }
+
+    const AxisAlignedBoundingBox &Mesh::GetLocalBounds() const noexcept
+    {
+        return m_LocalBounds;
     }
 }

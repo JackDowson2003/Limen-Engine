@@ -7,9 +7,14 @@
 #include <vector>
 #include "Limen/Core/Core.h"
 #include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
 #include "glm/vec2.hpp"
+#include "Limen/Math/AxisAlignedBoundingBox.h"
+
 namespace Limen
 {
+    class VertexArray;
+
     /**
      * @brief  3D Mesh中一条顶点记录
      * 用于描述物体的几何形状
@@ -27,6 +32,10 @@ namespace Limen
 
         // 顶点的二维纹理坐标。
         glm::vec2 TexCoord{0.f, 0.f};
+
+        // xyz 保存沿着纹理 U 增大的方向的切线
+        // w 保存切线空间的左右手性，用在 Shader 中重建 Bitangent
+        glm::vec4 Tangent{1.0f,0.0f,0.0f,1.0f};
     };
 
     /**
@@ -43,7 +52,6 @@ namespace Limen
         std::vector<uint32_t> Indices;
     };
 
-    class VertexArray;
 
     /**
      * @brief 一份可以提交给 Renderer 绘制的静态几何数据。
@@ -81,8 +89,23 @@ namespace Limen
         [[nodiscard]]
         const VertexArray& GetVertexArray() const;
 
+        /**
+         * @brief 获取Mesh在模型局部空间中的轴对齐包围盒。
+         *
+         * 包围盒由构造Mesh时传入的全部顶点位置计算得到。
+         * 返回const引用，调用者只能读取，不能破坏Mesh保存的范围。
+         */
+        [[nodiscard]]
+        const AxisAlignedBoundingBox& GetLocalBounds() const noexcept;
+
     private:
         // Mesh 独占其VAO, VAO内部会通过Ref 保持与VBO IBO的存活
         Scope<VertexArray> m_VertexArray;
+
+        // 根据Mesh全部顶点位置计算出的局部空间包围盒。
+        AxisAlignedBoundingBox m_LocalBounds;
+
+
+
     };
 }
