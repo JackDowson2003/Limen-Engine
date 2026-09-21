@@ -34,6 +34,7 @@ namespace SandBox
          * TexCoord：二维纹理坐标，2个float，范围通常为[0, 1]。
          *
          * 每条顶点记录总共8个float。
+         * Tangent不保存在该数组中，稍后按面写入MeshVertex。
          *
          * 立方体虽然只有8个不同的位置，但需要24条顶点记录。
          * 因为同一个角在三个面上具有不同的法线和UV。
@@ -91,17 +92,37 @@ namespace SandBox
             20, 21, 22, 22, 23, 20
         };
 
+        /*
+         * 六个面的切线方向。
+         *
+         * 数组顺序必须与cubeVertices中的面顺序一致；
+         * xyz表示纹理U增大的方向，w表示重建Bitangent所需的手性符号。
+         */
+        constexpr glm::vec4 cubeFaceTangents[] =
+        {
+            {1.0f, 0.0f, 0.0f, 1.0f}, // 前面
+            {-1.0f, 0.0f, 0.0f, 1.0f}, // 后面
+            {0.0f, 0.0f, 1.0f, 1.0f}, // 左面
+            {0.0f, 0.0f, -1.0f, 1.0f}, // 右面
+            {1.0f, 0.0f, 0.0f, 1.0f}, // 上面
+            {1.0f, 0.0f, 0.0f, 1.0f} // 下面
+        };
+
         Limen::MeshData cubeData;
 
         for (uint32_t i = 0; i < sizeof(cubeVertices) / sizeof(float); i += 8)
         {
+            const uint32_t vertexIndex = i / 8;
+            const uint32_t faceIndex = vertexIndex / 4;
+
             cubeData.Vertices.push_back(
                 //C++20 标准增加了部分“聚合类型圆括号初始化”能力，但不同工具链及模板构造场景的支持并不完全一致。
                 //所以不能写Limen::MeshVertex(xxxxx)
                 Limen::MeshVertex{
                     .Position = glm::vec3{cubeVertices[i], cubeVertices[i + 1], cubeVertices[i + 2]},
                     .Normal = glm::vec3{cubeVertices[i + 3], cubeVertices[i + 4], cubeVertices[i + 5]},
-                    .TexCoord = glm::vec2{cubeVertices[i + 6], cubeVertices[i + 7]}
+                    .TexCoord = glm::vec2{cubeVertices[i + 6], cubeVertices[i + 7]},
+                    .Tangent = cubeFaceTangents[faceIndex]
                 }
             );
         }
@@ -179,21 +200,35 @@ namespace SandBox
          * 因此运行时可以通过assets/textures/...访问。
          */
         const Limen::Ref<Limen::Texture2D> texture = Limen::AssetManager::LoadTexture2D(
-            "textures/checkerboard.png"
+            "textures/checkerboard.png",
+            Limen::TextureColorSpace::SRGB
         );
 
         /*
          * 默认白纹理由AssetManager统一创建和管理，
          * 所有没有map_Kd的材质都可以共享它。
          */
-        const Limen::Ref<Limen::Texture2D> &defaultWhiteTexture = Limen::AssetManager::GetWhiteTexture();
+        const Limen::Ref<Limen::Texture2D> &defaultWhiteTexture =
+                Limen::AssetManager::GetWhiteTexture();
 
         LM_CORE_ASSERT(
             defaultWhiteTexture,
             "AssetManager default white texture is unavailable"
         );
 
-        //使用立方体Pipeline的材质
+        /*
+         * 示例立方体没有法线贴图，绑定共享平坦法线纹理，
+         * 以满足Blinn-Phong Shader的采样契约。
+         */
+        const Limen::Ref<Limen::Texture2D> &defaultFlatNormalTexture =
+                Limen::AssetManager::GetFlatNormalTexture();
+
+        LM_CORE_ASSERT(
+            defaultFlatNormalTexture,
+            "AssetManager default flat normal texture is unavailable"
+        );
+
+        // 使用立方体Pipeline的材质。
         m_CubeMaterial = Limen::CreateRef<Limen::Material>(
             pipeline,
             "Example3D Cube Material"
@@ -238,11 +273,20 @@ namespace SandBox
                 "u_SpecularColor",
                 glm::vec3(0.35f)
             );
+
+            m_CubeMaterial->SetTexture(
+                "u_NormalTexture",
+                defaultFlatNormalTexture,
+                1
+            );
         }
 
-        m_ImportedMaterials = Limen::ModelMaterialBuilder::BuildBlinnPhong(*m_ImportModel,pipeline);
+        m_ImportedMaterials = Limen::ModelMaterialBuilder::BuildBlinnPhong(
+            *m_ImportModel,
+            pipeline
+        );
 
-        //初始时不允许鼠标控制
+        // 初始时不允许鼠标控制。
         m_CameraController.SetMouseLookEnabled(false);
 
         /*
@@ -285,9 +329,7 @@ namespace SandBox
 
         /*
          * 创建用于测试GAMES101 Blinn-Phong光照的点光源。
-         *
-         * 目前只是把光源加入Scene；
-         * Renderer和Shader还没有读取它，所以暂时不会改变画面。
+         * SceneRenderer会把它与其他场景光源一并交给Renderer。
          */
         Limen::PointLight pointLight;
 
@@ -408,12 +450,12 @@ namespace SandBox
 
             Limen::SceneRenderObject importedObj;
 
-            // 使用 .OBJ 的data
+            // 使用OBJ导入得到的几何资源。
             importedObj.MeshResource = MeshResource;
 
             /*
-             * 当前ModelImporter还没有转换MTL材质，
-             * 因此暂时复用立方体的Blinn-Phong材质。
+             * 没有对应源材质的ModelPart不存在可用的运行时Material，
+             * 因此使用立方体材质作为当前示例的回退材质。
              */
             if (MaterialSlot == Limen::ModelPart::InvalidMaterialSlot)
             {

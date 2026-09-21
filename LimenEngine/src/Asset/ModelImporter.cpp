@@ -4,8 +4,9 @@
 
 #include "Limen/Asset/ModelImporter.h"
 
-#include <cmath>
 #include <cctype>
+#include <cmath>
+#include <filesystem>
 #include <limits>
 #include <optional>
 #include <system_error>
@@ -598,18 +599,32 @@ namespace Limen
 
             /*
              * tinyobjloader已经从map_Kd中解析出纹理文件名。
-             *
-             * 相对路径暂时以OBJ所在目录为基准；
-             * 后续AssetManager会统一负责更完整的路径解析。
+             * 这里只解析并保存路径；GPU纹理由ModelMaterialBuilder
+             * 通过AssetManager加载。
              */
             if (!material.diffuse_texname.empty())
             {
                 std::filesystem::path texturePath = material.diffuse_texname;
 
-                // 相对路径的情况下加上pre path
+                // 按当前导入约定，将相对路径拼接到OBJ所在目录。
                 if (texturePath.is_relative())
                     texturePath = sourcePath.parent_path() / texturePath;
                 slot.AlbedoTexturePath = texturePath.lexically_normal();
+            }
+
+            /*
+             * tinyobjloader将MTL中的norm路径保存到normal_texname。
+             * 这里只解析并保存文件路径；不创建或拥有GPU纹理。
+             */
+            if (!material.normal_texname.empty())
+            {
+                std::filesystem::path texturePath = material.normal_texname;
+
+                // 按当前导入约定，将相对路径拼接到OBJ所在目录。
+                if (texturePath.is_relative())
+                    texturePath = sourcePath.parent_path() / texturePath;
+
+                slot.NormalTexturePath = texturePath.lexically_normal();
             }
 
             materialSlots.push_back(std::move(slot));

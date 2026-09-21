@@ -48,9 +48,10 @@ namespace Limen
             glm::mat4 DirectionalLightViewProjection{1.0f};
 
             /**
-             * Shadow Map绑定的纹理槽。
+             * 当前场景实际使用的Shadow Map纹理槽。
              *
-             * 当前槽0用于Albedo，所以Shadow Map使用槽1。
+             * 该值由BeginScene的调用方提供；Renderer只负责缓存并上传，
+             * 不负责选择或绑定Shadow Map。
              */
             uint32_t ShadowMapTextureSlot = 1;
         };
@@ -316,7 +317,7 @@ namespace Limen
             s_SceneData.DirectionalLightViewProjection
         );
 
-        // 告诉Fragment Shader从纹理槽1采样Shadow Map。
+        // 将调用方提供的Shadow Map纹理槽上传给Fragment Shader。
         shader->SetInt(
             "u_ShadowMap",
             s_SceneData.ShadowMapTextureSlot

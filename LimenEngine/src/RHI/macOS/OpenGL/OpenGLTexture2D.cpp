@@ -99,19 +99,20 @@ namespace Limen
 
         uint32_t internalFormat = 0;
         uint32_t dataFormat = 0;
+        const bool useSRGB = specification.ColorSpace == TextureColorSpace::SRGB;
 
         switch (m_Format)
         {
             case TextureFormat::RGB8:
             {
-                internalFormat = GL_RGB8;
+                internalFormat = useSRGB ? GL_SRGB8 :  GL_RGB8;
                 dataFormat = GL_RGB;
                 m_BPP = 3;
                 break;
             }
             case TextureFormat::RGBA8:
             {
-                internalFormat = GL_RGBA8;
+                internalFormat = useSRGB ? GL_SRGB8_ALPHA8 : GL_RGBA8;
                 dataFormat = GL_RGBA;
                 m_BPP = 4;
                 break;

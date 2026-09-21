@@ -17,10 +17,10 @@ namespace Limen
     /**
      * @brief 将 Model 中的导入材质描述转换为运行时 Material
      *
-     * Model 保存的是来自 OBJ/MTL的Ka, Kd, Ks, Ns and map_Kd
-     * Material 保存的是Pipeline, Shader参数和纹理绑定
+     * Model保存来自OBJ/MTL的Ka、Kd、Ks、Ns及map_Kd、norm路径；
+     * Builder通过AssetManager加载纹理并组装Material。
      *
-     * 这个类负责链接二者，但是不负责绘制模型
+     * 这个类不负责绘制模型。
      */
     class LIMEN_API ModelMaterialBuilder final
     {

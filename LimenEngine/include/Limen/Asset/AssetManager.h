@@ -7,11 +7,10 @@
 #include <filesystem>
 
 #include "Limen/Core/Core.h"
+#include "Limen/RHI/Texture.h"
 
 namespace Limen
 {
-    class Texture2D;
-
     class Model;
 
     /**
@@ -42,7 +41,7 @@ namespace Limen
          * 当前程序使用的资源根目录。
          */
         static void Init(
-            const std::filesystem::path& assetRoot = "assets"
+            const std::filesystem::path &assetRoot = "assets"
         );
 
         /**
@@ -65,7 +64,10 @@ namespace Limen
          * 文件不存在或解码失败时返回nullptr。
          */
         [[nodiscard]]
-        static Ref<Texture2D> LoadTexture2D(const std::filesystem::path& logicalPath);
+        static Ref<Texture2D> LoadTexture2D(
+            const std::filesystem::path &logicalPath,
+            TextureColorSpace colorSpace
+        );
 
         /**
          * @brief 加载或返回缓存中的Model
@@ -73,9 +75,9 @@ namespace Limen
          * @param logicalPath 相对于assets根目录的模型路径
          * @return 创建好的Model
          */
-        [[nodiscard]] static Ref<Model> LoadModel(const std::filesystem::path& logicalPath);
+        [[nodiscard]] static Ref<Model> LoadModel(const std::filesystem::path &logicalPath);
 
-        [[nodiscard]] static Ref<Model> LoadModelFromFile(const std::filesystem::path& filePath);
+        [[nodiscard]] static Ref<Model> LoadModelFromFile(const std::filesystem::path &filePath);
 
         /**
          * @brief 从已经解析好的文件路径加载纹理。
@@ -88,14 +90,24 @@ namespace Limen
          */
         [[nodiscard]]
         static Ref<Texture2D> LoadTexture2DFromFile(
-            const std::filesystem::path& filePath
+            const std::filesystem::path &filePath,
+            TextureColorSpace colorSpace
         );
 
         /**
          * @brief 获取所有无Albedo纹理材质共享的默认白纹理。
          */
         [[nodiscard]]
-        static const Ref<Texture2D>& GetWhiteTexture();
+        static const Ref<Texture2D> &GetWhiteTexture();
+
+        /**
+         * @brief 获取所有未提供Normal Map的材质共享的默认平坦法线纹理。
+         *
+         * RGB(128, 128, 255)解码后的切线空间法线接近(0, 0, 1)，
+         * 可作为近似保持模型原始法线方向的回退资源。
+         */
+        [[nodiscard]]
+        static const Ref<Texture2D> &GetFlatNormalTexture();
 
     private:
         /**
@@ -105,8 +117,6 @@ namespace Limen
          * 后续修改内部缓存结构也不会影响客户端。
          */
         struct AssetManagerData;
-
-        
 
         // Init创建，Shutdown显式销毁。
         static Scope<AssetManagerData> s_Data;

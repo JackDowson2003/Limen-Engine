@@ -121,6 +121,14 @@ uniform float u_Shininess;
 uniform vec3 u_SpecularColor;
 
 /**
+ * 当前材质的切线空间Normal Map。
+ *
+ * R、G、B通道分别编码法线沿Tangent、Bitangent、Normal的分量。
+ * 当前Material约定将该纹理绑定到槽1。
+ */
+uniform sampler2D u_NormalTexture;
+
+/**
  * @brief 计算一个光源对当前着色点产生的Blinn-Phong直接光照。
  *
  * 这个函数不计算环境光，因为环境光只应在整个片元中计算一次，
@@ -205,11 +213,11 @@ float CalculateDirectionalShadow(
 
     // 超过光源远平面的片元不计算阴影。
     if (projectedCoordinates.x < 0.0 ||
-        projectedCoordinates.x > 1.0 ||
-        projectedCoordinates.y < 0.0 ||
-        projectedCoordinates.y > 1.0 ||
-        projectedCoordinates.z < 0.0 ||
-        projectedCoordinates.z > 1.0)
+    projectedCoordinates.x > 1.0 ||
+    projectedCoordinates.y < 0.0 ||
+    projectedCoordinates.y > 1.0 ||
+    projectedCoordinates.z < 0.0 ||
+    projectedCoordinates.z > 1.0)
     {
         return 0.0;
     }
@@ -230,6 +238,32 @@ float CalculateDirectionalShadow(
     return currentDepth - bias > closestDepth ? 1.0 : 0.0;
 }
 
+/**
+ * @brief 将一个线性RGB通道编码为sRGB。
+ */
+float LinearChannelToSRGB(float linearValue)
+{
+    linearValue = max(linearValue, 0.0);
+
+    if (linearValue <= 0.0031308)
+        return linearValue * 12.92;
+
+    return 1.055 * pow(linearValue, 1.0 / 2.4) - 0.055;
+}
+
+/**
+ * @brief 将线性RGB颜色编码为显示用的sRGB。
+ *
+ * Alpha不属于颜色通道，不在这里转换。
+ */
+vec3 LinearToSRGB(vec3 linearColor)
+{
+    return vec3(
+    LinearChannelToSRGB(linearColor.r),
+    LinearChannelToSRGB(linearColor.g),
+    LinearChannelToSRGB(linearColor.b)
+    );
+}
 
 /**
 u_AmbientReflectance
@@ -244,7 +278,7 @@ u_AmbientLightColor × u_AmbientLightIntensity
 */
 void main()
 {
-    /**
+/**
      * 对Albedo纹理进行采样。
      *
      * RGB用于材质漫反射系数k_d；
@@ -261,7 +295,7 @@ void main()
     // 材质镜面反射系数。
     vec3 k_s = u_SpecularColor;
 
-    /**
+/**
      * Blinn-Phong高光指数。
      *
      * 越大，高光越集中；
@@ -272,45 +306,52 @@ void main()
     // 环境光强度I_a。
     vec3 ambientLightIntensity = u_AmbientLightColor * u_AmbientLightIntensity;
 
-    /**
+/**
      * 平行光强度I。
      *
      * 当前使用平行光，所以没有1/r²距离衰减。
      */
     vec3 lightIntensity = u_DirectionalLightColor * u_DirectionalLightIntensity;
 
-    // 插值后的世界空间顶点法线。
+    // 由顶点法线插值得到的当前片元世界空间法线。
     vec3 N = normalize(v_WorldNormal);
 
-    // 插值后的T可能不再与N严格垂直，因此再次正交化
+    // 插值后的T可能不再与N严格垂直，因此再次正交化。
     vec3 T = v_WorldTangent.xyz;
-    T = normalize(T - N * dot(N,T));
+    T = normalize(T - N * dot(N, T));
 
-    // w只表示方向，不使用插值后的值
+    // w编码±1手性；插值后只取符号，恢复为离散的手性值。
     float tangentHandedness =
-        v_WorldTangent.w < 0.0
-            ? -1.0
-            : 1.0;
+    v_WorldTangent.w < 0.0
+    ? -1.0
+    : 1.0;
     // 使用N、T和手性重建世界空间Bitangent。
     vec3 B = normalize(cross(N, T)) * tangentHandedness;
 
     // GLSL矩阵构造参数是列，因此三列分别为T、B、N。
     mat3 tangentToWorld = mat3(T, B, N);
 
-    /*
-     * 暂时使用切线空间默认法线(0,0,1)测试TBN。
-     * 转换结果应当仍然等于世界空间N，所以画面不应改变。
+/*
+     * 纹理通道位于[0,1]，将其解码回切线空间法线的[-1,1]。
+     *
+     * R对应Tangent，G对应Bitangent，B对应Normal。
      */
-    vec3 n = normalize(tangentToWorld * vec3(0.0, 0.0, 1.0));
+    vec3 tangentSpaceNormal = texture(u_NormalTexture, v_TexCoord).rgb * 2.0 - 1.0;
 
-    /*
+/*
+     * 光照计算使用世界空间方向，
+     * 因此通过TBN将切线空间法线转换到世界空间。
+     */
+    vec3 n = normalize(tangentToWorld * tangentSpaceNormal);
+
+/*
      * Direction 表示光从光源射向场景；
      * Blinn-Phong 中的 l 表示从表面点指向光源，
      * 因此两者方向相反。
      */
     vec3 l = normalize(-u_DirectionalLightDirection);
 
-    /**
+/**
      * v：从着色点指向相机的单位方向。
      */
     vec3 v = normalize(u_CameraPosition - v_WorldPosition);
@@ -337,7 +378,7 @@ void main()
         lightIntensity
     );
 
-    /**
+/**
      * 所有点光源产生的直接光照总和。
      *
      * 每个点光源的直接光照包含：
@@ -347,14 +388,14 @@ void main()
 
     for (int pointLightIndex = 0; pointLightIndex < u_PointLightCount; pointLightIndex++)
     {
-        /**
+    /**
          * 从当前着色点p指向点光源位置的向量。
          *
          * lightVector = lightPosition - fragmentPosition
          */
         vec3 lightVector = u_PointLights[pointLightIndex].Position - v_WorldPosition;
 
-        /**
+    /**
          * r² = lightVector · lightVector
          *
          * 使用较小的下限，避免着色点恰好位于光源位置时除以0。
@@ -364,7 +405,7 @@ void main()
             0.0001
         );
 
-        /**
+    /**
          * l：从当前着色点指向点光源的单位方向。
          *
          * lightVector / length(lightVector)
@@ -373,7 +414,7 @@ void main()
          */
         vec3 pointLightDirection = lightVector * inversesqrt(distanceSquared);
 
-        /**
+    /**
          * GAMES101中的距离平方反比衰减：
          *
          * I / r²
@@ -383,7 +424,7 @@ void main()
         u_PointLights[pointLightIndex].Intensity /
         distanceSquared;
 
-        /**
+    /**
          * 当前点光源的l和I/r²已经计算完成，
          * 交给通用函数计算漫反射与镜面反射。
          */
@@ -399,9 +440,7 @@ void main()
         );
     }
 
-    color = vec4(ambient
-        + directionalLightContribution
-        + pointLightContribution,
-        albedoSample.a
-    );
+    vec3 linearColor = ambient + directionalLightContribution + pointLightContribution;
+
+    color = vec4(LinearToSRGB(linearColor), albedoSample.a);
 }

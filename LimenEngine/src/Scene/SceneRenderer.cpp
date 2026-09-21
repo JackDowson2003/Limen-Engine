@@ -379,14 +379,18 @@ namespace Limen
 
         m_ShadowRenderPass->End();
 
-        // 开始物理渲染阶段
+        // Shadow Pass结束后，开始向场景颜色目标渲染Main Pass。
         m_RenderPass->Begin();
 
         // begin 失败
         if (!m_RenderPass->IsActive())
             return;
 
-        constexpr uint32_t shadowMapTextureSlot = 1;
+        /*
+         * 当前Blinn-Phong Main Pass的材质纹理占用槽0（Albedo）
+         * 和槽1（Normal Map），因此Shadow Map使用槽2。
+         */
+        constexpr uint32_t shadowMapTextureSlot = 2;
 
         m_ShadowFramebuffer->BindDepthAttachment(shadowMapTextureSlot);
 
@@ -450,7 +454,7 @@ namespace Limen
          */
         Renderer::EndScene();
 
-        //结束物理渲染场景 完成 MSAA Resolve，解绑FBO
+        // 结束Main Pass，完成MSAA Resolve并解绑场景Framebuffer。
         m_RenderPass->End();
     }
 

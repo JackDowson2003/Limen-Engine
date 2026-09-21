@@ -18,8 +18,9 @@ namespace Limen
     /**
      * @brief Model中的一个材质槽定义。
      *
-     * 当前只保存源模型中的材质名称。
-     * 它不是Renderer使用的Material，也不拥有Shader或Pipeline。
+     * 保存源材质名称、Blinn-Phong参数和纹理文件路径。
+     * 它是CPU端描述，不是Renderer使用的Material，
+     * 也不拥有Shader、Pipeline或GPU纹理。
      */
     struct ModelMaterialSlot
     {
@@ -37,8 +38,6 @@ namespace Limen
 
         /**
          * @brief MTL的map_Kd漫反射纹理路径。
-         *
-
          * 空路径表示源材质没有指定纹理。
          */
         std::filesystem::path AlbedoTexturePath;
@@ -50,7 +49,6 @@ namespace Limen
          * 空路径表示源材质没有指定Normal Map。
          */
         std::filesystem::path NormalTexturePath;
-
 
         // MTL中的Ns：Blinn-Phong高光指数。
         float Shininess = 32.0f;
