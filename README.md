@@ -1,444 +1,624 @@
 # Limen Engine
 
-Limen Engine 是一个用于学习并逐步实现现代实时渲染架构的 C++20 游戏引擎项目。当前重点是建立清晰的 Application、Renderer、RHI、RenderPass、GraphicsPipeline 与 Editor 分层，并以 macOS OpenGL 4.1 后端验证设计；后续计划加入 macOS Metal 与 Windows Direct3D 11/12 后端。
+Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实时渲染研究项目。
 
-## 当前状态
+当前阶段以 macOS OpenGL 4.1 后端验证引擎分层、资源管线、光栅化和实时光照；中期重点是 HDR、PBR、glTF、IBL 和稳定实时阴影，之后再进入 Windows Direct3D 12、GPU Driven Rendering 与 NVIDIA DXR 混合实时光追。
 
-| 操作系统 | 图形 API | 状态 |
-| --- | --- | --- |
-| macOS | OpenGL 4.1 | 已实现，当前默认后端 |
-| macOS | Metal | 规划中 |
-| Windows | Direct3D 11 | 规划中 |
-| Windows | Direct3D 12 | 规划中 |
-| Linux | OpenGL / Vulkan | 规划中 |
-| iOS | Metal | 远期规划 |
-| Android | Vulkan | 远期规划 |
+本项目的近期目标不是一次性补齐商业引擎的所有模块，而是先形成一套架构清晰、结果可验证、性能可测量的渲染研究引擎，再逐步增加场景编辑与游戏运行时能力。
 
-当前 CMake 会在 Windows 与 Linux 配置阶段明确报错，因为这些平台后端尚未落地。`RendererAPI::API` 中的枚举表示架构预留，不等于对应后端已经可以构建。
+## 项目里程碑
 
-Windows 版本计划只支持 Direct3D 11/12，不提供 Windows OpenGL 后端；macOS 计划允许在 OpenGL 与 Metal 之间选择。
+项目按三个完成节点推进：
 
-## 获取与构建
+1. **Limen Renderer v1**
+   - HDR、Tone Mapping、Metallic-Roughness PBR；
+   - glTF/GLB、IBL 和稳定实时阴影；
+   - 自动化回归与 CPU/GPU Profiling。
+2. **Limen Game Engine v1**
+   - 可保存和加载的场景；
+   - 基础 Editor、脚本、动画、物理、音频与打包；
+   - 能够制作一个小型可玩 Demo。
+3. **Limen Research Engine v2**
+   - Windows Direct3D 12；
+   - GPU Driven、时域渲染；
+   - DXR 与混合实时光追。
+
+“完成引擎”在本仓库中指完成上述明确里程碑，不代表一次性达到 Unity、Unreal Engine 等商业引擎的功能规模。
+
+## 平台状态
+
+| 操作系统 | 图形 API | 当前状态 | 优先级 |
+| --- | --- | --- | --- |
+| macOS | OpenGL 4.1 | 已实现，当前唯一可运行后端 | 当前基线 |
+| Windows | Direct3D 12 | 尚未实现 | 后续主目标 |
+| macOS | Metal | 尚未实现 | 后续方向 |
+| Windows | Direct3D 11 | 只有枚举与路径预留 | 非当前主线 |
+| Linux | OpenGL / Vulkan | 尚未实现 | 远期方向 |
+| iOS / Android | Metal / Vulkan | 尚未实现 | 远期方向 |
+
+`RendererAPI::API` 中存在某个枚举，只表示公共架构预留，不表示对应后端已经可用。当前 CMake 会在 Windows 与 Linux 配置阶段主动报错，避免生成一个无法工作的工程。
+
+## 当前已经具备的能力
+
+### Application 与基础设施
+
+- Application 主循环、Window、Layer 与 Overlay；
+- 键盘、鼠标、窗口事件和跨平台键码接口；
+- 正交相机、透视相机与相机控制器；
+- 日志、断言、`DeltaTime`、`Scope` 与 `Ref`；
+- ImGui Dockspace、Scene Viewport、光源参数面板和 Shadow Map 调试显示；
+- 静态库、动态库与 Debug/Release CMake Preset；
+- Debug 模式下的 ASan 与 UBSan。
+
+### Renderer 与 RHI
+
+- 后端无关的 Buffer、VertexArray、Shader、Texture、UniformBuffer；
+- Framebuffer、颜色/深度附件、MSAA 与 Resolve；
+- RenderPass 的 Color/Depth/Stencil Load/Store 语义；
+- GraphicsPipeline 的拓扑、深度、混合、剔除和正面绕序状态；
+- Material 参数表与纹理绑定；
+- Mesh、局部 AABB 和索引绘制；
+- Renderer2D 批处理、纹理槽切换和自动 Flush；
+- SceneRenderer 组织 Shadow Pass 与 Main Pass；
+- 环境光、一个主平行光和最多四个点光源；
+- 第一版平行光硬阴影。
+
+### Asset、Model 与材质
+
+- Asset 根目录与逻辑路径解析；
+- Texture 和 Model 缓存；
+- 同一文件按 Linear 与 sRGB 分别缓存 GPU 纹理；
+- 默认白纹理与默认平坦法线纹理；
+- stb_image 图片解码和 Mipmap 生成；
+- OBJ/MTL 导入、多 Shape、多材质槽和 ModelPart；
+- 缺失法线生成、平滑组处理；
+- Tangent、Bitangent 手性和退化 UV 回退；
+- Mesh 与 Model 局部包围盒；
+- Albedo 与 Normal Map 的运行时 Material 构建；
+- 切线空间 Normal Mapping。
+
+### 当前颜色空间链路
+
+当前 3D 材质遵守以下约定：
+
+```text
+sRGB Albedo
+    ↓ GPU 纹理采样时自动解码
+Linear Albedo
+    ↓
+Linear 空间中的环境光、漫反射、镜面反射与阴影计算
+    ↓
+当前 Blinn-Phong Shader 手动执行 Linear → sRGB
+    ↓
+RGBA8 场景颜色附件 → MSAA Resolve → ImGui Viewport
+```
+
+- Albedo 等颜色纹理使用 `TextureColorSpace::SRGB`；
+- Normal、Roughness、Metallic 等数据纹理必须使用 `TextureColorSpace::Linear`；
+- Alpha 不参与 sRGB 转换；
+- 当前输出编码仍在 Blinn-Phong Shader 内，下一阶段会迁移到统一 PostProcess Pass。
+
+## 当前限制
+
+- 场景颜色附件仍是 `RGBA8`，尚无 `RGBA16F`、HDR、曝光和 Tone Mapping；
+- 没有统一全屏后处理阶段；
+- 阴影只有单平行光硬阴影，没有 PCF、CSM、Shadow Atlas 和点光阴影；
+- Scene 句柄仍是 `vector` 下标，不支持删除和 Generation；
+- 只支持 OBJ/MTL，不支持 glTF/GLB；
+- 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
+- 没有正式单元测试、CTest、截图回归和 GPU Profiler；
+- 当前 ImGui 面板是 Sandbox 调试界面，不是完整 Editor；
+- 没有场景序列化、脚本、动画、物理、音频和网络；
+- 旧的 `Texture2D::Create(path)` 与 AssetManager 路径仍然并存；
+- Direct3D 12 所需的显式命令、描述符、资源状态和同步模型尚未建立。
+
+## 获取、构建与运行
 
 ### 环境要求
 
+- macOS；
+- 安装在 `/Applications/Xcode.app` 的 Xcode 工具链；
 - CMake 4.0 或更高版本；
-- 支持 C++20 的编译器；
 - Ninja；
-- Git（用于初始化 submodule）；
-- macOS 当前需要可用的 OpenGL 4.1 与 Cocoa 窗口环境。
+- Git；
+- 支持 C++20 的 Clang；
+- 可用的 macOS OpenGL 4.1 Core Profile。
 
-初始化第三方 submodule：
+当前 Preset 硬编码了 Xcode 默认工具链路径，并带有 Darwin 条件，因此不能直接用于 Windows 或 Linux。
+
+### 第三方依赖现状
+
+| 依赖 | 用途 | 当前管理方式 |
+| --- | --- | --- |
+| GLAD | 加载 OpenGL 函数 | 仓库内普通源码 |
+| stb_image | 图片解码 | 仓库内普通源码 |
+| GLFW | 窗口、输入、Context | 已登记 Git submodule |
+| tinyobjloader | OBJ/MTL 解析 | 已登记 Git submodule |
+| GLM | 向量与矩阵 | 当前工作副本存在，但父仓库 gitlink 待修复 |
+| ImGui | 编辑器与调试 UI | 当前工作副本存在，但父仓库 gitlink 待修复 |
+| spdlog | 日志 | 当前工作副本存在，但父仓库 gitlink 待修复 |
+
+当前 `.gitmodules` 声明了五个 submodule，但 Git index 实际只登记了 GLFW 和 tinyobjloader。也就是说，在修复依赖元数据之前，全新 clone 只执行下面的命令不能保证恢复 GLM、ImGui 和 spdlog：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-配置并构建 macOS Debug 版本：
+这是当前构建基础设施的已知问题，已经列入最先执行的开发任务。`scripts/sub_module.sh` 和 `scripts/sub_module.cmd` 是历史初始化脚本，不是可靠替代方案，也不应在已有仓库中重复执行。
+
+### Debug 构建
+
+在依赖已经存在的当前工作副本中，从仓库根目录执行：
 
 ```bash
 cmake --preset ninja-debug
 cmake --build --preset build-debug
 ```
 
-运行：
+运行时必须让进程的工作目录位于 `out/`，因为当前 Asset 根目录是相对路径 `assets`：
 
 ```bash
+(cd out && ./LimenSandBox)
+```
+
+不要从仓库根目录直接执行：
+
+```text
 ./out/LimenSandBox
 ```
 
-构建目录、最终程序与开发期资源副本分别位于：
+这种写法不会改变进程工作目录，程序会错误地在仓库根目录寻找 `assets/`。
 
-```text
-out/cmake-build-debug-clang++/   # Ninja 构建树和 CMakeCache.txt
-out/LimenSandBox                 # 最终可执行文件
-out/assets/                      # POST_BUILD 复制的 Sandbox 资源
+### 日常增量构建
+
+修改 C++ 后：
+
+```bash
+cmake --build --preset build-debug
+(cd out && ./LimenSandBox)
 ```
 
-### 可用 Preset
+### Preset 与输出目录
 
-| 配置 | Configure Preset | Build Preset | 引擎类型 | Sanitizer |
-| --- | --- | --- | --- | --- |
-| Debug | `ninja-debug` | `build-debug` | Static | ASan + UBSan |
-| Shared Debug | `ninja-shared-debug` | `build-shared-debug` | Shared | ASan + UBSan |
-| Release | `ninja-release` | `build-release` | Static | 关闭 |
+| 配置 | Configure Preset | Build Preset | 构建树 | Engine 类型 | Sanitizer |
+| --- | --- | --- | --- | --- | --- |
+| Debug | `ninja-debug` | `build-debug` | `out/cmake-build-debug-clang17/` | Static | ASan + UBSan |
+| Shared Debug | `ninja-shared-debug` | `build-shared-debug` | `out/cmake-build-shared-debug-clang17/` | Shared | ASan + UBSan |
+| Release | `ninja-release` | `build-release` | `out/cmake-build-release-clang17/` | Static | 关闭 |
 
-`cmake --preset` 接收 Configure Preset；`cmake --build --preset` 接收 Build Preset，两者名称不能混用。
+三个配置最终都会输出到：
+
+```text
+out/LimenSandBox
+```
+
+因此最后一次构建的配置会覆盖之前的同名可执行文件。
+
+### 资源复制与工作目录
+
+`LimenSandBox/CMakeLists.txt` 中的正式 `POST_BUILD` 会依次执行：
+
+```text
+LimenEngine/assets    → out/assets
+LimenSandBox/assets   → out/assets
+```
+
+Engine 资源先复制，Sandbox 资源后复制，因此相同相对路径由 Sandbox 版本覆盖。
+
+只修改 Shader、纹理或模型时，CMake 可能判定可执行目标无需重新链接，从而不会再次执行 `POST_BUILD`。此时从仓库根目录手动刷新两套资源：
+
+```bash
+cmake -E copy_directory LimenEngine/assets out/assets
+cmake -E copy_directory LimenSandBox/assets out/assets
+(cd out && ./LimenSandBox)
+```
+
+`copy_directory` 不会删除目标目录中已经失去源文件的旧资源；如果发生资源重命名或删除，应额外检查 `out/assets` 是否残留旧文件。
+
+## 开发脚本
+
+正式构建入口是 CMake Preset。`scripts/` 当前包含辅助脚本和历史脚本：
+
+| 路径 | 实际用途 | 当前状态 |
+| --- | --- | --- |
+| `scripts/test-shared.sh` | 配置 Shared Debug、检查 `.dylib` 链接并运行数秒 | macOS 冒烟测试；不是 CTest 或画面回归 |
+| `scripts/POST_BUILD.sh` | 手动复制 Sandbox assets | 未被 CMake 调用；依赖调用目录；不复制 Engine assets |
+| `scripts/sub_module.sh` | 历史 submodule 添加命令 | 非幂等，路径与当前仓库不完全一致，不作为入口 |
+| `scripts/sub_module.cmd` | 历史 Windows 初始化尝试 | 当前语法与平台构建均不可用，不作为入口 |
+| `scripts/out/` | 本地生成残留目录 | 被忽略，不属于源码或正式构建输出 |
+
+Shared Library 冒烟测试当前应从 `out/` 工作目录启动，以保证运行时能够找到资源：
+
+```bash
+(cd out && LIMEN_SHARED_RUN_SECONDS=2 ../scripts/test-shared.sh)
+```
+
+该脚本要求 `cmake`、`ninja`、`otool` 和图形桌面会话。它验证动态库生成、链接和短时间进程存活，不证明画面、Shader 或渲染数学正确。
 
 ## 当前目录结构
 
+以下只列源码和配置目录，不列 `.idea`、`.DS_Store` 与其他本地生成文件：
+
 ```text
 Limen-Engine/
-├── CMakeLists.txt                       # 项目级标准、选项和统一编译策略
-├── CMakePresets.json                    # Debug/Release 构建入口
+├── AGENTS.md
+├── CMakeLists.txt
+├── CMakePresets.json
 ├── README.md
+├── scripts/
+│   ├── test-shared.sh
+│   ├── POST_BUILD.sh
+│   ├── sub_module.sh
+│   └── sub_module.cmd
 │
 ├── LimenEngine/
-│   ├── CMakeLists.txt                   # 引擎库、第三方目标与平台源文件边界
+│   ├── CMakeLists.txt
+│   ├── assets/
+│   │   └── shaders/OpenGL/
+│   │       ├── Renderer2D/
+│   │       └── Renderer3D/
 │   ├── include/
-│   │   ├── Limen.h                     # Sandbox 使用的公共聚合头
+│   │   ├── Limen.h
 │   │   └── Limen/
-│   │       ├── Application/            # Application、Window、LayerStack
-│   │       ├── Core/                   # Scope/Ref、日志、断言、DeltaTime
-│   │       ├── Events/                 # 窗口、键盘与鼠标事件
-│   │       ├── Input/                  # 跨平台输入查询与统一键码
-│   │       ├── Renderer/               # Camera、Renderer、RenderPass
-│   │       ├── RHI/                    # 公共 GPU 资源与 Pipeline 抽象
-│   │       ├── EntryPoint.h            # 客户端程序入口
-│   │       └── lmpch.h                 # 仅引擎内部使用的 PCH
+│   │       ├── Application/
+│   │       ├── Asset/
+│   │       ├── Core/
+│   │       ├── Events/
+│   │       ├── Input/
+│   │       ├── Math/
+│   │       ├── Renderer/
+│   │       ├── RHI/
+│   │       └── Scene/
 │   ├── src/
 │   │   ├── Application/
+│   │   ├── Asset/
 │   │   ├── Core/
-│   │   ├── Editor/ImGui/               # 引擎私有 ImGui Layer
-│   │   ├── Platform/
-│   │   │   ├── GLFW/                   # 输入查询与键码转换
-│   │   │   └── macOS/                  # MacWindow
-│   │   ├── Renderer/                   # 高层场景提交与 RenderPass 实现
-│   │   └── RHI/
-│   │       ├── Common/                 # 后端工厂与 API 无关实现
-│   │       └── macOS/OpenGL/           # 当前 OpenGL 后端实现
-│   └── vendor/                         # GLAD、GLFW、GLM、ImGui、spdlog、stb_image
+│   │   ├── Editor/ImGui/
+│   │   ├── Platform/{GLFW,macOS}/
+│   │   ├── Renderer/
+│   │   ├── RHI/{Common,macOS/OpenGL}/
+│   │   └── Scene/
+│   └── vendor/
+│       ├── glad/
+│       ├── glfw/
+│       ├── glm/
+│       ├── imgui/
+│       ├── spdlog/
+│       ├── stb_image/
+│       └── tinyobjloader/
 │
-└── LimenSandBox/
-    ├── CMakeLists.txt                   # 测试程序、资源复制和输出目录
-    ├── assets/
-    │   ├── shaders/OpenGL/             # 当前 GLSL Shader
-    │   └── textures/                   # 测试纹理
-    └── src/                            # 2D/3D 测试 Layer
+├── LimenSandBox/
+│   ├── CMakeLists.txt
+│   ├── assets/
+│   │   ├── models/
+│   │   ├── shaders/OpenGL/{Example2D,Example3D}/
+│   │   └── textures/
+│   └── src/
+│       ├── SandBoxApp.cpp
+│       ├── Example3DLayer.*
+│       ├── Renderer2DTestLayer.*
+│       ├── SandBox2D.*
+│       └── ParticleSystem.*
+│
+└── out/                              # CMake 构建树、程序与运行时资源
 ```
-
-项目当前没有独立的 `cmake/*.cmake` 辅助脚本；公共构建函数仍定义在根 `CMakeLists.txt` 中。等平台与工具链继续增加后，可以再把 warnings、sanitizers 和 platform selection 拆为独立模块。
 
 ## 架构分层
 
 ```text
-LimenSandBox / 游戏与编辑器客户端代码
-                    ↓
-Application + LayerStack + Event/Input
-                    ↓
-Renderer + RenderPass
-                    ↓
-RHI 公共资源、GraphicsPipeline、RendererAPI
-                    ↓
-macOS/OpenGL 后端
-                    ↓
-GLAD + OpenGL 4.1 + GLFW
+Application / Layer / Event / Input
+                ↓
+Scene / Camera / Light / Asset
+                ↓
+SceneRenderer / Renderer2D / Renderer
+                ↓
+RenderPass / Material / Mesh / GraphicsPipeline
+                ↓
+RHI 公共接口
+                ↓
+macOS OpenGL 4.1 后端
 ```
 
-### Application
-
-`Application` 管理进程与每帧生命周期：
-
-- 在 Window 与 GraphicsContext 创建前选择 `RendererAPI`；
-- 创建窗口并注册事件回调；
-- 初始化和关闭 Renderer；
-- 管理 `LayerStack` 与引擎私有 `ImGUILayer`；
-- 每帧执行 PollEvents、Layer Update、ImGui 和 Present；
-- 析构时先销毁 Layer 中的 GPU 资源，再销毁 Renderer 和 Window/Context。
-
-### Renderer
-
-`Renderer` 是客户端使用的高层提交入口：
-
-- `BeginScene()` 缓存本帧相机的 ViewProjection 与世界坐标；
-- `Submit()` 组合 Pipeline、几何体和 Model 矩阵，发出一次索引绘制；
-- `EndScene()` 结束逻辑提交区间；
-- `RendererCommand` 把即时命令转发给当前 `RendererAPI`。
-
-`Renderer` 不应包含 `gl*`、`ID3D12*` 或 Metal 原生类型。
-
-### RenderPass、Framebuffer 与 GraphicsPipeline
-
-| 对象 | 回答的问题 | 当前职责 |
+| 模块 | 当前职责 | 不负责什么 |
 | --- | --- | --- |
-| `RenderPass` | 画到哪里、何时开始和结束？ | Bind 目标、Clear、结束时 Resolve |
-| `Framebuffer` | 渲染结果保存在哪里？ | 颜色、深度/模板和 MSAA 附件 |
-| `GraphicsPipeline` | 使用什么规则绘制？ | Shader、深度、混合、剔除、绕序、Topology |
-| `VertexArray` | 绘制什么几何数据？ | 顶点缓冲、索引缓冲、顶点布局 |
-| `Texture2D` | 表面从哪里采样？ | 纹理资源与纹理槽绑定 |
+| `Scene` | 保存可渲染对象、Transform 和光源数据 | 不发出 GPU 命令 |
+| `SceneRenderer` | 组织 Shadow Pass、Main Pass 和场景提交 | 不解析模型文件 |
+| `Renderer` | 准备每帧、每视图、每物体数据并提交 Draw | 不拥有 Scene |
+| `RenderPass` | 描述目标、开始、清理、保存、Resolve 和结束 | 不定义材质外观 |
+| `Framebuffer` | 拥有颜色、深度和 MSAA 附件 | 不决定使用哪个 Shader |
+| `GraphicsPipeline` | 保存 Shader 和固定功能状态 | 不拥有几何资源 |
+| `Material` | 保存 Pipeline、材质参数和纹理绑定 | 不拥有场景 Transform |
+| `Mesh` | 拥有可绘制几何资源和局部 AABB | 不选择光照模型 |
+| `AssetManager` | 路径解析、加载、缓存和默认资源 | 不执行场景渲染 |
+| `RendererCommand / RendererAPI` | 转发跨后端渲染命令 | 不理解 Scene 或 Material |
 
-OpenGL 没有与 Direct3D 12 PSO 完全对应的单一对象，因此 `OpenGLGraphicsPipeline::Bind()` 会调用 `glUseProgram()`、`glEnable/glDisable()`、`glDepthFunc()`、`glBlendFunc()`、`glCullFace()` 和 `glFrontFace()`。未来 `DX12GraphicsPipeline` 会根据相同的公共规格创建并持有 `ID3D12PipelineState`。
+公共接口位于 `LimenEngine/include/Limen/`。OpenGL 原生类型和实现只允许出现在 `LimenEngine/src/RHI/macOS/OpenGL/` 等后端私有目录中。
 
-### RHI
+## Application 生命周期
 
-公共 RHI 接口位于 `LimenEngine/include/Limen/RHI`，后端工厂位于 `src/RHI/Common`，当前实现位于 `src/RHI/macOS/OpenGL`。
-
-```text
-公共抽象                    OpenGL 后端
-RendererAPI          →      OpenGLRendererAPI
-GraphicsPipeline     →      OpenGLGraphicsPipeline
-Framebuffer          →      OpenGLFramebuffer
-Shader               →      OpenGLShader
-VertexBuffer         →      OpenGLVertexBuffer
-IndexBuffer          →      OpenGLIndexBuffer
-VertexArray          →      OpenGLVertexArray
-Texture2D            →      OpenGLTexture2D
-UniformBuffer        →      OpenGLUniformBuffer
-GraphicsContext      →      OpenGLContext
-```
-
-客户端只依赖公共抽象；`OpenGL*` 头文件位于 `src`，属于引擎私有实现。
-
-### Shader 路径
-
-客户端传入不带后端目录和扩展名的逻辑路径：
-
-```cpp
-m_ShaderLibrary->Load("Example3D/BlinnPhong");
-```
-
-`ShaderLibrary` 根据当前 API 解析为实际文件：
+初始化顺序：
 
 ```text
-OpenGL    → assets/shaders/OpenGL/Example3D/BlinnPhong.vert/.frag
-DX11      → assets/shaders/DirectX11/Example3D/BlinnPhong.vs/.ps.hlsl
-DX12      → assets/shaders/DirectX12/Example3D/BlinnPhong.vs/.ps.hlsl
-Metal     → assets/shaders/Metal/Example3D/BlinnPhong.vert/.frag.metal
-Vulkan    → assets/shaders/Vulkan/Example3D/BlinnPhong.vert/.frag.glsl
+选择 RendererAPI
+    ↓
+Window + GraphicsContext
+    ↓
+Renderer::Init
+    ↓
+AssetManager::Init
+    ↓
+创建 Layer 与其 GPU 资源
 ```
 
-目前只有 OpenGL 文件实际存在，其他路径是后续后端约定。
+销毁顺序：
 
-## 当前整体流程图
+```text
+销毁 Layer
+    ↓
+AssetManager::Shutdown
+    ↓
+Renderer::Shutdown
+    ↓
+销毁 Window + GraphicsContext
+```
+
+GPU 资源必须在 GraphicsContext 销毁前释放。
+
+## 当前 3D 帧流程
 
 ```mermaid
 flowchart TD
-    A[EntryPoint main] --> B[CreateApplication]
-    B --> C[SandBoxApp 选择 OpenGL]
-    C --> D[Application 创建 MacWindow]
-    D --> E[GraphicsContext 工厂创建 OpenGLContext]
-    E --> F[glfwMakeContextCurrent + gladLoadGL 创建上下文并加载函数]
-    F --> G[Renderer::Init]
-    G --> H[RendererCommand 创建 OpenGLRendererAPI]
-    H --> I[创建 Example3DLayer 资源]
-    I --> I1[ShaderLibrary 加载 BlinnPhong]
-    I1 --> I2[GraphicsPipeline 工厂创建 OpenGLGraphicsPipeline]
-    I2 --> I3[Framebuffer + RenderPass + Cube VAO/Texture]
-
-    I3 --> J{Application 每帧}
-    J --> K[Window::PollEvents]
-    K --> L[Example3DLayer::OnUpdate]
-    L --> M[CameraController 更新 View/Projection]
-    M --> N[RenderPass::Begin]
-    N --> N1[绑定 Scene FBO + 设置 Viewport + Clear]
-    N1 --> O[Renderer::BeginScene 缓存相机数据]
-    O --> P[Renderer::Submit]
-    P --> P1[Pipeline::Bind: Shader/Depth/Blend/Cull]
-    P1 --> P2[上传 ViewProjection/Model/CameraPosition]
-    P2 --> P3[绑定 VAO + RendererCommand::DrawIndexed]
-    P3 --> P4[OpenGLRendererAPI → glDrawElements]
-    P4 --> Q[GPU 写入 MSAA Scene Framebuffer]
-    Q --> R[Renderer::EndScene]
-    R --> S[RenderPass::End]
-    S --> S1[解绑 FBO + MSAA Resolve 到普通颜色纹理]
-    S1 --> T[清理窗口默认 Framebuffer]
-    T --> U[ImGUILayer::Begin]
-    U --> V[OnImGuiRender 用 ImGui::Image 显示 Scene 纹理]
-    V --> W[ImGUILayer::End]
-    W --> X[Window::Present]
-    X --> J
+    A[Application PollEvents] --> B[Example3DLayer 更新 Camera 与 Transform]
+    B --> C[SceneRenderer Render]
+    C --> D[计算主平行光 ViewProjection]
+    D --> E[Shadow RenderPass]
+    E --> F[遍历 SceneRenderObject]
+    F --> G[Renderer SubmitDepth]
+    G --> H[生成 Depth32F Shadow Map]
+    H --> I[Main RenderPass]
+    I --> J[Renderer BeginScene 上传 Camera 与 Lights]
+    J --> K[Material Bind 参数与纹理]
+    K --> L[Renderer Submit Mesh 与 Transform]
+    L --> M[Linear 光照与 Shadow Map 采样]
+    M --> N[当前 Shader 执行 Linear 转 sRGB]
+    N --> O[MSAA Resolve]
+    O --> P[ImGui Scene Viewport]
+    P --> Q[Present]
 ```
 
-### 一次 3D Draw Call 的调用链
-
-```text
-Example3DLayer
-  Renderer::Submit(pipeline, vertexArray, model)
-    ├── pipeline.Bind()
-    │     ├── glUseProgram
-    │     ├── glEnable(GL_DEPTH_TEST)
-    │     ├── glDepthFunc(GL_LESS)
-    │     ├── glDepthMask(GL_TRUE)
-    │     ├── glDisable(GL_BLEND)
-    │     ├── glCullFace(GL_BACK)
-    │     └── glFrontFace(GL_CCW)
-    ├── Shader::SetMat4 / SetFloat3
-    ├── VertexArray::Bind
-    └── RendererCommand::DrawIndexed(TriangleList)
-          └── OpenGLRendererAPI::DrawIndexed
-                └── glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr)
-```
-
-## CMake 文件及其关系
-
-项目当前有三份 `CMakeLists.txt` 和一份 `CMakePresets.json`：
+## CMake 目标关系
 
 ```mermaid
 flowchart TD
     P[CMakePresets.json] --> R[根 CMakeLists.txt]
-    R --> E[LimenEngine/CMakeLists.txt]
-    R --> S[LimenSandBox/CMakeLists.txt]
-    E --> ET[LimenEngine 目标]
+    R --> E[LimenEngine CMakeLists]
+    R --> S[LimenSandBox CMakeLists]
+    E --> ET[LimenEngine]
     E --> G[glad]
     E --> F[glfw]
-    E --> M[glm::glm]
+    E --> M[glm]
     E --> I[imgui]
     E --> STB[stb_image]
-    I --> F
-    I --> G
-    ET --> F
-    ET --> G
-    ET --> I
-    ET --> STB
-    ET --> M
-    S --> APP[LimenSandBox 目标]
+    E --> OBJ[tinyobjloader]
+    S --> APP[LimenSandBox]
     APP --> ET
     APP --> I
-    APP --> COPY[POST_BUILD 复制 assets]
+    APP --> COPY[合并 Engine 与 Sandbox assets]
 ```
 
-### 1. 根 `CMakeLists.txt`
+- 根 `CMakeLists.txt` 统一设置 C++20、警告、Sanitizer 和静态/动态库选项；
+- `LimenEngine/CMakeLists.txt` 收集 Application、Asset、Renderer、Scene、RHI 与平台后端；
+- `LimenSandBox/CMakeLists.txt` 构建测试程序并部署运行时资源；
+- PCH 只属于 LimenEngine 私有编译优化，公共头文件仍必须自包含。
 
-根文件定义整个仓库共同遵守的构建策略。
+## 开发执行顺序
 
-| 配置                           | 作用                                       | 与子目录的联系                        |
-|--------------------------------|--------------------------------------------|---------------------------------------|
-| `cmake_minimum_required(4.0)`  | 固定需要的 CMake 能力                      | 所有子目录继承                        |
-| `project(... LANGUAGES C CXX)` | 建立 C/C++ 工程                            | GLAD 使用 C，Engine 使用 C++          |
-| `CMAKE_CXX_STANDARD 20`        | 要求标准 C++20 且关闭编译器扩展            | Engine 与 Sandbox 都继承              |
-| `CMAKE_MSVC_RUNTIME_LIBRARY`   | 统一 Windows CRT，Debug `/MDd`、其他 `/MD` | 为未来 DLL/EXE 避免 CRT 不一致        |
-| `LIMEN_WARNINGS_AS_ERRORS`     | 可选地把警告提升为错误                     | 由统一函数应用到两个自有目标          |
-| `LIMEN_ENABLE_SANITIZERS`      | Debug 下启用 ASan/UBSan                    | Preset 控制，应用到 Engine/Sandbox    |
-| `LIMEN_ENGINE_SHARED`          | 选择静态或共享引擎库                       | Engine 子目录读取该选项               |
-| `limen_configure_target()`     | 统一 MSVC/Clang/GCC 警告与 Sanitizer       | Engine 与 Sandbox 分别调用            |
-| `add_subdirectory()`           | 进入两个子项目                             | 先定义 Engine，再定义依赖它的 Sandbox |
+测试与 Profiling 不是最后补充的独立阶段，而是从当前基线开始持续伴随所有后续功能。
 
-### 2. `LimenEngine/CMakeLists.txt`
+```mermaid
+flowchart LR
+    A[修复依赖与构建可复现性] --> B[收尾当前 sRGB 与模型链路]
+    B --> C[测试与 Profiling 基线]
+    C --> D[HDR + PostProcess + Tone Mapping]
+    D --> E[PBR Metallic-Roughness]
+    E --> F[glTF/GLB + IBL]
+    F --> G[PCF + CSM + Shadow Atlas]
+    G --> H[G-Buffer + Motion Vector + TAA]
+    H --> I[Windows + Direct3D 12]
+    I --> J[DXR 混合实时光追]
 
-该文件负责构建引擎库以及引擎直接使用的第三方目标。
-
-#### 源文件分组
-
-`LIMEN_ENGINE_COMMON_SOURCES` 收集平台无关代码：
-
-```text
-Core
-Application
-Renderer
-RHI/Common
-Editor/ImGui
+    C --> K[Entity + 序列化 + AssetID]
+    K --> L[正式 Editor]
+    L --> M[脚本 + 动画 + 物理 + 音频]
+    M --> N[打包小型可玩 Demo]
 ```
 
-macOS 分支额外收集：
+### 阶段 0A：修复仓库基线
 
-```text
-Platform/GLFW
-Platform/macOS
-RHI/macOS/OpenGL
-```
+1. 修复 GLM、ImGui、spdlog 的 gitlink 与 `.gitmodules` 一致性；
+2. 删除或重写失效的 submodule 初始化脚本；
+3. 让资源同步脚本自定位仓库根目录，并统一复制 Engine/Sandbox assets；
+4. 保证全新 clone 能通过文档命令构建。
 
-这保证未来 Windows 构建不会意外编译 macOS/OpenGL 实现。Windows 与 Linux 后端尚未实现，因此当前通过 `message(FATAL_ERROR)` 在配置阶段停止。
+### 阶段 0B：收尾当前渲染改动
 
-`GLOB_RECURSE ... CONFIGURE_DEPENDS` 会在新增匹配文件时请求 CMake 重新配置。它适合当前学习阶段；如果以后需要严格控制大型项目的源文件清单，可以改为显式列表或模块级 `target_sources()`。
+1. 构建并运行当前 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；
+2. 验证同一路径的 Linear/sRGB 两份纹理缓存；
+3. 验证 Albedo 使用 sRGB，Normal Map 保持 Linear；
+4. 迁移剩余 `Texture2D::Create(path)` 调用后再删除旧加载路径；
+5. 建立固定测试场景和视觉基线；
+6. 完成稳定检查点后再开始 HDR。
 
-#### 引擎库类型
+### 阶段 1：验证基础设施
 
-```text
-LIMEN_ENGINE_SHARED=OFF → STATIC（默认）
-LIMEN_ENGINE_SHARED=ON  → SHARED
-```
+1. 为 AABB、法线、切线和路径解析建立 CPU 单元测试；
+2. 增加 Shader 编译失败检查；
+3. 增加带容差的截图回归；
+4. 增加 OpenGL Debug Callback、CPU 帧时间与 GPU Timer Query；
+5. 修复只修改资源时部署不更新的问题。
 
-共享模式通过 `LIMEN_ENGINE_SHARED`、`LM_BUILD_DLL` 和 `LIMEN_API` 区分导出方与使用方；静态模式定义 `LIMEN_ENGINE_STATIC`。
+### 阶段 2：HDR 与统一后处理
 
-#### PCH
+1. 扩展 Texture/Framebuffer 格式，增加 `RGBA16F`；
+2. Main Pass 输出 Linear HDR；
+3. 由 `SceneRenderer` 组织独立全屏 PostProcess Pass；
+4. 加入 Exposure 与 Tone Mapping；
+5. 在最终输出位置执行唯一一次 Linear → sRGB；
+6. 删除 Blinn-Phong Shader 内的临时输出编码。
 
-`target_precompile_headers(LimenEngine PRIVATE lmpch.h)` 只加速引擎自身翻译单元。它不传播给 Sandbox，公共头文件仍必须显式包含自己使用的标准库、GLM 和 Limen 类型。
+### 阶段 3：PBR Metallic-Roughness
 
-#### 第三方目标
+1. 定义 Base Color、Metallic、Roughness、Normal、AO、Emissive 语义；
+2. 明确每种纹理的颜色空间与默认纹理；
+3. 实现 Cook-Torrance BRDF；
+4. 建立标准材质球测试场景；
+5. 保留 Blinn-Phong 作为教学和回归对照，而不是直接删除。
 
-| 目标        | 类型/来源              | 用途                              | 主要依赖关系                                            |
-|-------------|------------------------|-----------------------------------|---------------------------------------------------------|
-| `glad`      | 本地静态库             | 加载 OpenGL 函数地址              | Engine、ImGui OpenGL3 backend                           |
-| `glfw`      | submodule              | 窗口、输入、OpenGL Context        | Engine、ImGui GLFW backend                              |
-| `glm::glm`  | submodule/CMake target | 向量、矩阵、变换                  | `PUBLIC` 链接给 Engine 客户端                           |
-| `imgui`     | 本地静态库             | 编辑器 UI 与 GLFW/OpenGL3 backend | 私有依赖 `glfw`、`glad`                                 |
-| `stb_image` | 本地静态库             | 图片解码                          | Engine Texture 实现                                     |
-| `spdlog`    | Header-only include    | 日志                              | `Log.h` 暴露其类型，因此 include 路径为 `SYSTEM PUBLIC` |
+### 阶段 4：glTF/GLB 与 IBL
 
-#### Include 边界
+1. 选择只负责解析的 glTF 第三方库；
+2. 转换为 Limen 自有 Model、Mesh、Material 和 Texture；
+3. 支持节点层级、PBR 材质和切线数据；
+4. 加入环境贴图、Diffuse Irradiance、Prefilter 与 BRDF LUT；
+5. 使用公开标准 glTF 测试模型验证。
 
-```text
-PUBLIC  LimenEngine/include    → Sandbox 可以包含稳定公共接口
-PRIVATE LimenEngine/src        → 只有引擎能包含 OpenGL、MacWindow 等实现头
-SYSTEM PUBLIC spdlog/include   → 公共 Log.h 可用，同时抑制第三方警告
-```
+### 阶段 5：阴影升级
 
-### 3. `LimenSandBox/CMakeLists.txt`
+1. PCF；
+2. 稳定的平行光阴影范围；
+3. Cascaded Shadow Maps；
+4. Shadow Atlas 与多光源阴影预算；
+5. 根据需求增加点光与聚光阴影。
 
-该文件负责测试程序：
+### 阶段 6：Scene、资源与序列化
 
-- 将 `SandBoxApp.cpp`、`Example3DLayer.cpp`、`SandBox2D.cpp` 编译为 `LimenSandBox`；
-- 私有链接 `LimenEngine`；
-- 因 Sandbox 自己调用 `ImGui::*`，额外私有链接 `imgui`；
-- 调用 `limen_configure_target()`，使用与引擎一致的警告和 Sanitizer；
-- 把最终程序统一输出到仓库根目录 `out/`；
-- 构建完成后，把 `LimenSandBox/assets` 复制到程序旁的 `out/assets`。
+1. Generation Handle 与安全删除；
+2. Entity、Transform 层级和 Render/Camera/Light 组织；
+3. 场景序列化与反序列化；
+4. AssetID、Registry、依赖关系和热重载基础；
+5. 先保持最小数据模型，不提前引入复杂 ECS 和 Job System。
 
-当前 `copy_directory` 是开发期方案，便于从 IDE 或终端直接启动。正式大型项目不会在每次构建时复制全部 AAA 资源，而会使用资源根目录、增量 Cooker、Asset Registry 与 Pak/Archive 包。
+### 阶段 7：正式 Editor
 
-### 4. `CMakePresets.json`
+1. Hierarchy；
+2. Inspector；
+3. Content Browser；
+4. Picking 与 Transform Gizmo；
+5. Undo/Redo；
+6. Edit/Play 状态。
 
-Preset 只保存“如何调用根 CMake”的常用参数，不创建新目标：
+### 阶段 8：可玩运行时
 
-```text
-Configure Preset
-    决定 Generator、binaryDir、Debug/Release 和项目选项
-                ↓
-根 CMakeLists.txt
-                ↓
-Engine/Sandbox 子目录定义目标
-                ↓
-Build Preset
-    选择已配置构建树中的 LimenSandBox 目标进行编译
-```
+1. 输入映射；
+2. Prefab；
+3. 脚本；
+4. 骨骼动画；
+5. 基础物理；
+6. 音频；
+7. 简单游戏 UI；
+8. 资源打包与可发布 Demo。
 
-## PUBLIC、PRIVATE 与目标传播
+### 阶段 9：现代实时渲染
 
-CMake 的可见性决定依赖是否继续传给下游目标：
+1. G-Buffer 与 Deferred/Hybrid 路径；
+2. Motion Vector；
+3. TAA；
+4. Frustum/Occlusion Culling；
+5. GPU Profiling；
+6. GPU Driven Rendering；
+7. Pass 数量和资源依赖足够复杂后，再评估 Render Graph。
 
-| 关键字      | 当前目标使用 | 依赖当前目标的下游使用 |
-|-------------|--------------|------------------------|
-| `PRIVATE`   | 是           | 否                     |
-| `PUBLIC`    | 是           | 是                     |
-| `INTERFACE` | 否           | 是                     |
+### 阶段 10：Windows Direct3D 12
 
-例如 `glm::glm` 使用 `PUBLIC`，因为 `Camera.h`、`Shader.h` 等公共头文件出现了 GLM 类型；`glad` 使用 `PRIVATE`，因为 `glad/gl.h` 只应出现在 OpenGL 后端实现中。
+1. Windows 构建与 Window/SwapChain；
+2. Device、Queue、Command Allocator/List；
+3. Fence 与 Frames in Flight；
+4. RTV、DSV、SRV、CBV Descriptor；
+5. Resource State 与 Barrier；
+6. Upload Heap 与资源生命周期；
+7. DXC、HLSL、Root Signature 与 PSO；
+8. 按清屏、三角形、Main Pass、Shadow、PBR、Renderer2D 顺序与 OpenGL 对齐。
 
-## 资源与工作目录
+### 阶段 11：DXR 与混合实时光追
 
-Shader 与 Texture 当前通过相对路径读取，因此运行目录必须能找到 `assets/`。CMake 的 `POST_BUILD copy_directory` 把资源放到 `out/assets`，从 `out/LimenSandBox` 所在目录启动时即可访问：
+1. BLAS/TLAS；
+2. Raytracing Pipeline；
+3. Shader Table；
+4. 光追阴影或反射的第一个混合效果；
+5. 时域累积与降噪；
+6. 后续研究 ReSTIR、混合 GI 和多光源预算。
 
-```text
-assets/shaders/OpenGL/Example3D/BlinnPhong.vert
-assets/shaders/OpenGL/Example3D/BlinnPhong.frag
-assets/textures/checkerboard.png
-```
+## 时间估算
 
-后续 AssetManager 应负责统一资源根目录、路径规范化、缓存、热重载与打包，业务代码不应长期依赖当前工作目录。
+下面按单人、边学习边实现估算。一个“有效开发日”按约 5 小时专注工作计算，包含设计、编码、调试、验证和文档。
 
-## 公共与私有头文件规则
+| 阶段                              | 可验证第一版 |         稳定可复用版本 |
+|-----------------------------------|-------------:|-----------------------:|
+| 0A. 依赖与脚本可复现性            |   0.5–1.5 天 |                 2–3 天 |
+| 0B. 当前 sRGB、Normal、OBJ 收尾   |       1–2 天 |                 3–5 天 |
+| 1. 测试与 Profiling 基线          |       3–6 天 |                 2–3 周 |
+| 2. HDR、PostProcess、Tone Mapping |       4–8 天 |                 2–3 周 |
+| 3. Metallic-Roughness PBR         |      8–15 天 |                 3–5 周 |
+| 4. glTF/GLB 与 IBL                |     10–20 天 |               1–2 个月 |
+| 5. PCF、CSM、Shadow Atlas         |     12–25 天 |               2–4 个月 |
+| 6. Entity、序列化、AssetID        |     15–30 天 |               2–3 个月 |
+| 7. 正式 Editor                    |     20–40 天 |               3–6 个月 |
+| 8. 脚本、动画、物理、音频、打包   |     35–70 天 |              6–12 个月 |
+| 9. G-Buffer、TAA、GPU Driven      |     30–60 天 |               4–8 个月 |
+| 10. Windows Direct3D 12           |     40–80 天 |              6–12 个月 |
+| 11. DXR 与混合实时光追            |     30–70 天 | 持续研究，约 6–18 个月 |
 
-`LimenEngine/include/Limen` 是公共 API，Sandbox 可以包含。`LimenEngine/src` 中的头文件是私有实现，原则上只允许引擎自身包含。
+这些区间不是交付承诺。图形错误定位、平台驱动差异、第三方库选择和功能范围变化都可能显著影响时间；稳定版本中的测试、Profiling 和工具建设也会与后续阶段重叠，不应简单机械相加。
 
-公共头文件必须自包含。例如使用 `std::vector` 就必须自己 `#include <vector>`，不能依赖 PCH 或另一个头文件偶然包含。
+大致日历时间：
 
-## 当前限制与下一步
+| 里程碑                   |     全职开发 | 每天约 2–3 小时 |
+|--------------------------|-------------:|----------------:|
+| Limen Renderer v1        |  约 3–5 个月 |    约 6–12 个月 |
+| Limen Game Engine v1     | 约 8–15 个月 |     约 1.5–3 年 |
+| Limen Research Engine v2 |  约 1.5–3 年 |       约 3–5 年 |
 
-当前已经具备：
+## 当前最先执行的清单
 
-- Application、Layer、Event、Input 与相机控制器；
-- OpenGL Buffer、VertexArray、Shader、Texture2D、UniformBuffer；
-- Framebuffer、深度/模板附件与 MSAA Resolve；
-- RenderPass 作用域；
-- GraphicsPipeline 的深度、混合、剔除、绕序和拓扑状态；
-- 3D Blinn-Phong 测试与 ImGui Scene Viewport
-- Shader Map :实时渲染无法像离线渲染那样追踪每条光线，所以做法是阴影贴图（Shadow Mapping）
+在增加新渲染效果前，按以下顺序执行：
 
-后续顺序：
+1. 修复依赖 gitlink 与 submodule 初始化流程；
+2. 整理或替换 `scripts/` 中失效、依赖工作目录的脚本；
+3. 完成当前工作区的 Debug 构建和运行验证；
+4. 验证 Linear/sRGB 双缓存和纹理语义；
+5. 建立最小颜色空间与 Normal Mapping 回归场景；
+6. 迁移剩余旧纹理加载入口；
+7. 建立测试与 GPU 调试基线；
+8. 设计 `RGBA16F` 附件和 PostProcess 所有权；
+9. 实现 HDR Main Pass；
+10. 实现 Tone Mapping，并把最终 sRGB 编码集中到 PostProcess。
 
-1. 把 2D 示例也迁移到 GraphicsPipeline，删除旧的 Shader 直接 Submit；
-2. 为 RenderPass 增加 Load/Store Operation 与附件规格；
-3. 引入 Material，把纹理与材质参数从测试 Layer 中抽离；
-4. 引入 Mesh、Scene 与 SceneRenderer；
-5. 增加 Pipeline/Shader 缓存与 GPU Debug Marker；
-6. 再实现 Metal 或 Windows Direct3D 12 后端。
+在这十项完成前，不提前进入 PBR、DX12 或 DXR。
+
+## 暂不阻塞当前主线的功能
+
+以下功能有价值，但不是 Limen Renderer v1 的前置条件：
+
+- 网络与多人同步；
+- 大型通用 ECS；
+- 复杂 Job System；
+- Linux/Vulkan、移动端；
+- Virtual Shadow Maps；
+- ReSTIR、Path Tracing 和神经渲染。
+
+它们应在真实瓶颈和研究目标出现后再立项，而不是提前加入当前架构。
+
+## 协作与代码边界
+
+仓库协作、教学顺序、代码修改授权和架构约束见 [`AGENTS.md`](AGENTS.md)。核心原则包括：
+
+- `Scene` 只保存数据；
+- `SceneRenderer` 组织场景 Pass；
+- Renderer 与公共 RHI 不暴露 OpenGL、Direct3D 12 或 Metal 原生类型；
+- 第三方解析库只负责解析，最终转换成 Limen 自有资源；
+- GPU Context 销毁前必须先释放所有 GPU 资源；
+- 每个新功能都需要编译验证、最小测试场景和明确的预期结果。
+
+## License
+
+本项目使用 Apache License 2.0，详见 [`LICENSE`](LICENSE)。
