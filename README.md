@@ -126,25 +126,27 @@ RGBA8 场景颜色附件 → MSAA Resolve → ImGui Viewport
 
 当前 Preset 硬编码了 Xcode 默认工具链路径，并带有 Darwin 条件，因此不能直接用于 Windows 或 Linux。
 
-### 第三方依赖现状
+### 第三方依赖约定
 
-| 依赖 | 用途 | 当前管理方式 |
-| --- | --- | --- |
-| GLAD | 加载 OpenGL 函数 | 仓库内普通源码 |
-| stb_image | 图片解码 | 仓库内普通源码 |
-| GLFW | 窗口、输入、Context | 已登记 Git submodule |
-| tinyobjloader | OBJ/MTL 解析 | 已登记 Git submodule |
-| GLM | 向量与矩阵 | 当前工作副本存在，但父仓库 gitlink 待修复 |
-| ImGui | 编辑器与调试 UI | 当前工作副本存在，但父仓库 gitlink 待修复 |
-| spdlog | 日志 | 当前工作副本存在，但父仓库 gitlink 待修复 |
+| 依赖          | 用途                | 当前管理方式                                          |
+|---------------|---------------------|-------------------------------------------------------|
+| GLAD          | 加载 OpenGL 函数    | 仓库内普通源码                                        |
+| stb_image     | 图片解码            | 仓库内普通源码                                        |
+| GLFW          | 窗口、输入、Context | 当前由父仓库登记的既有 submodule                      |
+| tinyobjloader | OBJ/MTL 解析        | 当前由父仓库登记的既有 submodule                      |
+| GLM           | 向量与矩阵          | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
+| ImGui         | 编辑器与调试 UI     | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
+| spdlog        | 日志                | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
 
-当前 `.gitmodules` 声明了五个 submodule，但 Git index 实际只登记了 GLFW 和 tinyobjloader。也就是说，在修复依赖元数据之前，全新 clone 只执行下面的命令不能保证恢复 GLM、ImGui 和 spdlog：
+`.gitmodules` 由 CLion 生成和维护，不手动编辑。GLM、ImGui、spdlog 以及后续新增的第三方库保留各自的外部依赖目录或仓库，不要求重新登记为 Limen Engine 父仓库的 gitlink。
+
+因此，准备第三方依赖属于本地开发环境的前置步骤，而不是引擎功能路线中的“仓库修复”任务。全新 clone 后，应先通过既有的 CLion/本地依赖流程准备所需库；仅执行下面的命令不保证恢复所有依赖：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-这是当前构建基础设施的已知问题，已经列入最先执行的开发任务。`scripts/sub_module.sh` 和 `scripts/sub_module.cmd` 是历史初始化脚本，不是可靠替代方案，也不应在已有仓库中重复执行。
+`scripts/sub_module.sh` 和 `scripts/sub_module.cmd` 是历史初始化脚本，不是当前标准入口，也不应在已有仓库中重复执行。
 
 ### Debug 构建
 
@@ -417,30 +419,22 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[修复依赖与构建可复现性] --> B[收尾当前 sRGB 与模型链路]
-    B --> C[测试与 Profiling 基线]
-    C --> D[HDR + PostProcess + Tone Mapping]
-    D --> E[PBR Metallic-Roughness]
-    E --> F[glTF/GLB + IBL]
-    F --> G[PCF + CSM + Shadow Atlas]
-    G --> H[G-Buffer + Motion Vector + TAA]
-    H --> I[Windows + Direct3D 12]
-    I --> J[DXR 混合实时光追]
+    A[收尾当前 sRGB 与模型链路] --> B[测试与 Profiling 基线]
+    B --> C[HDR + PostProcess + Tone Mapping]
+    C --> D[PBR Metallic-Roughness]
+    D --> E[glTF/GLB + IBL]
+    E --> F[PCF + CSM + Shadow Atlas]
+    F --> G[G-Buffer + Motion Vector + TAA]
+    G --> H[Windows + Direct3D 12]
+    H --> I[DXR 混合实时光追]
 
-    C --> K[Entity + 序列化 + AssetID]
-    K --> L[正式 Editor]
-    L --> M[脚本 + 动画 + 物理 + 音频]
-    M --> N[打包小型可玩 Demo]
+    B --> J[Entity + 序列化 + AssetID]
+    J --> K[正式 Editor]
+    K --> L[脚本 + 动画 + 物理 + 音频]
+    L --> M[打包小型可玩 Demo]
 ```
 
-### 阶段 0A：修复仓库基线
-
-1. 修复 GLM、ImGui、spdlog 的 gitlink 与 `.gitmodules` 一致性；
-2. 删除或重写失效的 submodule 初始化脚本；
-3. 让资源同步脚本自定位仓库根目录，并统一复制 Engine/Sandbox assets；
-4. 保证全新 clone 能通过文档命令构建。
-
-### 阶段 0B：收尾当前渲染改动
+### 阶段 0：收尾当前渲染改动
 
 1. 构建并运行当前 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；
 2. 验证同一路径的 Linear/sRGB 两份纹理缓存；
@@ -554,8 +548,7 @@ flowchart LR
 
 | 阶段                              | 可验证第一版 |         稳定可复用版本 |
 |-----------------------------------|-------------:|-----------------------:|
-| 0A. 依赖与脚本可复现性            |   0.5–1.5 天 |                 2–3 天 |
-| 0B. 当前 sRGB、Normal、OBJ 收尾   |       1–2 天 |                 3–5 天 |
+| 0. 当前 sRGB、Normal、OBJ 收尾    |       1–2 天 |                 3–5 天 |
 | 1. 测试与 Profiling 基线          |       3–6 天 |                 2–3 周 |
 | 2. HDR、PostProcess、Tone Mapping |       4–8 天 |                 2–3 周 |
 | 3. Metallic-Roughness PBR         |      8–15 天 |                 3–5 周 |
@@ -582,18 +575,16 @@ flowchart LR
 
 在增加新渲染效果前，按以下顺序执行：
 
-1. 修复依赖 gitlink 与 submodule 初始化流程；
-2. 整理或替换 `scripts/` 中失效、依赖工作目录的脚本；
-3. 完成当前工作区的 Debug 构建和运行验证；
-4. 验证 Linear/sRGB 双缓存和纹理语义；
-5. 建立最小颜色空间与 Normal Mapping 回归场景；
-6. 迁移剩余旧纹理加载入口；
-7. 建立测试与 GPU 调试基线；
-8. 设计 `RGBA16F` 附件和 PostProcess 所有权；
-9. 实现 HDR Main Pass；
-10. 实现 Tone Mapping，并把最终 sRGB 编码集中到 PostProcess。
+1. 完成当前工作区的 Debug 构建和运行验证；
+2. 验证 Linear/sRGB 双缓存和纹理语义；
+3. 建立最小颜色空间与 Normal Mapping 回归场景；
+4. 迁移剩余旧纹理加载入口；
+5. 建立测试与 GPU 调试基线；
+6. 设计 `RGBA16F` 附件和 PostProcess 所有权；
+7. 实现 HDR Main Pass；
+8. 实现 Tone Mapping，并把最终 sRGB 编码集中到 PostProcess。
 
-在这十项完成前，不提前进入 PBR、DX12 或 DXR。
+在这八项完成前，不提前进入 PBR、DX12 或 DXR。
 
 ## 暂不阻塞当前主线的功能
 
