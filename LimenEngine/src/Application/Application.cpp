@@ -2,6 +2,7 @@
 // Created by chenlong on 2026/8/5.
 //
 
+#include <chrono>
 
 #include "Limen/Application/Application.h"
 #include "Limen/Events/ApplicationEvent.h"
@@ -74,6 +75,10 @@ namespace Limen
             if (!m_Running)
                 break;
 
+
+            const auto cpuFrameWorkStart = std::chrono::steady_clock::now();
+
+            Renderer::BeginFrame();
             const double time = glfwGetTime();
             DeltaTime deltaTime = time - m_LastFrameTime;
             m_LastFrameTime = time;
@@ -103,6 +108,12 @@ namespace Limen
             m_ImGUILayer->End();
 #endif
 
+            Renderer::EndFrame();
+            const auto cpuFrameWorkEnd = std::chrono::steady_clock::now();
+            m_LastCPUFrameWorkMilliseconds =
+                std::chrono::duration<double, std::milli>(
+                    cpuFrameWorkEnd - cpuFrameWorkStart
+                ).count();
             // 所有场景与 ImGui 命令完成后再交换窗口缓冲。
             m_Window->Present(); //render
         }

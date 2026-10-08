@@ -48,7 +48,8 @@ namespace Limen
             // map_Kd存在时，尝试用文件纹理替换默认白纹理。
             if (!slot.AlbedoTexturePath.empty())
             {
-                Ref<Texture2D> loadedTexture = AssetManager::LoadTexture2DFromFile(slot.AlbedoTexturePath,TextureColorSpace::SRGB);
+                Ref<Texture2D> loadedTexture =
+                    AssetManager::LoadTexture2DFromFile(slot.AlbedoTexturePath,TextureColorSpace::SRGB);
 
                 // 加载成功则替换
                 if (loadedTexture)
@@ -61,7 +62,8 @@ namespace Limen
 
             if (!slot.NormalTexturePath.empty())
             {
-                Ref<Texture2D> loadedTexture = AssetManager::LoadTexture2DFromFile(slot.NormalTexturePath, TextureColorSpace::Linear);
+                Ref<Texture2D> loadedTexture =
+                    AssetManager::LoadTexture2DFromFile(slot.NormalTexturePath, TextureColorSpace::Linear);
 
                 // 加载成功时替换平坦法线纹理；失败时继续使用回退资源。
                 if (loadedTexture)

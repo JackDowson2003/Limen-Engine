@@ -102,6 +102,9 @@ namespace SandBox
          */
         Limen::Scope<Limen::SceneRenderer> m_SceneRenderer;
 
+        // 最近一次场景渲染调用的 CPU 耗时，单位：ms, -1表示未测量
+        double m_LastSceneRenderCPUMilliseconds = -1.0;
+
         /**
          * @brief m_Scene 中立方体对象的句柄。
          *

@@ -37,6 +37,12 @@ namespace Limen
 
         void OnEvent(Event& e);
 
+        /** 最近一次 BeginFrame～EndFrame 的 CPU 工作耗时，单位毫秒；-1 表示尚无结果。 */
+        [[nodiscard]] double GetLastCPUFrameWorkMilliseconds() const noexcept
+        {
+            return m_LastCPUFrameWorkMilliseconds;
+        }
+
         [[nodiscard]] Window& GetWindow() const { return *m_Window; }
 
         static  Application& GetApp() { return *s_Instance; }
@@ -53,6 +59,9 @@ namespace Limen
         bool m_Minimized = false;
 
         double m_LastFrameTime = 0.0f;
+
+        // 最近一次 BeginFrame～EndFrame 的 CPU 工作耗时，单位毫秒；-1 表示尚未测量。
+        double m_LastCPUFrameWorkMilliseconds = -1.0;
 
         static Application *s_Instance;
 

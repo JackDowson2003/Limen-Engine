@@ -39,10 +39,33 @@ namespace Limen
         LM_CORE_INFO("Vendor: {}", vendor ? vendor : "Unknown");
         LM_CORE_INFO("Version: {}", version );
         LM_CORE_INFO("Renderer: {}", renderer ? renderer : "Unknown");
+
+        const bool hasKHRDebug = glfwExtensionSupported("GL_KHR_debug") == GLFW_TRUE;
+        const bool hasARBDebugOutput = glfwExtensionSupported("GL_ARB_debug_output") == GLFW_TRUE;
+        LM_CORE_INFO(
+            "GL_KHR_debug: {}",
+            hasKHRDebug ? "available" : "unavailable"
+        );
+        LM_CORE_INFO(
+            "GL_ARB_debug_output: {}",
+            hasARBDebugOutput ? "available" : "unavailable"
+        );
     }
 
     void OpenGLContext::Present()
     {
+#ifdef LM_ENABLE_ASSERTS
+        // 在帧边界取出累计的 GL 错误；具体出错调用需再缩小检查范围。
+        for (GLenum error = glGetError();
+             error != GL_NO_ERROR;
+             error = glGetError())
+        {
+            LM_CORE_ERROR(
+                "OpenGL error before Present: 0x{:04X}",
+                static_cast<unsigned int>(error)
+            );
+        }
+#endif
         glfwSwapBuffers(m_Window);
     }
 

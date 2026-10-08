@@ -4,6 +4,8 @@
 #pragma once
 
 #include  <vector>
+#include <string_view>
+#include "Limen/Renderer/GPUProfiler.h"
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/RendererCommand.h"
 #include "Limen/RHI/GraphicsPipeline.h"
@@ -52,9 +54,9 @@ namespace Limen
          * 使用const引用，避免在函数传参阶段复制整个vector。
          */
         static void BeginScene(
-            const Camera& camera,
-            const DirectionalLight& directionalLight,
-            const std::vector<PointLight>& pointLights
+            const Camera &camera,
+            const DirectionalLight &directionalLight,
+            const std::vector<PointLight> &pointLights
         );
 
         /**
@@ -73,10 +75,10 @@ namespace Limen
          * 当前场景中的全部点光源。
          */
         static void BeginScene(
-            const Camera& camera,
-            const AmbientLight& ambientLight,
-            const DirectionalLight& directionalLight,
-            const std::vector<PointLight>& pointLights
+            const Camera &camera,
+            const AmbientLight &ambientLight,
+            const DirectionalLight &directionalLight,
+            const std::vector<PointLight> &pointLights
         );
 
         /**
@@ -89,11 +91,11 @@ namespace Limen
          * Shadow Map当前绑定的纹理槽。
          */
         static void BeginScene(
-            const Camera& camera,
-            const AmbientLight& ambientLight,
-            const DirectionalLight& directionalLight,
-            const std::vector<PointLight>& pointLights,
-            const glm::mat4& directionalLightViewProjection,
+            const Camera &camera,
+            const AmbientLight &ambientLight,
+            const DirectionalLight &directionalLight,
+            const std::vector<PointLight> &pointLights,
+            const glm::mat4 &directionalLightViewProjection,
             uint32_t shadowMapTextureSlot
         );
 
@@ -114,6 +116,24 @@ namespace Limen
          * 调用时OpenGL Context仍然必须有效。
          */
         static void Shutdown();
+
+        /** 开始当前窗口帧的 GPU 计时提交。 */
+        static void BeginFrame();
+
+        /** 结束当前窗口帧的 GPU 计时提交。 */
+        static void EndFrame();
+
+        /** 开始一个具名 GPU 计时范围；返回值用于配对结束。 */
+        [[nodiscard]]
+        static GPUProfileScopeHandle BeginGPUProfileScope(std::string_view debugName);
+
+        /** 结束对应的具名 GPU 计时范围。 */
+        static void EndGPUProfileScope(GPUProfileScopeHandle handle);
+
+        /** 借用最近完成的 GPU 帧结果；没有 Profiler 时返回 nullptr。 */
+        [[nodiscard]]
+        static const GPUProfileFrameResult*
+        GetLatestCompletedGPUProfileFrame() noexcept;
 
         /**
          * @brief 旧的 Shader 直接提交入口，保留到 2D 示例迁移完成。
@@ -184,10 +204,10 @@ namespace Limen
          * @param transform 模型局部空间到世界空间的矩阵。
          */
         static void SubmitDepth(
-            const GraphicsPipeline& shadowPipeline,
-            const Mesh& mesh,
-            const glm::mat4& lightViewProjection,
-            const glm::mat4& transform = glm::mat4(1.0f)
+            const GraphicsPipeline &shadowPipeline,
+            const Mesh &mesh,
+            const glm::mat4 &lightViewProjection,
+            const glm::mat4 &transform = glm::mat4(1.0f)
         );
 
         static RendererAPI::API GetRenderAPI()

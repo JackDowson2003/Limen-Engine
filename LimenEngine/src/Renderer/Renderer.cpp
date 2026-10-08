@@ -3,6 +3,7 @@
 //
 #include "Limen/Renderer/Renderer2D.h"
 #include "Limen/Renderer/Renderer.h"
+#include "Limen/Renderer/GPUProfiler.h"
 
 #include "Limen/Core/Log.h"
 #include "Limen/Renderer/Material.h"
@@ -56,7 +57,11 @@ namespace Limen
             uint32_t ShadowMapTextureSlot = 1;
         };
 
-        SceneData s_SceneData;
+        // g_ g is " global "
+        SceneData g_SceneData;
+
+        // Renderer 独占 Profiler, 其中 GPU Query 必须在 Context 销毁前释放
+        Scope<GPUProfiler> g_GPUProfiler;
     }
 
     void Renderer::BeginScene(const Camera &camera)
@@ -86,34 +91,34 @@ namespace Limen
         const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights,
         const glm::mat4 &directionalLightViewProjection, const uint32_t shadowMapTextureSlot)
     {
-        if (s_SceneData.IsActive)
+        if (g_SceneData.IsActive)
         {
             LM_CORE_ERROR("Another scene is already active");
             return;
         }
 
-        s_SceneData.ViewProjection =
+        g_SceneData.ViewProjection =
             camera.GetViewProjectionMatrix();
 
-        s_SceneData.CameraPosition =
+        g_SceneData.CameraPosition =
             camera.GetPosition();
 
-        s_SceneData.SceneAmbientLight =
+        g_SceneData.SceneAmbientLight =
             ambientLight;
 
-        s_SceneData.MainDirectionalLight =
+        g_SceneData.MainDirectionalLight =
             directionalLight;
 
-        s_SceneData.PointLights =
+        g_SceneData.PointLights =
             pointLights;
 
-        s_SceneData.DirectionalLightViewProjection =
+        g_SceneData.DirectionalLightViewProjection =
             directionalLightViewProjection;
 
-        s_SceneData.ShadowMapTextureSlot =
+        g_SceneData.ShadowMapTextureSlot =
             shadowMapTextureSlot;
 
-        s_SceneData.IsActive = true;
+        g_SceneData.IsActive = true;
     }
 
     void Renderer::OnWindowResize(const uint32_t width, const uint32_t height)
@@ -126,14 +131,14 @@ namespace Limen
 
     void Renderer::EndScene()
     {
-        if (!s_SceneData.IsActive)
+        if (!g_SceneData.IsActive)
         {
             LM_CORE_ASSERT(false, "Renderer::EndScene called without a matching BeginScene");
             return;
         }
 
         // Present 属于窗口帧生命周期；EndScene() 只关闭逻辑提交区间。
-        s_SceneData.IsActive = false;
+        g_SceneData.IsActive = false;
     }
 
     void Renderer::Init()
@@ -145,6 +150,9 @@ namespace Limen
          * 会通过 RendererCommand 和 RHI 使用当前图形 API。
          */
         RendererCommand::Init();
+
+        // 初始化 GPUProfiler
+        g_GPUProfiler = GPUProfiler::Create();
 
         /*
          * 底层渲染后端和 GraphicsContext 已经可用，
@@ -160,10 +168,47 @@ namespace Limen
          */
         Renderer2D::Shutdown();
 
+        // 必须在2D 后 ，RendererCommand前释放
+        g_GPUProfiler.reset();
+
         /*
          * 所有高层渲染资源释放后，再销毁底层 RendererAPI。
          */
         RendererCommand::Shutdown();
+    }
+
+    void Renderer::BeginFrame()
+    {
+        if (g_GPUProfiler)
+            g_GPUProfiler->BeginFrame();
+    }
+
+    void Renderer::EndFrame()
+    {
+        if (g_GPUProfiler)
+            g_GPUProfiler->EndFrame();
+    }
+
+    GPUProfileScopeHandle Renderer::BeginGPUProfileScope(const std::string_view debugName)
+    {
+        if (!g_GPUProfiler)
+            return {};
+
+        return g_GPUProfiler->BeginScope(debugName);
+    }
+
+    void Renderer::EndGPUProfileScope(const GPUProfileScopeHandle handle)
+    {
+        if (g_GPUProfiler)
+            g_GPUProfiler->EndScope(handle);
+    }
+
+    const GPUProfileFrameResult * Renderer::GetLatestCompletedGPUProfileFrame() noexcept
+    {
+        if (!g_GPUProfiler)
+            return nullptr;
+
+        return &g_GPUProfiler->GetLatestCompletedFrame();
     }
 
     // 兼容尚未迁移到 GraphicsPipeline 的 2D 示例。
@@ -173,7 +218,7 @@ namespace Limen
         const glm::mat4 &transform
     )
     {
-        if (!s_SceneData.IsActive)
+        if (!g_SceneData.IsActive)
         {
             LM_CORE_ASSERT(false, "Renderer::Submit must be called between BeginScene and EndScene");
             return;
@@ -189,7 +234,7 @@ namespace Limen
 
         shader->SetMat4(
             "u_ViewProjection",
-            s_SceneData.ViewProjection
+            g_SceneData.ViewProjection
         );
 
         shader->SetMat4(
@@ -199,7 +244,7 @@ namespace Limen
 
         shader->SetFloat3(
             "u_CameraPosition",
-            s_SceneData.CameraPosition
+            g_SceneData.CameraPosition
         );
 
         vertexArray.Bind();
@@ -212,7 +257,7 @@ namespace Limen
         const glm::mat4 &transform
     )
     {
-        if (!s_SceneData.IsActive)
+        if (!g_SceneData.IsActive)
         {
             LM_CORE_ERROR("Renderer::Submit must be called between BeginScene and EndScene");
             return;
@@ -232,7 +277,7 @@ namespace Limen
 
         shader->SetMat4(
             "u_ViewProjection",
-            s_SceneData.ViewProjection
+            g_SceneData.ViewProjection
         );
 
         shader->SetMat4(
@@ -242,7 +287,7 @@ namespace Limen
 
         shader->SetFloat3(
             "u_CameraPosition",
-            s_SceneData.CameraPosition
+            g_SceneData.CameraPosition
         );
 
 
@@ -256,7 +301,7 @@ namespace Limen
     void Renderer::Submit(const Material &material, const Mesh &mesh, const glm::mat4 &transform)
     {
         // 绘制只能发生在BeginScene和EndScene之间。
-        if (!s_SceneData.IsActive)
+        if (!g_SceneData.IsActive)
         {
             LM_CORE_ERROR(
                 "Renderer::Submit(Material, Mesh) must be called "
@@ -298,7 +343,7 @@ namespace Limen
         */
         shader->SetMat4(
             "u_ViewProjection",
-            s_SceneData.ViewProjection
+            g_SceneData.ViewProjection
         );
 
         shader->SetMat4(
@@ -308,19 +353,19 @@ namespace Limen
 
         shader->SetFloat3(
             "u_CameraPosition",
-            s_SceneData.CameraPosition
+            g_SceneData.CameraPosition
         );
 
         // 主场景顶点需要用它计算光源空间位置。
         shader->SetMat4(
             "u_LightViewProjection",
-            s_SceneData.DirectionalLightViewProjection
+            g_SceneData.DirectionalLightViewProjection
         );
 
         // 将调用方提供的Shadow Map纹理槽上传给Fragment Shader。
         shader->SetInt(
             "u_ShadowMap",
-            s_SceneData.ShadowMapTextureSlot
+            g_SceneData.ShadowMapTextureSlot
         );
 
         /**
@@ -329,7 +374,7 @@ namespace Limen
          * Meterial::Bind() 已经绑定正确的 Shader,
          * 因此这里可以上传当前场景的环境光数据
          */
-        const auto&[Color, Intensity] = s_SceneData.SceneAmbientLight;
+        const auto&[Color, Intensity] = g_SceneData.SceneAmbientLight;
 
         shader->SetFloat3("u_AmbientLightColor", Color);
         shader->SetFloat("u_AmbientLightIntensity", Intensity);
@@ -340,7 +385,7 @@ namespace Limen
          * Material::Bind() 已经绑定了正确的 Shader，
          * 因此现在可以把本帧缓存的光源参数写入该 Shader。
          */
-        const DirectionalLight &directionalLight = s_SceneData.MainDirectionalLight;
+        const DirectionalLight &directionalLight = g_SceneData.MainDirectionalLight;
 
         // 光线从光源射向场景的方向。
         shader->SetFloat3(
@@ -362,7 +407,7 @@ namespace Limen
 
         //GLSL 数组容量固定为4 Scene 可以保存更多点光源，但当前钱箱渲染路径只把前四个上传给Shader
         const uint32_t pointLightCount = static_cast<uint32_t>(std::min<std::size_t>(
-            s_SceneData.PointLights.size(), MaxPointLightCount));
+            g_SceneData.PointLights.size(), MaxPointLightCount));
 
         // Tell to shader what size of point lights we should deal
         shader->SetInt("u_PointLightCount", pointLightCount);
@@ -373,7 +418,7 @@ namespace Limen
          */
         for (uint32_t pointLightIndex = 0; pointLightIndex < pointLightCount; ++pointLightIndex)
         {
-            const auto &[Position, Color, Intensity] = s_SceneData.PointLights[pointLightIndex];
+            const auto &[Position, Color, Intensity] = g_SceneData.PointLights[pointLightIndex];
 
             /*
              * pointLightIndex为0时，prefix为：

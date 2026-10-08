@@ -9,6 +9,7 @@
 
 #include "glm/vec4.hpp"
 #include "Limen/Core/Core.h"
+#include "Limen/Renderer/GPUProfiler.h"
 
 namespace Limen
 {
@@ -130,10 +131,10 @@ namespace Limen
      * @brief 管理一个渲染阶段的开始与结束。
      *
      * Begin() 绑定目标 Framebuffer、设置清屏颜色并清除附件；End() 解绑
-     * Framebuffer，并在启用 MSAA 时把多采样颜色解析到普通颜色纹理。
+     * Framebuffer，并在启用 MSAA 时把多采样颜色解析到普通颜色纹理
      *
      * RenderPass 是明确的作用域对象，不允许复制，避免同一个逻辑阶段被
-     * 多个对象同时标记为活动状态。
+     * 多个对象同时标记为活动状态
      */
     class LIMEN_API RenderPass final
     {
@@ -168,5 +169,9 @@ namespace Limen
         RenderPassSpecification m_Specification;
         //是否创建（激活）
         bool m_IsActive = false;
+
+        // 放在 bool m_IsActive = false; 之后
+        // 仅保存配对标识；实际 GPU Query 由 Profiler 拥有。
+        GPUProfileScopeHandle m_ProfileScopeHandle{};
     };
 }

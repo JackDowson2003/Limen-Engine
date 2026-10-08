@@ -5,6 +5,7 @@
 
 #include "Limen/Core/Log.h"
 #include "Limen/Renderer/RendererCommand.h"
+#include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/Framebuffer.h"
 
 namespace Limen
@@ -39,6 +40,9 @@ namespace Limen
             );
             return;
         }
+
+        // 从绑定目标到结束时候解绑，完整覆盖这个 Pass
+        m_ProfileScopeHandle = Renderer::BeginGPUProfileScope(m_Specification.DebugName);
 
         // Bind() 同时把 Viewport 更新为目标 Framebuffer 的尺寸。
         m_Specification.TargetFramebuffer->Bind();
@@ -88,6 +92,9 @@ namespace Limen
          */
         if (m_Specification.ColorStoreOperation == AttachmentStoreOperation::Store)
             m_Specification.TargetFramebuffer->Resolve();
+
+        Renderer::EndGPUProfileScope(m_ProfileScopeHandle);
+        m_ProfileScopeHandle = {};
 
         // 当前版本回到窗口默认 Framebuffer；多 Pass 系统将改为绑定下一目标。
         m_Specification.TargetFramebuffer->UnBind();

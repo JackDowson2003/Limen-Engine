@@ -118,7 +118,7 @@ RGBA8 场景颜色附件 → MSAA Resolve → ImGui Viewport
 
 - macOS；
 - 安装在 `/Applications/Xcode.app` 的 Xcode 工具链；
-- CMake 4.0 或更高版本；
+- CMake 4.4.3；
 - Ninja；
 - Git；
 - 支持 C++20 的 Clang；
@@ -605,7 +605,7 @@ flowchart LR
 
 - `Scene` 只保存数据；
 - `SceneRenderer` 组织场景 Pass；
-- Renderer 与公共 RHI 不暴露 OpenGL、Direct3D 12 或 Metal 原生类型；
+- `Renderer` 与公共 RHI 不暴露 OpenGL、Direct3D 12 或 Metal 原生类型；
 - 第三方解析库只负责解析，最终转换成 Limen 自有资源；
 - GPU Context 销毁前必须先释放所有 GPU 资源；
 - 每个新功能都需要编译验证、最小测试场景和明确的预期结果。

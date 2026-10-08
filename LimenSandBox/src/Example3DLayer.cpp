@@ -3,16 +3,20 @@
 //
 
 #include <cmath>
+#include <chrono>
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+
+#include "Limen/Application/Application.h"
 #include "Example3DLayer.h"
 #include "imgui.h"
 #include "Limen/Asset/AssetManager.h"
 #include "Limen/Asset/ModelMaterialBuilder.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Input/Input.h"
+#include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
 #include "Limen/RHI/Texture.h"
 
@@ -522,6 +526,7 @@ namespace SandBox
      */
     void Example3DLayer::OnUpdate(Limen::DeltaTime &deltaTime)
     {
+        m_LastSceneRenderCPUMilliseconds = -1.0;
         LM_CORE_ASSERT(m_SceneRenderer, "Scene renderer is not initialized");
 
         if (!m_SceneRenderer)
@@ -612,6 +617,8 @@ namespace SandBox
         if (!transformUpdated)
             return;
 
+        const auto cpuStart = std::chrono::steady_clock::now();
+
         /*
          * SceneRenderer 内部执行：
          *
@@ -625,6 +632,9 @@ namespace SandBox
             m_Scene,
             m_CameraController.GetCamera()
         );
+        const auto cpuEnd = std::chrono::steady_clock::now();
+        m_LastSceneRenderCPUMilliseconds =
+                std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
     }
 
     void Example3DLayer::OnEvent(Limen::Event &event)
@@ -682,6 +692,41 @@ namespace SandBox
                         );
                     }
                 }
+            }
+        }
+        ImGui::End();
+        // 固定测试姿态，便于比较渲染改动前后的同一场景。
+        if (ImGui::Begin("Regression"))
+        {
+            if (ImGui::Button("Freeze reference pose"))
+            {
+                m_CubeRotationDegrees = 0.0f;
+                m_CubeRotationSpeed = 0.0f;
+
+                m_CameraController.GetCamera().SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));
+                m_CameraController.GetCamera().SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));
+            }
+            if (ImGui::Button("Check Linear/SRGB cache"))
+            {
+                const auto srgbA = Limen::AssetManager::LoadTexture2D(
+                    "textures/checkerboard.png", Limen::TextureColorSpace::SRGB);
+                const auto srgbB = Limen::AssetManager::LoadTexture2D(
+                    "textures/checkerboard.png", Limen::TextureColorSpace::SRGB);
+                const auto linearA = Limen::AssetManager::LoadTexture2D(
+                    "textures/checkerboard.png", Limen::TextureColorSpace::Linear);
+                const auto linearB = Limen::AssetManager::LoadTexture2D(
+                    "textures/checkerboard.png", Limen::TextureColorSpace::Linear);
+
+                const bool cacheOK =
+                    srgbA && srgbB && linearA && linearB &&
+                    srgbA == srgbB &&
+                    linearA == linearB &&
+                    srgbA != linearA;
+
+                if (cacheOK)
+                    LM_CORE_INFO("Linear/SRGB texture cache: PASS");
+                else
+                    LM_CORE_ERROR("Linear/SRGB texture cache: FAIL");
             }
         }
         ImGui::End();
@@ -849,6 +894,57 @@ namespace SandBox
         // 无论 Begin() 返回 true 还是 false，都必须调用 End()。
         ImGui::End();
         //endregion
+
+        if (ImGui::Begin("Render Timings"))
+        {
+            const Limen::GPUProfileFrameResult *result =
+                    Limen::Renderer::GetLatestCompletedGPUProfileFrame();
+
+            if (result == nullptr)
+            {
+                ImGui::TextUnformatted("GPU profiler unavailable");
+            } else if (!result->Valid)
+            {
+                ImGui::TextUnformatted("Waiting for completed GPU frame...");
+            } else
+            {
+                ImGui::Text(
+                    "Completed frame: %llu",
+                    static_cast<unsigned long long>(result->FrameIndex)
+                );
+                ImGui::Text(
+                    "GPU timeline: %.3f ms",
+                    result->FrameDurationMilliseconds
+                );
+            }
+            ImGui::Separator();
+            if (m_LastSceneRenderCPUMilliseconds < 0.0)
+                ImGui::TextUnformatted("CPU scene render call: not measured");
+            else
+            {
+                ImGui::Text(
+                    "CPU scene render call (latest): %.3f ms",
+                    m_LastSceneRenderCPUMilliseconds);
+            }
+
+            ImGui::Separator();
+
+            const double cpuFrameWorkMilliseconds =
+                Limen::Application::GetApp().GetLastCPUFrameWorkMilliseconds();
+
+            if (cpuFrameWorkMilliseconds < 0.0)
+            {
+                ImGui::TextUnformatted("CPU frame work: not measured");
+            }
+            else
+            {
+                ImGui::Text(
+                    "CPU frame work (previous): %.3f ms",
+                    cpuFrameWorkMilliseconds
+                );
+            }
+        }
+        ImGui::End();
 
 
         ImGui::End();
