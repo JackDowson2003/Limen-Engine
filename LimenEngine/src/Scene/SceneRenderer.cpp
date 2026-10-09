@@ -17,6 +17,9 @@
 #include "Limen/RHI/Framebuffer.h"
 #include "Limen/Renderer/RenderPass.h"
 
+#include "Limen/RHI/VertexArray.h"
+#include "Limen/RHI/IndexBuffer.h"
+
 namespace Limen
 {
     SceneRenderer::SceneRenderer(const SceneRendererSpecification &spec)
@@ -60,6 +63,7 @@ namespace Limen
         framebufferSpec.Width = m_Spec.Width;
         framebufferSpec.Height = m_Spec.Height;
         framebufferSpec.Samples = m_Spec.Samples;
+        framebufferSpec.Attachments = {FramebufferAttachmentFormat::RGBA16F,FramebufferAttachmentFormat::Depth24Stencil8};
 
         m_Framebuffer = Framebuffer::Create(framebufferSpec);
 
@@ -142,6 +146,21 @@ namespace Limen
         if (!m_ShadowShader)
             return;
 
+        m_PostProcessShader = shaderLibrary.Load("Renderer3D/PostProcess");
+
+        LM_CORE_ASSERT(
+            m_PostProcessShader,
+            "SceneRenderer '{}' failed to load PostProcess shader",
+            m_Spec.DebugName
+        );
+
+        if (!m_PostProcessShader)
+            return;
+
+        m_PostProcessShader->Bind();
+        m_PostProcessShader->SetInt("u_SceneColor",0);
+        m_PostProcessShader->UnBind();
+
         // Specification of Shadow Pipeline
         GraphicsPipelineSpecification shadowPPSpec;
 
@@ -189,6 +208,36 @@ namespace Limen
          */
         m_RenderPass = CreateScope<RenderPass>(renderPassSpec);
 
+        FramebufferSpecification postProcessSpec;
+        postProcessSpec.Width = m_Spec.Width;
+        postProcessSpec.Height = m_Spec.Height;
+        postProcessSpec.Samples = 1;
+        postProcessSpec.Attachments = {FramebufferAttachmentFormat::RGBA8};
+
+        m_PostProcessFramebuffer = Framebuffer::Create(postProcessSpec);
+        LM_CORE_ASSERT(
+            m_PostProcessFramebuffer,
+            "SceneRenderer '{}' failed to create PostProcess Framebuffer",
+            m_Spec.DebugName
+        );
+
+        if (!m_PostProcessFramebuffer)
+            return;
+
+        RenderPassSpecification postProcessRenderPassSpec;
+        postProcessRenderPassSpec.TargetFramebuffer = m_PostProcessFramebuffer.get();
+        postProcessRenderPassSpec.ColorLoadOperation = AttachmentLoadOperation::Clear;
+        postProcessRenderPassSpec.ColorStoreOperation = AttachmentStoreOperation::Store;
+        postProcessRenderPassSpec.DepthLoadOperation = AttachmentLoadOperation::DontCare;
+        postProcessRenderPassSpec.DepthStoreOperation = AttachmentStoreOperation::DontCare;
+        postProcessRenderPassSpec.StencilLoadOperation = AttachmentLoadOperation::DontCare;
+        postProcessRenderPassSpec.StencilStoreOperation = AttachmentStoreOperation::DontCare;
+
+        postProcessRenderPassSpec.ClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        postProcessRenderPassSpec.DebugName = m_Spec.DebugName + " PostProcess RenderPass";
+
+        m_PostProcessRenderPass = CreateScope<RenderPass>(postProcessRenderPassSpec);
+
         m_ShadowPipeline = GraphicsPipeline::Create(shadowPPSpec);
 
         LM_CORE_ASSERT(
@@ -199,6 +248,59 @@ namespace Limen
 
         if (!m_ShadowPipeline)
             return;
+
+        GraphicsPipelineSpecification postProcessPipelineSpec;
+        postProcessPipelineSpec.ShaderProgram = m_PostProcessShader;
+        postProcessPipelineSpec.Topology = PrimitiveTopology::TriangleList;
+        postProcessPipelineSpec.DepthTestEnabled = false;
+        postProcessPipelineSpec.DepthWriteEnabled = false;
+        postProcessPipelineSpec.Blend = BlendMode::Opaque;
+        postProcessPipelineSpec.Culling = CullMode::None;
+        postProcessPipelineSpec.DebugName = m_Spec.DebugName + " PostProcess Pipeline";
+
+        m_PostProcessPipeline = GraphicsPipeline::Create(postProcessPipelineSpec);
+
+        LM_CORE_ASSERT(
+            m_PostProcessPipeline,
+            "SceneRenderer '{}' failed to create PostProcess Pipeline",
+            m_Spec.DebugName
+        );
+
+        if (!m_PostProcessPipeline)
+            return;
+
+        m_PostProcessVertexArray.reset(VertexArray::Create());
+
+        LM_CORE_ASSERT(
+            m_PostProcessVertexArray,
+            "SceneRenderer '{}' failed to create PostProcess VertexArray",
+            m_Spec.DebugName
+        );
+
+        if (!m_PostProcessVertexArray)
+            return;
+
+        // IBO 会绑定 GL_ELEMENT_ARRAY_BUFFER, so we must bing target before
+        m_PostProcessVertexArray->Bind();
+
+        const uint32_t indices[] = {0, 1, 2};
+
+        Ref<IndexBuffer> ibo;
+        ibo.reset(IndexBuffer::Create(indices, 3));
+
+        LM_CORE_ASSERT(
+            ibo,
+            "SceneRenderer '{}' failed to create PostProcess IndexBuffer",
+            m_Spec.DebugName
+        );
+        if (!ibo)
+        {
+            m_PostProcessVertexArray->UnBind();
+            m_PostProcessVertexArray.reset();
+            return;
+        }
+        m_PostProcessVertexArray->SetIndexBuffer(ibo);
+        m_PostProcessVertexArray->UnBind();
     }
 
     void SceneRenderer::RecalculateDirectionalLightViewProjection(const DirectionalLight &directionalLight)
@@ -456,6 +558,44 @@ namespace Limen
 
         // 结束Main Pass，完成MSAA Resolve并解绑场景Framebuffer。
         m_RenderPass->End();
+
+        LM_CORE_ASSERT(
+            m_PostProcessRenderPass,
+            "SceneRenderer '{}' has no PostProcess RenderPass",
+            m_Spec.DebugName
+        );
+        if (!m_PostProcessRenderPass)
+            return;
+
+        LM_CORE_ASSERT(m_PostProcessPipeline, "Missing PostProcess Pipeline");
+        LM_CORE_ASSERT(m_PostProcessVertexArray, "Missing PostProcess VertexArray");
+        if (!m_PostProcessPipeline || !m_PostProcessVertexArray)
+            return;
+
+        if (m_PostProcessRenderPass->IsActive())
+        {
+            LM_CORE_ASSERT(
+                false,
+                "SceneRenderer '{}' PostProcess RenderPass is already active",
+                m_Spec.DebugName
+            );
+            return;
+        }
+
+        m_PostProcessRenderPass->Begin();
+        if (!m_PostProcessRenderPass->IsActive())
+            return;
+
+        constexpr uint32_t sceneColorTextureSlot = 0;
+        m_Framebuffer->BindColorAttachment(sceneColorTextureSlot);
+
+        m_PostProcessShader->Bind();
+        // 设置曝光
+        m_PostProcessShader->SetFloat("u_Exposure", m_Exposure);
+
+        Renderer::SubmitFullscreen(*m_PostProcessPipeline,*m_PostProcessVertexArray);
+
+        m_PostProcessRenderPass->End();
     }
 
     void SceneRenderer::Resize(const uint32_t width, const uint32_t height)
@@ -471,23 +611,44 @@ namespace Limen
 
         LM_CORE_ASSERT(m_Framebuffer, "SceneRenderer '{}' has no Framebuffer", m_Spec.DebugName);
 
-        if (!m_Framebuffer)
+        LM_CORE_ASSERT(
+            m_PostProcessFramebuffer,
+            "SceneRenderer '{}' has no PostProcess Framebuffer",
+            m_Spec.DebugName
+        );
+
+        if (!m_Framebuffer || !m_PostProcessFramebuffer)
             return;
+
 
         //重新创建 FBO 对应的尺寸
         m_Framebuffer->Resize(width, height);
+        m_PostProcessFramebuffer->Resize(width, height);
 
         // 同步保存 SceneRenderer 当前使用的尺寸
         m_Spec.Width = width;
         m_Spec.Height = height;
     }
 
+    bool SceneRenderer::SetExposure(const float exposure) noexcept
+    {
+        if (!std::isfinite(exposure) || exposure < 0.0f)
+            return false;
+        m_Exposure = exposure;
+        return true;
+    }
+
+    float SceneRenderer::GetExposure() const noexcept
+    {
+        return m_Exposure;
+    }
+
     std::uintptr_t SceneRenderer::GetFinalColorAttachmentHandle() const noexcept
     {
         // Forbidding nullptr
-        if (!m_Framebuffer)
+        if (!m_PostProcessFramebuffer)
             return 0;
-        return m_Framebuffer->GetColorAttachmentHandle();
+        return m_PostProcessFramebuffer->GetColorAttachmentHandle();
     }
 
     std::uintptr_t SceneRenderer::GetShadowMapHandle() const noexcept

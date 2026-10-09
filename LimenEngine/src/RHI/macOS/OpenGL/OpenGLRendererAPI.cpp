@@ -54,15 +54,32 @@ namespace Limen
         if (HasClearFlag(flags, ClearFlags::Color))
             clearMask |= GL_COLOR_BUFFER_BIT;
 
-        if (HasClearFlag(flags, ClearFlags::Depth))
+        const bool  clearDepth = HasClearFlag(flags, ClearFlags::Depth);
+        if (clearDepth)
             clearMask |= GL_DEPTH_BUFFER_BIT;
 
         if (HasClearFlag(flags, ClearFlags::Stencil))
             clearMask |= GL_STENCIL_BUFFER_BIT;
 
         // ClearFlags::None 时不需要想GPU发出清理指令
-        if (clearMask != 0)
-            glClear(clearMask);
+        if (clearMask == 0)
+            return;
+
+        // 记录 OpenGL 当前允不允许写深度
+        GLboolean previousDepthWriteMask = GL_TRUE;
+        if (clearDepth)
+        {
+            glGetBooleanv(GL_DEPTH_WRITEMASK, &previousDepthWriteMask);
+
+            if (previousDepthWriteMask == GL_FALSE)
+                glDepthMask(GL_TRUE);
+        }
+        // 执行清除
+        glClear(clearMask);
+
+        // 如果刚刚临时改过许可，就回复
+        if (clearDepth && previousDepthWriteMask == GL_FALSE)
+            glDepthMask(GL_FALSE);
     }
 
     inline void OpenGLRendererAPI::SetClearColor(const glm::vec4 &color)

@@ -93,6 +93,7 @@ namespace Limen
         if (m_Specification.ColorStoreOperation == AttachmentStoreOperation::Store)
             m_Specification.TargetFramebuffer->Resolve();
 
+        // GPU 计时组件
         Renderer::EndGPUProfileScope(m_ProfileScopeHandle);
         m_ProfileScopeHandle = {};
 

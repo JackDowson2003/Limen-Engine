@@ -5,6 +5,9 @@ project(LimenEngine
         LANGUAGES C CXX
 )
 
+# 启用项目测试入口，具体测算在后续步骤注册
+include(CTest)
+
 # 统一 MSVC 运行时：Debug 使用 /MDd，其余配置使用 /MD。
 if (MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
@@ -90,3 +93,7 @@ endfunction ()
 # 子目录分别定义 LimenEngine 库与 LimenSandBox 可执行文件。
 add_subdirectory(LimenEngine)
 add_subdirectory(LimenSandBox)
+
+if (BUILD_TESTING)
+    add_subdirectory(tests)
+endif ()

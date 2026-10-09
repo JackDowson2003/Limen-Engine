@@ -450,8 +450,23 @@ namespace Limen
         RendererCommand::DrawIndexed(vao, specification.Topology);
     }
 
+    void Renderer::SubmitFullscreen(const GraphicsPipeline &pipeline, const VertexArray &vertexArray)
+    {
+        const auto & specification = pipeline.GetSpecification();
+
+        if (!specification.ShaderProgram)
+        {
+            LM_CORE_ERROR("Renderer::SubmitFullscreen received a pipeline without a shader");
+            return;
+        }
+        pipeline.Bind();
+        vertexArray.Bind();
+
+        RendererCommand::DrawIndexed(vertexArray,specification.Topology);
+    }
+
     void Renderer::SubmitDepth(const GraphicsPipeline &shadowPipeline, const Mesh &mesh, const glm::mat4 &lightViewProjection,
-        const glm::mat4 &transform)
+                               const glm::mat4 &transform)
     {
         const GraphicsPipelineSpecification& specification = shadowPipeline.GetSpecification();
 

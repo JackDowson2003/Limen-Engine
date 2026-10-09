@@ -184,6 +184,15 @@ namespace Limen
         );
 
         /**
+         * 提交不依赖场景相机和物体变换的全屏几何。
+         * 调用方负责先开始目标 RenderPass；本函数只借用 Pipeline 和 VAO。
+         */
+        static void SubmitFullscreen(
+            const GraphicsPipeline& pipeline,
+            const VertexArray& vertexArray
+        );
+
+        /**
          * @brief 提交一次只写深度的几何绘制。
          *
          *  普通 Submit：

@@ -24,20 +24,20 @@ get_filename_component(LIMEN_PROJECT_ROOT
 
 # 开发期把引擎内置资源和 Sandbox 项目资源复制到可执行文件旁。
 # 先复制引擎资源，再复制项目资源。
-add_custom_command(
-        TARGET LimenSandBox
-        POST_BUILD
-
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
+add_custom_target(LimenSandBoxAssets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${LIMEN_PROJECT_ROOT}/LimenEngine/assets"
         "$<TARGET_FILE_DIR:LimenSandBox>/assets"
 
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:LimenSandBox>/assets"
 
-        COMMENT "Copying LimenEngine and Sandbox assets"
+        COMMENT "Syncing LimenEngine and Sandbox assets"
+        VERBATIM
 )
+
+add_dependencies(LimenSandBox LimenSandBoxAssets)
 
 # 将不同构建目录生成的可执行文件统一放到仓库根目录的 out/。
 set_target_properties(LimenSandBox PROPERTIES

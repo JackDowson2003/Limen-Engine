@@ -2,7 +2,7 @@
 
 Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实时渲染研究项目。
 
-当前阶段以 macOS OpenGL 4.1 后端验证引擎分层、资源管线、光栅化和实时光照；中期重点是 HDR、PBR、glTF、IBL 和稳定实时阴影，之后再进入 Windows Direct3D 12、GPU Driven Rendering 与 NVIDIA DXR 混合实时光追。
+当前阶段以 macOS OpenGL 4.1 后端验证引擎分层、资源管线、光栅化和实时光照；HDR 与基础后处理已有可运行版本，接下来重点验证现有链路并推进 PBR、glTF、IBL 和稳定实时阴影，之后再进入 Windows Direct3D 12、GPU Driven Rendering 与 NVIDIA DXR 混合实时光追。
 
 本项目的近期目标不是一次性补齐商业引擎的所有模块，而是先形成一套架构清晰、结果可验证、性能可测量的渲染研究引擎，再逐步增加场景编辑与游戏运行时能力。
 
@@ -27,16 +27,18 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实�
 
 ## 平台状态
 
-| 操作系统 | 图形 API | 当前状态 | 优先级 |
-| --- | --- | --- | --- |
-| macOS | OpenGL 4.1 | 已实现，当前唯一可运行后端 | 当前基线 |
-| Windows | Direct3D 12 | 尚未实现 | 后续主目标 |
-| macOS | Metal | 尚未实现 | 后续方向 |
-| Windows | Direct3D 11 | 只有枚举与路径预留 | 非当前主线 |
-| Linux | OpenGL / Vulkan | 尚未实现 | 远期方向 |
-| iOS / Android | Metal / Vulkan | 尚未实现 | 远期方向 |
+| 操作系统      | 图形 API        | 当前状态                   | 优先级     |
+|---------------|-----------------|----------------------------|------------|
+| macOS         | OpenGL 4.1      | 已实现，当前唯一可运行后端 | 当前基线   |
+| Windows       | Direct3D 12     | 尚未实现                   | 后续主目标 |
+| macOS         | Metal           | 尚未实现                   | 后续方向   |
+| Windows       | Direct3D 11     | 只有枚举与路径预留         | 非当前主线 |
+| Linux         | OpenGL / Vulkan | 尚未实现                   | 远期方向   |
+| iOS / Android | Metal / Vulkan  | 尚未实现                   | 远期方向   |
 
 `RendererAPI::API` 中存在某个枚举，只表示公共架构预留，不表示对应后端已经可用。当前 CMake 会在 Windows 与 Linux 配置阶段主动报错，避免生成一个无法工作的工程。
+
+[本机 M1 图形环境记录](docs/MacM1.md)是 2026-10-08 的配置快照，其中关于“主场景尚未启用 HDR”和手动复制资源的描述早于当前实现；涉及项目现状时以本 README 和当前代码为准。
 
 ## 当前已经具备的能力
 
@@ -46,7 +48,7 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实�
 - 键盘、鼠标、窗口事件和跨平台键码接口；
 - 正交相机、透视相机与相机控制器；
 - 日志、断言、`DeltaTime`、`Scope` 与 `Ref`；
-- ImGui Dockspace、Scene Viewport、光源参数面板和 Shadow Map 调试显示；
+- ImGui Dockspace、Scene Viewport、光源与曝光参数面板、Shadow Map 调试显示；
 - 静态库、动态库与 Debug/Release CMake Preset；
 - Debug 模式下的 ASan 与 UBSan。
 
@@ -59,7 +61,10 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实�
 - Material 参数表与纹理绑定；
 - Mesh、局部 AABB 和索引绘制；
 - Renderer2D 批处理、纹理槽切换和自动 Flush；
-- SceneRenderer 组织 Shadow Pass 与 Main Pass；
+- SceneRenderer 组织 Shadow Pass、Main Pass 与全屏 PostProcess Pass；
+- Main Pass 使用 MSAA `RGBA16F` 线性 HDR 颜色附件；后处理输出单采样 `RGBA8`；
+- PostProcess Pass 提供手动曝光、Reinhard Tone Mapping 和最终 Linear → sRGB 编码；
+- CPU 帧时间、CPU 场景渲染时间与 OpenGL 整帧 GPU 计时调试显示；
 - 环境光、一个主平行光和最多四个点光源；
 - 第一版平行光硬阴影。
 
@@ -88,25 +93,31 @@ Linear Albedo
     ↓
 Linear 空间中的环境光、漫反射、镜面反射与阴影计算
     ↓
-当前 Blinn-Phong Shader 手动执行 Linear → sRGB
+Blinn-Phong Shader 输出 Linear HDR 颜色
     ↓
-RGBA8 场景颜色附件 → MSAA Resolve → ImGui Viewport
+MSAA RGBA16F Main Pass → Resolve 为单采样 HDR 颜色
+    ↓
+SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → sRGB
+    ↓
+单采样 RGBA8 最终颜色附件（Alpha = 1）→ ImGui Scene Viewport
 ```
 
 - Albedo 等颜色纹理使用 `TextureColorSpace::SRGB`；
 - Normal、Roughness、Metallic 等数据纹理必须使用 `TextureColorSpace::Linear`；
 - Alpha 不参与 sRGB 转换；
-- 当前输出编码仍在 Blinn-Phong Shader 内，下一阶段会迁移到统一 PostProcess Pass。
+- Shadow Pass 独立写入 `Depth32F`，不参与颜色空间转换；
+- 最终 Scene Viewport 图像的不透明 Alpha 是当前调试视口的输出约定，不表示场景已支持透明合成；
+- 此处的曝光是后处理中的线性乘法，不是自动曝光或相机 EV 模型。
 
 ## 当前限制
 
-- 场景颜色附件仍是 `RGBA8`，尚无 `RGBA16F`、HDR、曝光和 Tone Mapping；
-- 没有统一全屏后处理阶段；
+- Tone Mapping 目前只有基础 Reinhard 算子；没有自动曝光、相机 EV、可选 Tone Mapper 或完整显示管理；
+- 最终输出是 8-bit `RGBA8` 不透明 Scene 图像，尚无透明合成与 HDR 显示输出；
 - 阴影只有单平行光硬阴影，没有 PCF、CSM、Shadow Atlas 和点光阴影；
 - Scene 句柄仍是 `vector` 下标，不支持删除和 Generation；
 - 只支持 OBJ/MTL，不支持 glTF/GLB；
 - 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
-- 没有正式单元测试、CTest、截图回归和 GPU Profiler；
+- 没有正式单元测试、CTest 和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
 - 当前 ImGui 面板是 Sandbox 调试界面，不是完整 Editor；
 - 没有场景序列化、脚本、动画、物理、音频和网络；
 - 旧的 `Texture2D::Create(path)` 与 AssetManager 路径仍然并存；
@@ -198,7 +209,7 @@ out/LimenSandBox
 
 ### 资源复制与工作目录
 
-`LimenSandBox/CMakeLists.txt` 中的正式 `POST_BUILD` 会依次执行：
+`LimenSandBox/CMakeLists.txt` 中的 `LimenSandBoxAssets` 自定义目标是 `LimenSandBox` 的构建依赖。每次构建 Sandbox 时，它都会用 `cmake -E copy_directory_if_different` 依次同步：
 
 ```text
 LimenEngine/assets    → out/assets
@@ -207,15 +218,14 @@ LimenSandBox/assets   → out/assets
 
 Engine 资源先复制，Sandbox 资源后复制，因此相同相对路径由 Sandbox 版本覆盖。
 
-只修改 Shader、纹理或模型时，CMake 可能判定可执行目标无需重新链接，从而不会再次执行 `POST_BUILD`。此时从仓库根目录手动刷新两套资源：
+只修改 Shader、纹理或模型时，无需依赖可执行文件重新链接，也无需手动执行历史 `scripts/POST_BUILD.sh`。从仓库根目录重新构建再运行即可：
 
 ```bash
-cmake -E copy_directory LimenEngine/assets out/assets
-cmake -E copy_directory LimenSandBox/assets out/assets
+cmake --build --preset build-debug
 (cd out && ./LimenSandBox)
 ```
 
-`copy_directory` 不会删除目标目录中已经失去源文件的旧资源；如果发生资源重命名或删除，应额外检查 `out/assets` 是否残留旧文件。
+`copy_directory_if_different` 只同步新增或变化的文件，不会删除目标目录中已经失去源文件的旧资源；如果发生资源重命名或删除，应额外检查 `out/assets` 是否残留旧文件。
 
 ## 开发脚本
 
@@ -247,6 +257,8 @@ Limen-Engine/
 ├── CMakeLists.txt
 ├── CMakePresets.json
 ├── README.md
+├── docs/
+│   └── MacM1.md
 ├── scripts/
 │   ├── test-shared.sh
 │   ├── POST_BUILD.sh
@@ -324,7 +336,7 @@ macOS OpenGL 4.1 后端
 | 模块 | 当前职责 | 不负责什么 |
 | --- | --- | --- |
 | `Scene` | 保存可渲染对象、Transform 和光源数据 | 不发出 GPU 命令 |
-| `SceneRenderer` | 组织 Shadow Pass、Main Pass 和场景提交 | 不解析模型文件 |
+| `SceneRenderer` | 组织 Shadow Pass、Main Pass、PostProcess Pass 和场景提交 | 不解析模型文件 |
 | `Renderer` | 准备每帧、每视图、每物体数据并提交 Draw | 不拥有 Scene |
 | `RenderPass` | 描述目标、开始、清理、保存、Resolve 和结束 | 不定义材质外观 |
 | `Framebuffer` | 拥有颜色、深度和 MSAA 附件 | 不决定使用哪个 Shader |
@@ -382,10 +394,12 @@ flowchart TD
     J --> K[Material Bind 参数与纹理]
     K --> L[Renderer Submit Mesh 与 Transform]
     L --> M[Linear 光照与 Shadow Map 采样]
-    M --> N[当前 Shader 执行 Linear 转 sRGB]
-    N --> O[MSAA Resolve]
-    O --> P[ImGui Scene Viewport]
-    P --> Q[Present]
+    M --> N[Main Pass 写入 MSAA RGBA16F Linear HDR]
+    N --> O[Main Pass 结束并 Resolve 为单采样 HDR]
+    O --> P[PostProcess Pass：曝光与 Reinhard Tone Mapping]
+    P --> Q[最终 Linear 转 sRGB，写入 RGBA8 且 Alpha 为 1]
+    Q --> R[ImGui Scene Viewport]
+    R --> S[Present]
 ```
 
 ## CMake 目标关系
@@ -403,9 +417,10 @@ flowchart TD
     E --> STB[stb_image]
     E --> OBJ[tinyobjloader]
     S --> APP[LimenSandBox]
+    S --> ASSETS[LimenSandBoxAssets：同步 Engine 与 Sandbox assets]
+    ASSETS --> APP
     APP --> ET
     APP --> I
-    APP --> COPY[合并 Engine 与 Sandbox assets]
 ```
 
 - 根 `CMakeLists.txt` 统一设置 C++20、警告、Sanitizer 和静态/动态库选项；
@@ -419,8 +434,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[收尾当前 sRGB 与模型链路] --> B[测试与 Profiling 基线]
-    B --> C[HDR + PostProcess + Tone Mapping]
+    A[已具备：OBJ、Normal Map、sRGB] --> B[已具备：HDR + PostProcess + 整帧计时]
+    B --> C[当前：回归测试与旧纹理入口收尾]
     C --> D[PBR Metallic-Roughness]
     D --> E[glTF/GLB + IBL]
     E --> F[PCF + CSM + Shadow Atlas]
@@ -434,31 +449,26 @@ flowchart LR
     L --> M[打包小型可玩 Demo]
 ```
 
-### 阶段 0：收尾当前渲染改动
+### 阶段 0：收尾当前渲染改动（部分完成）
 
-1. 构建并运行当前 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；
-2. 验证同一路径的 Linear/sRGB 两份纹理缓存；
-3. 验证 Albedo 使用 sRGB，Normal Map 保持 Linear；
-4. 迁移剩余 `Texture2D::Create(path)` 调用后再删除旧加载路径；
-5. 建立固定测试场景和视觉基线；
-6. 完成稳定检查点后再开始 HDR。
+1. 已能构建运行 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；Sandbox 有 Linear/sRGB 缓存检查入口；
+2. 仍需把颜色空间、Normal Mapping 的固定参考姿态变成可重复的视觉基线；
+3. 迁移剩余 `Texture2D::Create(path)` 调用后再删除旧加载路径。
 
-### 阶段 1：验证基础设施
+### 阶段 1：验证基础设施（部分完成）
 
-1. 为 AABB、法线、切线和路径解析建立 CPU 单元测试；
-2. 增加 Shader 编译失败检查；
-3. 增加带容差的截图回归；
-4. 增加 OpenGL Debug Callback、CPU 帧时间与 GPU Timer Query；
-5. 修复只修改资源时部署不更新的问题。
+1. 已有 CPU 帧/场景渲染时间、OpenGL 整帧 `GL_TIME_ELAPSED` 查询，以及每次构建时的资源同步；
+2. 为 AABB、法线、切线和路径解析建立 CPU 单元测试；
+3. 增加 Shader 编译失败的自动检查和带容差的截图回归；
+4. OpenGL Debug Callback 仅在运行时确认扩展可用时启用；当前 M1 环境的 `GL_KHR_debug`、`GL_ARB_debug_output` 不可用，需保留其他诊断路径。
 
-### 阶段 2：HDR 与统一后处理
+### 阶段 2：HDR 与统一后处理（可运行第一版已完成）
 
-1. 扩展 Texture/Framebuffer 格式，增加 `RGBA16F`；
-2. Main Pass 输出 Linear HDR；
-3. 由 `SceneRenderer` 组织独立全屏 PostProcess Pass；
-4. 加入 Exposure 与 Tone Mapping；
-5. 在最终输出位置执行唯一一次 Linear → sRGB；
-6. 删除 Blinn-Phong Shader 内的临时输出编码。
+1. `RGBA16F` MSAA Main Pass 输出 Linear HDR，并 Resolve 为可采样的单采样颜色；
+2. `SceneRenderer` 组织独立全屏 PostProcess Pass；
+3. PostProcess 执行手动 Exposure、Reinhard Tone Mapping 和最终 Linear → sRGB；
+4. Blinn-Phong Shader 不再进行输出编码，后处理写入 `RGBA8`，输出 Alpha 固定为 1；
+5. 下一步是可重复的视觉与数值回归，不把“可运行”直接等同于“稳定完成”。
 
 ### 阶段 3：PBR Metallic-Roughness
 
@@ -518,7 +528,7 @@ flowchart LR
 2. Motion Vector；
 3. TAA；
 4. Frustum/Occlusion Culling；
-5. GPU Profiling；
+5. 更细粒度的 Pass/Scope GPU Profiling（当前 OpenGL 后端只有整帧计时）；
 6. GPU Driven Rendering；
 7. Pass 数量和资源依赖足够复杂后，再评估 Render Graph。
 
@@ -544,7 +554,7 @@ flowchart LR
 
 ## 时间估算
 
-下面按单人、边学习边实现估算。一个“有效开发日”按约 5 小时专注工作计算，包含设计、编码、调试、验证和文档。
+下面按单人、边学习边实现、从零开始估算；已经完成的第一版不应再算作剩余工作量。一个“有效开发日”按约 5 小时专注工作计算，包含设计、编码、调试、验证和文档。
 
 | 阶段                              | 可验证第一版 |         稳定可复用版本 |
 |-----------------------------------|-------------:|-----------------------:|
@@ -573,18 +583,27 @@ flowchart LR
 
 ## 当前最先执行的清单
 
-在增加新渲染效果前，按以下顺序执行：
+现有 HDR 与后处理链路已接入，后续按以下顺序收尾并推进：
 
-1. 完成当前工作区的 Debug 构建和运行验证；
-2. 验证 Linear/sRGB 双缓存和纹理语义；
-3. 建立最小颜色空间与 Normal Mapping 回归场景；
-4. 迁移剩余旧纹理加载入口；
-5. 建立测试与 GPU 调试基线；
-6. 设计 `RGBA16F` 附件和 PostProcess 所有权；
-7. 实现 HDR Main Pass；
-8. 实现 Tone Mapping，并把最终 sRGB 编码集中到 PostProcess。
+1. 固定当前场景与参数，复验曝光 `0`、默认曝光和高强度光照下的画面、Shadow Map 与最终不透明输出；记录预期结果；
+2. 将颜色空间、Normal Mapping 和 HDR/后处理检查转成可重复的测试（先 CPU 数值测试，再增加带容差的截图回归）；
+3. 确认旧 `Texture2D::Create(path)` 的调用方并迁移，再删除旧入口；
+4. 补齐 Shader 编译失败检查和当前 OpenGL 环境可用的诊断路径；
+5. 完成上述基线后，定义 PBR 材质语义与纹理颜色空间，开始 Metallic-Roughness PBR；
+6. 随后进入 glTF/GLB、IBL 与阴影升级；DX12 和 DXR 继续按后续阶段推进。
 
-在这八项完成前，不提前进入 PBR、DX12 或 DXR。
+### HDR 与后处理手工验收记录（2026-10-09）
+
+环境：macOS OpenGL 4.1。重新启动 Sandbox，点击 `Freeze reference pose`，保持相机、Scene 视口尺寸、光源方向和其他光源参数不变。默认环境光强度为 `0.35`，第一个点光源强度为 `10.00`。
+
+| 条件                                | 预期                                | 本次手工观察                              | 状态            |
+|-------------------------------------|-------------------------------------|-------------------------------------------|-----------------|
+| 曝光 `1.00`、平行光强度 `1.00`      | 显示固定参考场景与 Shadow Map       | 参考画面已截图，参数与默认值一致          | 人工基线        |
+| 曝光 `0.00`，其他参数不变           | Scene 视口变黑，Shadow Map 图案不变 | 两项均符合预期                            | 人工通过        |
+| 曝光恢复 `1.00`、平行光强度 `10.00` | 受照区域变亮，Shadow Map 图案不变   | 两项均符合预期                            | 人工通过        |
+| 最终 `RGBA8` 附件的 Alpha           | 应为 `255`（不透明）                | Shader 固定输出 `1.0`，但尚未读回附件数值 | 待 GPU 数值验证 |
+
+以上是手工观察，不等于带容差的截图回归。强度 `10.00` 是当前面板范围内的测试，不代表此前 `100000` 强度情形已被验证。
 
 ## 暂不阻塞当前主线的功能
 

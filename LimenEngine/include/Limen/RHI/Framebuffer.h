@@ -28,6 +28,12 @@ namespace Limen
         RGBA8,
 
         /**
+         * 每通道 16 位浮点的 RGBA 颜色附件。
+         * 可保存 Linear HDR 渲染结果，不是最终显示用的 sRGB 图像。
+         */
+        RGBA16F,
+
+        /**
          * 24位深度加8位模板附件。
          *
          * 用于当前主场景的深度测试与模板测试。
@@ -197,6 +203,14 @@ namespace Limen
          * 必须在场景绘制完成、ImGui::Image 显示前调用。
          */
         virtual void Resolve() const = 0;
+
+        /**
+         * @brief 将已完成绘制和必要 Resolve 的颜色附件供 Shader 采样。
+         *
+         * Framebuffer 仍拥有纹理；调用方只在本次绘制中借用。
+         * @param slot Shader 使用的纹理槽编号。
+         */
+        virtual void BindColorAttachment(uint32_t slot) const = 0;
 
         /**
          * @brief 把可采样深度附件绑定到指定纹理槽。

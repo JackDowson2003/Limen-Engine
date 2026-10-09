@@ -46,13 +46,14 @@ namespace Limen
                     continue;
 
                 m_DepthAttachmentFormat = format;
-            }
-            else
+            } else
             {
-                /*
-                 * 当前唯一支持的颜色附件格式是RGBA8。
-                 */
-                LM_CORE_ASSERT(format == FramebufferAttachmentFormat::RGBA8,
+                // 当前支持 RGBA8 和 RGBA16F, 但仍只允许一个颜色附件
+                const bool supportedColorFormat =
+                        format == FramebufferAttachmentFormat::RGBA8 ||
+                        format == FramebufferAttachmentFormat::RGBA16F;
+
+                LM_CORE_ASSERT(supportedColorFormat,
                                "Unsupported OpenGL color attachment format"
                 );
 
@@ -62,18 +63,12 @@ namespace Limen
                     "OpenGLFramebuffer currently supports only one color attachment"
                 );
 
-                if (format != FramebufferAttachmentFormat::RGBA8 || m_ColorAttachmentFormat !=
-                    FramebufferAttachmentFormat::None)
+                if (!supportedColorFormat || m_ColorAttachmentFormat != FramebufferAttachmentFormat::None)
                     continue;
 
                 m_ColorAttachmentFormat = format;
             }
         }
-        /*
-         * 分类完成后，仍然调用现有创建逻辑。
-         * 目前Invalidate尚未使用这两个格式字段，
-         * 所以主场景行为不会改变。
-         */
         Invalidate();
     }
 
@@ -162,6 +157,15 @@ namespace Limen
         Invalidate();
     }
 
+    void OpenGLFramebuffer::BindColorAttachment(const uint32_t slot) const
+    {
+        LM_CORE_ASSERT(m_ColorAttachment != 0, "Framebuffer has no sampleable color attachment");
+        if (m_ColorAttachment == 0)
+            return;
+        glActiveTexture(GL_TEXTURE0 + slot);
+        glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
+    }
+
     void OpenGLFramebuffer::BindDepthAttachment(const uint32_t slot) const
     {
         LM_CORE_ASSERT(
@@ -196,14 +200,22 @@ namespace Limen
             m_Specification.Samples = static_cast<uint32_t>(maxSamples);
         }
         const int width = static_cast<int>(m_Specification.Width);
-
         const int height = static_cast<int>(m_Specification.Height);
 
         /*
-         * 主场景需要RGBA8颜色附件；
-         * Shadow Map只有Depth32F，不需要颜色附件。
+         * 颜色附件的实际存储格式由 m_ColorAttachmentFormat 决定
+         * Shadow Map 不需要颜色附件
          */
         const bool hasColorAttachment = m_ColorAttachmentFormat != FramebufferAttachmentFormat::None;
+
+        const GLenum colorInternalFormat =
+                m_ColorAttachmentFormat == FramebufferAttachmentFormat::RGBA16F
+                    ? GL_RGBA16F
+                    : GL_RGBA8;
+        const GLenum colorDataType =
+                m_ColorAttachmentFormat == FramebufferAttachmentFormat::RGBA16F
+                    ? GL_HALF_FLOAT
+                    : GL_UNSIGNED_BYTE;
 
         /*
          * 当前Depth32F专门用作Shadow Map。
@@ -246,12 +258,12 @@ namespace Limen
             glTexImage2D(
                 GL_TEXTURE_2D,
                 0,
-                static_cast<GLint>(GL_RGBA8),
+                static_cast<GLint>(colorInternalFormat),
                 width,
                 height,
                 0,
                 GL_RGBA,
-                GL_UNSIGNED_BYTE,
+                colorDataType,
                 nullptr
             );
 
@@ -293,8 +305,7 @@ namespace Limen
                     GL_RENDERBUFFER,
                     m_DepthStencilRenderbuffer
                 );
-            }
-            else if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth32F)
+            } else if (m_DepthAttachmentFormat == FramebufferAttachmentFormat::Depth32F)
             {
                 /*
                  * Shadow Map的深度必须在第二遍渲染时被Shader采样，
@@ -383,7 +394,7 @@ namespace Limen
             // 多采样颜色先存入 Renderbuffer，之后 Resolve 到 m_ColorAttachment。
             glRenderbufferStorageMultisample(GL_RENDERBUFFER,
                                              static_cast<GLsizei>(m_Specification.Samples),
-                                             GL_RGBA8,
+                                             colorInternalFormat,
                                              width, height
             );
 

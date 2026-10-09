@@ -13,6 +13,7 @@
 
 namespace Limen
 {
+    class VertexArray;
     class Camera;
     class Scene;
     class Framebuffer; //FBO
@@ -112,10 +113,28 @@ namespace Limen
         );
 
         /**
-         * @brief 获取最终可采样颜色纹理的后端句柄。
+         * @brief 设置后处理使用的线性曝光倍率
          *
-         * 当前 OpenGL 后端返回完成 MSAA Resolve 后的 Texture ID，
-         * 可以交给 ImGui::Image() 显示。
+         * 1.0 表示不缩放
+         * 0.0 表示黑色
+         * @return 成功接收新值时返回true
+         */
+        [[nodiscard]]
+        bool SetExposure(float exposure) noexcept;
+
+        [[nodiscard]]
+        float GetExposure() const noexcept;
+
+        /**
+         * @brief 获取后处理后的最终颜色纹理句柄。
+         *
+         * Main Pass 的线性 HDR 颜色先经过后处理，再写入用于显示的 RGBA8 纹理。
+         * 当前后处理先按曝光倍率缩放线性 HDR RGB，再进行基础 Reinhard Tone Mapping，
+         * 最终输出的 Alpha 固定为 1.0，表示 Scene 视口图像不透明。
+         * 此接口不提供保留透明背景的场景导出图像。
+         *
+         * 句柄由 SceneRenderer 拥有，调用者只借用；SceneRenderer 销毁后不可使用。
+         * 当前 OpenGL 后端返回 Texture ID；资源不存在时返回 0。
          */
         [[nodiscard]]
         std::uintptr_t
@@ -161,6 +180,9 @@ namespace Limen
         // 保存创建尺寸、MSAA采样数和清屏颜色
         SceneRendererSpecification m_Spec;
 
+        // 当前视角的后处理曝光倍率，下一步才会传给Shader
+        float m_Exposure = 1.0f;
+
         /**
          * 世界空间到平行光裁剪空间的变换矩阵。
          *
@@ -179,6 +201,9 @@ namespace Limen
          */
         Ref<Shader> m_ShadowShader;
 
+        // 场景后处理使用的 Shader；当前仅加载验证，尚未用于绘制。
+        Ref<Shader> m_PostProcessShader;
+
         /**
          * Graphics pipeline of Shadow pass
          *
@@ -190,6 +215,12 @@ namespace Limen
          * - draw Mesh in Triangle
          */
         Ref<GraphicsPipeline> m_ShadowPipeline;
+
+        // 后处理的绘制状态；当前尚未提交全屏绘制命令。
+        Ref<GraphicsPipeline> m_PostProcessPipeline;
+
+        // SceneRenderer 独占的全屏三角形VAO, VAO 会持有他的 IBO
+        Scope<VertexArray> m_PostProcessVertexArray;
 
         /**
          * SceneRenderer 独占场景渲染目标
@@ -204,6 +235,13 @@ namespace Limen
          * RenderPass 内部非拥有地引用 m_Framebuffer。
          */
         Scope<RenderPass> m_RenderPass;
+
+        // 后处理的但采样颜色输出，SceneRenderer 独占
+        Scope<Framebuffer> m_PostProcessFramebuffer;
+
+        // 非拥有地引用 m_PostProcessFramebuffer；析构时先于它释放
+        Scope<RenderPass> m_PostProcessRenderPass;
+
         /**
          * 平行光阴影使用的Depth-Only Framebuffer。
          *

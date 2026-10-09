@@ -29,6 +29,9 @@ namespace Limen
             uint32_t height
         ) override;
 
+        void BindColorAttachment(uint32_t slot) const override;
+
+
         void BindDepthAttachment(uint32_t slot) const override;
 
         [[nodiscard]]

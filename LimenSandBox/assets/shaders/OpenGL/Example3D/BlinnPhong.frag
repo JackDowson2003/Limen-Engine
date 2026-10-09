@@ -239,33 +239,6 @@ float CalculateDirectionalShadow(
 }
 
 /**
- * @brief 将一个线性RGB通道编码为sRGB。
- */
-float LinearChannelToSRGB(float linearValue)
-{
-    linearValue = max(linearValue, 0.0);
-
-    if (linearValue <= 0.0031308)
-        return linearValue * 12.92;
-
-    return 1.055 * pow(linearValue, 1.0 / 2.4) - 0.055;
-}
-
-/**
- * @brief 将线性RGB颜色编码为显示用的sRGB。
- *
- * Alpha不属于颜色通道，不在这里转换。
- */
-vec3 LinearToSRGB(vec3 linearColor)
-{
-    return vec3(
-    LinearChannelToSRGB(linearColor.r),
-    LinearChannelToSRGB(linearColor.g),
-    LinearChannelToSRGB(linearColor.b)
-    );
-}
-
-/**
 u_AmbientReflectance
     = k_a
     = 材质属性
@@ -388,14 +361,14 @@ void main()
 
     for (int pointLightIndex = 0; pointLightIndex < u_PointLightCount; pointLightIndex++)
     {
-    /**
+        /**
          * 从当前着色点p指向点光源位置的向量。
          *
          * lightVector = lightPosition - fragmentPosition
          */
         vec3 lightVector = u_PointLights[pointLightIndex].Position - v_WorldPosition;
 
-    /**
+        /**
          * r² = lightVector · lightVector
          *
          * 使用较小的下限，避免着色点恰好位于光源位置时除以0。
@@ -405,7 +378,7 @@ void main()
             0.0001
         );
 
-    /**
+        /**
          * l：从当前着色点指向点光源的单位方向。
          *
          * lightVector / length(lightVector)
@@ -414,7 +387,7 @@ void main()
          */
         vec3 pointLightDirection = lightVector * inversesqrt(distanceSquared);
 
-    /**
+        /**
          * GAMES101中的距离平方反比衰减：
          *
          * I / r²
@@ -424,7 +397,7 @@ void main()
         u_PointLights[pointLightIndex].Intensity /
         distanceSquared;
 
-    /**
+        /**
          * 当前点光源的l和I/r²已经计算完成，
          * 交给通用函数计算漫反射与镜面反射。
          */
@@ -442,5 +415,5 @@ void main()
 
     vec3 linearColor = ambient + directionalLightContribution + pointLightContribution;
 
-    color = vec4(LinearToSRGB(linearColor), albedoSample.a);
+    color = vec4(linearColor, albedoSample.a);
 }

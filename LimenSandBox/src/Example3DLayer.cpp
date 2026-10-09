@@ -18,6 +18,7 @@
 #include "Limen/Input/Input.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/GraphicsPipeline.h"
+#include "Limen/RHI/Framebuffer.h"
 #include "Limen/RHI/Texture.h"
 
 namespace SandBox
@@ -718,19 +719,67 @@ namespace SandBox
                     "textures/checkerboard.png", Limen::TextureColorSpace::Linear);
 
                 const bool cacheOK =
-                    srgbA && srgbB && linearA && linearB &&
-                    srgbA == srgbB &&
-                    linearA == linearB &&
-                    srgbA != linearA;
+                        srgbA && srgbB && linearA && linearB &&
+                        srgbA == srgbB &&
+                        linearA == linearB &&
+                        srgbA != linearA;
 
                 if (cacheOK)
                     LM_CORE_INFO("Linear/SRGB texture cache: PASS");
                 else
                     LM_CORE_ERROR("Linear/SRGB texture cache: FAIL");
             }
+
+            if (ImGui::Button("Check RGBA16F framebuffer"))
+            {
+                Limen::FramebufferSpecification spec;
+                spec.Width = 8;
+                spec.Height = 8;
+                spec.Attachments = Limen::FramebufferAttachmentSpecification{
+                    Limen::FramebufferAttachmentFormat::RGBA16F,
+                    Limen::FramebufferAttachmentFormat::Depth24Stencil8
+                };
+
+                spec.Samples = 1;
+                const auto singleSample = Limen::Framebuffer::Create(spec);
+
+                spec.Samples = 4;
+
+                if (const auto multiSample = Limen::Framebuffer::Create(spec);
+                    singleSample && multiSample &&
+                    singleSample->GetColorAttachmentHandle() != 0 &&
+                    multiSample->GetColorAttachmentHandle() != 0)
+                {
+                    LM_CORE_INFO("RGBA16F framebuffer allocation: PASS (MSAA {}x)",
+                                 multiSample->GetSpecification().Samples);
+                } else
+                {
+                    LM_CORE_ERROR("RGBA16F framebuffer allocation: FAIL");
+                }
+            }
         }
         ImGui::End();
         //endregion
+        if (ImGui::Begin("Post Process"))
+        {
+            if (m_SceneRenderer)
+            {
+                float exposure = m_SceneRenderer->GetExposure();
+
+                if (ImGui::DragFloat(
+                        "Exposure",
+                        &exposure,
+                        0.05f,
+                        0.0f,
+                        8.0f,
+                        "%.2f"))
+                {
+                    if (!m_SceneRenderer->SetExposure(exposure))
+                        LM_CORE_WARN("Rejected invalid post-process exposure: {}", exposure);
+                }
+            }
+        }
+        ImGui::End();
 
         if (ImGui::Begin("Lighting")) //初始化ImGUI
         {
@@ -874,7 +923,6 @@ namespace SandBox
             {
                 const std::uintptr_t shadowMapHandle =
                         m_SceneRenderer->GetShadowMapHandle();
-
                 if (shadowMapHandle != 0)
                 {
                     const ImTextureID textureID = shadowMapHandle;
@@ -926,17 +974,15 @@ namespace SandBox
                     "CPU scene render call (latest): %.3f ms",
                     m_LastSceneRenderCPUMilliseconds);
             }
-
             ImGui::Separator();
 
             const double cpuFrameWorkMilliseconds =
-                Limen::Application::GetApp().GetLastCPUFrameWorkMilliseconds();
+                    Limen::Application::GetApp().GetLastCPUFrameWorkMilliseconds();
 
             if (cpuFrameWorkMilliseconds < 0.0)
             {
                 ImGui::TextUnformatted("CPU frame work: not measured");
-            }
-            else
+            } else
             {
                 ImGui::Text(
                     "CPU frame work (previous): %.3f ms",
