@@ -5,7 +5,7 @@ project(LimenEngine
         LANGUAGES C CXX
 )
 
-# 启用项目测试入口，具体测算在后续步骤注册
+# 启用项目测试入口，具体测试在 tests/ 子目录注册。
 include(CTest)
 
 # 统一 MSVC 运行时：Debug 使用 /MDd，其余配置使用 /MD。
