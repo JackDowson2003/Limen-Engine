@@ -13,6 +13,7 @@ if (MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
             "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>"
     )
+    add_compile_options(/utf-8) # encoding
 endif ()
 
 set(CMAKE_CXX_STANDARD 20)
