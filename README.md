@@ -117,7 +117,7 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 - Scene 句柄仍是 `vector` 下标，不支持删除和 Generation；
 - 只支持 OBJ/MTL，不支持 glTF/GLB；
 - 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
-- 没有正式单元测试、CTest 和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
+- 已有 PostProcess CPU 数值 CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
 - 当前 ImGui 面板是 Sandbox 调试界面，不是完整 Editor；
 - 没有场景序列化、脚本、动画、物理、音频和网络；
 - 旧的 `Texture2D::Create(path)` 与 AssetManager 路径仍然并存；
@@ -233,6 +233,7 @@ cmake --build --preset build-debug
 
 | 路径 | 实际用途 | 当前状态 |
 | --- | --- | --- |
+| `scripts/RUN_TEST.sh` | 构建并运行 PostProcess CPU/GPU 数值测试 | GPU 测试需要 macOS 桌面 OpenGL Context；从仓库根目录或 `scripts/` 运行 |
 | `scripts/test-shared.sh` | 配置 Shared Debug、检查 `.dylib` 链接并运行数秒 | macOS 冒烟测试；不是 CTest 或画面回归 |
 | `scripts/POST_BUILD.sh` | 手动复制 Sandbox assets | 未被 CMake 调用；依赖调用目录；不复制 Engine assets |
 | `scripts/sub_module.sh` | 历史 submodule 添加命令 | 非幂等，路径与当前仓库不完全一致，不作为入口 |
@@ -396,8 +397,8 @@ flowchart TD
     L --> M[Linear 光照与 Shadow Map 采样]
     M --> N[Main Pass 写入 MSAA RGBA16F Linear HDR]
     N --> O[Main Pass 结束并 Resolve 为单采样 HDR]
-    O --> P[PostProcess Pass：曝光与 Reinhard Tone Mapping]
-    P --> Q[最终 Linear 转 sRGB，写入 RGBA8 且 Alpha 为 1]
+    O --> P[PostProcess Pass: 曝光与 Reinhard Tone Mapping]
+    P --> Q[最终 Linear 转 sRGB, 写入 RGBA8 且 Alpha 为 1]
     Q --> R[ImGui Scene Viewport]
     R --> S[Present]
 ```
@@ -417,7 +418,7 @@ flowchart TD
     E --> STB[stb_image]
     E --> OBJ[tinyobjloader]
     S --> APP[LimenSandBox]
-    S --> ASSETS[LimenSandBoxAssets：同步 Engine 与 Sandbox assets]
+    S --> ASSETS[LimenSandBoxAssets: 同步 Engine 与 Sandbox assets]
     ASSETS --> APP
     APP --> ET
     APP --> I
@@ -434,8 +435,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[已具备：OBJ、Normal Map、sRGB] --> B[已具备：HDR + PostProcess + 整帧计时]
-    B --> C[当前：回归测试与旧纹理入口收尾]
+    A[已具备: OBJ,Normal Map,sRGB] --> B[已具备:HDR + PostProcess + 整帧计时]
+    B --> C[当前: 回归测试与旧纹理入口收尾]
     C --> D[PBR Metallic-Roughness]
     D --> E[glTF/GLB + IBL]
     E --> F[PCF + CSM + Shadow Atlas]
@@ -596,14 +597,16 @@ flowchart LR
 
 环境：macOS OpenGL 4.1。重新启动 Sandbox，点击 `Freeze reference pose`，保持相机、Scene 视口尺寸、光源方向和其他光源参数不变。默认环境光强度为 `0.35`，第一个点光源强度为 `10.00`。
 
-| 条件                                | 预期                                | 本次手工观察                              | 状态            |
+| 条件                                | 预期                                | 本次验证结果                              | 状态            |
 |-------------------------------------|-------------------------------------|-------------------------------------------|-----------------|
 | 曝光 `1.00`、平行光强度 `1.00`      | 显示固定参考场景与 Shadow Map       | 参考画面已截图，参数与默认值一致          | 人工基线        |
 | 曝光 `0.00`，其他参数不变           | Scene 视口变黑，Shadow Map 图案不变 | 两项均符合预期                            | 人工通过        |
 | 曝光恢复 `1.00`、平行光强度 `10.00` | 受照区域变亮，Shadow Map 图案不变   | 两项均符合预期                            | 人工通过        |
-| 最终 `RGBA8` 附件的 Alpha           | 应为 `255`（不透明）                | Shader 固定输出 `1.0`，但尚未读回附件数值 | 待 GPU 数值验证 |
+| PostProcess 测试附件的 Alpha        | 应为 `255`（不透明）                | 2026-10-10：真实 Shader 绘制后，曝光 `1`/`0` 均读回 `255` | GPU 数值通过 |
 
 以上是手工观察，不等于带容差的截图回归。强度 `10.00` 是当前面板范围内的测试，不代表此前 `100000` 强度情形已被验证。
+
+PostProcess 数值测试从仓库根目录运行 `bash scripts/RUN_TEST.sh`。CPU 测试检查参考公式；macOS GPU 测试将已知 `RGBA16F` 像素送入真实 Shader，在测试用 `RGBA8` 附件读回曝光 `1` 时的 `{225, 188, 0, 255}` 与曝光 `0` 时的 `{0, 0, 0, 255}`；RGB 容差为 ±2 字节，Alpha 必须精确为 `255`。2026-10-10 两项 CTest 均通过。GPU CTest 在全新构建中默认不注册，脚本会显式启用并由 CMake 缓存该开关；它需要桌面图形会话，也不直接读取 Sandbox 的 Scene FBO，不能替代场景或截图回归。
 
 ## 暂不阻塞当前主线的功能
 

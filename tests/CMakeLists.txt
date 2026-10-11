@@ -9,6 +9,12 @@ add_test(
         COMMAND $<TARGET_FILE:LimenPostProcessReferenceTests>
 )
 if (APPLE)
+    option(
+            LIMEN_ENABLE_OPENGL_GPU_TESTS
+            "Register OpenGL tests in CTest (requires a macOS desktop session)"
+            OFF
+    )
+
     add_executable(LimenOpenGLPostProcessTests
             OpenGLPostProcessTests.cpp
     )
@@ -26,4 +32,12 @@ if (APPLE)
             LIMEN_POSTPROCESS_VERT_PATH="${CMAKE_SOURCE_DIR}/LimenEngine/assets/shaders/OpenGL/Renderer3D/PostProcess.vert"
             LIMEN_POSTPROCESS_FRAG_PATH="${CMAKE_SOURCE_DIR}/LimenEngine/assets/shaders/OpenGL/Renderer3D/PostProcess.frag"
     )
+
+    if (LIMEN_ENABLE_OPENGL_GPU_TESTS)
+        add_test(
+                NAME LimenOpenGLPostProcess
+                COMMAND $<TARGET_FILE:LimenOpenGLPostProcessTests>
+        )
+        set_tests_properties(LimenOpenGLPostProcess PROPERTIES LABELS "gpu")
+    endif ()
 endif ()
