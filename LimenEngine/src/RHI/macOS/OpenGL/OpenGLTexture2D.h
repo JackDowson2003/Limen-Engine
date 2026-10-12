@@ -10,7 +10,6 @@ namespace Limen
     class OpenGLTexture2D : public Texture2D
     {
     public:
-        explicit OpenGLTexture2D(const std::string &path);
         /**
          * @brief 根据规格创建一张OpenGL空纹理。
          */
@@ -41,14 +40,11 @@ namespace Limen
         OpenGLTexture2D &operator=(OpenGLTexture2D &&other) noexcept;
 
 
-        static Ref<OpenGLTexture2D> LoadFromFile(const char *path);
-
     private:
         uint32_t m_RendererID = 0;
 
         // m_BPP 保存源图像的通道数（RGB 为 3，RGBA 为 4）。
         uint32_t m_Width = 0, m_Height = 0, m_BPP = 0;
-        std::string m_Path;
 
         TextureFormat m_Format = TextureFormat::None;
         bool m_GenerateMipmaps = false;

@@ -1,6 +1,8 @@
 //
 // Created by chenlong on 2026/8/11.
 //
+#include <algorithm>
+
 #include "Limen/Renderer/Renderer2D.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/Renderer/GPUProfiler.h"
@@ -39,7 +41,7 @@ namespace Limen
              * BeginScene时从Scene复制进来，
              * 后续所有Submit读取同一份光源数据。
              */
-            std::vector<PointLight> PointLights;
+            LArray<PointLight> PointLights;
 
             /**
              * 世界空间到平行光裁剪空间的矩阵。
@@ -76,19 +78,19 @@ namespace Limen
     }
 
     void Renderer::BeginScene(const Camera &camera, const DirectionalLight &directionalLight,
-                              const std::vector<PointLight> &pointLights)
+                              const LArray<PointLight> &pointLights)
     {
         BeginScene(camera, AmbientLight{}, directionalLight, pointLights);
     }
 
     void Renderer::BeginScene(const Camera &camera, const AmbientLight &ambientLight,
-                              const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights)
+                              const DirectionalLight &directionalLight, const LArray<PointLight> &pointLights)
     {
         BeginScene(camera,ambientLight,directionalLight,pointLights,glm::mat4(1.0f),1);
     }
 
     void Renderer::BeginScene(const Camera &camera, const AmbientLight &ambientLight,
-        const DirectionalLight &directionalLight, const std::vector<PointLight> &pointLights,
+        const DirectionalLight &directionalLight, const LArray<PointLight> &pointLights,
         const glm::mat4 &directionalLightViewProjection, const uint32_t shadowMapTextureSlot)
     {
         if (g_SceneData.IsActive)
@@ -109,8 +111,11 @@ namespace Limen
         g_SceneData.MainDirectionalLight =
             directionalLight;
 
-        g_SceneData.PointLights =
-            pointLights;
+        // Renderer 保存本次 BeginScene 的光源快照；复用容量，只复制传入的元素。
+        g_SceneData.PointLights.clear();
+        g_SceneData.PointLights.reserve(pointLights.getSize());
+        for (const PointLight &light : pointLights)
+            g_SceneData.PointLights.push_back(light);
 
         g_SceneData.DirectionalLightViewProjection =
             directionalLightViewProjection;
@@ -399,15 +404,15 @@ namespace Limen
             directionalLight.Color
         );
 
-        // 独立的亮度倍率。
+        // 平行光的强度
         shader->SetFloat(
             "u_DirectionalLightIntensity",
             directionalLight.Intensity
         );
 
-        //GLSL 数组容量固定为4 Scene 可以保存更多点光源，但当前钱箱渲染路径只把前四个上传给Shader
-        const uint32_t pointLightCount = static_cast<uint32_t>(std::min<std::size_t>(
-            g_SceneData.PointLights.size(), MaxPointLightCount));
+        // GLSL 数组容量固定为 4；Scene 可保存更多点光源，当前前向渲染只上传前四个。
+        const uint32_t pointLightCount = std::min(
+            g_SceneData.PointLights.getSize(), MaxPointLightCount);
 
         // Tell to shader what size of point lights we should deal
         shader->SetInt("u_PointLightCount", pointLightCount);

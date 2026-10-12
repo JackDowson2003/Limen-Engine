@@ -12,6 +12,7 @@
 
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/Mesh.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen
 {
@@ -97,8 +98,8 @@ namespace Limen
     {
     public:
         /**
-         * @brief 使用已经创建好的模型部分构造Model
-         * std::vector<ModelPart> parts 是可以进行move的，也可以保持之前的，执行复制
+         * @brief 使用已经创建好的模型部分构造 Model。
+         * 按值接收数组：调用方可以移动传入以转交元素所有权，也可以复制传入。
          *
          * @param parts
          * ModelImporter 解析源文件后创建的可绘制部分
@@ -106,7 +107,7 @@ namespace Limen
          * @param materialSlots
          * 源模型中定义的材质槽列表，ModelPart通过MaterialSlot索引该列表。
          */
-        explicit Model(std::vector<ModelPart> parts, std::vector<ModelMaterialSlot> materialSlots = {});
+        explicit Model(LArray<ModelPart> parts, LArray<ModelMaterialSlot> materialSlots = {});
 
         /**
         * @brief 获取模型包含的全部可绘制部分。
@@ -115,7 +116,7 @@ namespace Limen
         * 绕过 Model 添加、删除或替换内部部分。
         */
         [[nodiscard]]
-        const std::vector<ModelPart> &GetParts() const noexcept;
+        const LArray<ModelPart> &GetParts() const noexcept;
 
         /**
          * @brief 获取整个Model在模型局部空间中的包围盒。
@@ -130,14 +131,14 @@ namespace Limen
          * @brief 获取模型的材质槽列表。
          */
         [[nodiscard]]
-        const std::vector<ModelMaterialSlot> &GetMaterialSlots() const noexcept;
+        const LArray<ModelMaterialSlot> &GetMaterialSlots() const noexcept;
 
     private:
         // 组成当前 model 的每个部分
-        std::vector<ModelPart> m_Parts;
+        LArray<ModelPart> m_Parts;
 
-        // 每个ModelPart 的Material Slot
-        std::vector<ModelMaterialSlot> m_MaterialSlots;
+        // 源模型的材质槽表；多个 ModelPart 可以通过 MaterialSlot 索引同一个槽。
+        LArray<ModelMaterialSlot> m_MaterialSlots;
 
         /**
          * @brief 整个Model在模型局部空间中的包围盒。

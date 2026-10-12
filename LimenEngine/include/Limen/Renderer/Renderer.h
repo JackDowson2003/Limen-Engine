@@ -3,8 +3,8 @@
 //
 #pragma once
 
-#include  <vector>
 #include <string_view>
+#include "Limen/Tool/LArray.h"
 #include "Limen/Renderer/GPUProfiler.h"
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/RendererCommand.h"
@@ -51,12 +51,12 @@ namespace Limen
          *
          * @param pointLights
          * 当前场景中的全部点光源。
-         * 使用const引用，避免在函数传参阶段复制整个vector。
+         * 使用const引用，避免在函数传参阶段复制整个LArray。
          */
         static void BeginScene(
             const Camera &camera,
             const DirectionalLight &directionalLight,
-            const std::vector<PointLight> &pointLights
+            const LArray<PointLight> &pointLights
         );
 
         /**
@@ -78,7 +78,7 @@ namespace Limen
             const Camera &camera,
             const AmbientLight &ambientLight,
             const DirectionalLight &directionalLight,
-            const std::vector<PointLight> &pointLights
+            const LArray<PointLight> &pointLights
         );
 
         /**
@@ -94,7 +94,7 @@ namespace Limen
             const Camera &camera,
             const AmbientLight &ambientLight,
             const DirectionalLight &directionalLight,
-            const std::vector<PointLight> &pointLights,
+            const LArray<PointLight> &pointLights,
             const glm::mat4 &directionalLightViewProjection,
             uint32_t shadowMapTextureSlot
         );

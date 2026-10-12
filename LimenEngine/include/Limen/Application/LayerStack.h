@@ -1,8 +1,7 @@
 #pragma once
 
-#include <vector>
-
 #include "Limen/Application/Layer.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen {
 
@@ -21,20 +20,22 @@ namespace Limen {
 
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* overlay);
+		// 移除时只调用 OnDetach，不 delete；调用方需接管并销毁移出的 Layer。
 		void PopLayer(Layer* layer);
 		void PopOverlay(Layer* overlay);
 
-		std::vector<Layer*>::iterator begin() { return m_Layers.begin(); }
-		std::vector<Layer*>::iterator end() { return m_Layers.end(); }
-		std::vector<Layer*>::reverse_iterator rbegin() { return m_Layers.rbegin(); }
-		std::vector<Layer*>::reverse_iterator rend() { return m_Layers.rend(); }
+		auto begin() { return m_Layers.begin(); }
+		auto end() { return m_Layers.end(); }
+		auto rbegin() { return m_Layers.rbegin(); }
+		auto rend() { return m_Layers.rend(); }
 
-		[[nodiscard]] std::vector<Layer*>::const_iterator begin() const { return m_Layers.cbegin(); }
-		[[nodiscard]] std::vector<Layer*>::const_iterator end()	const { return m_Layers.cend(); }
-		[[nodiscard]] std::vector<Layer*>::const_reverse_iterator rbegin() const { return m_Layers.crbegin(); }
-		[[nodiscard]] std::vector<Layer*>::const_reverse_iterator rend() const { return m_Layers.crend(); }
+		[[nodiscard]] auto begin() const { return m_Layers.cbegin(); }
+		[[nodiscard]] auto end() const { return m_Layers.cend(); }
+		[[nodiscard]] auto rbegin() const { return m_Layers.crbegin(); }
+		[[nodiscard]] auto rend() const { return m_Layers.crend(); }
 	private:
-		std::vector<Layer*> m_Layers;
+		// 仍在栈中的指针由 LayerStack 拥有；[0, m_LayerInsertIndex) 为普通 Layer，其后为 Overlay。
+		LArray<Layer*> m_Layers;
 		unsigned int m_LayerInsertIndex = 0;
 	};
 

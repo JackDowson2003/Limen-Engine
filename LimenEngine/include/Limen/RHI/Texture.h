@@ -70,10 +70,6 @@ namespace Limen
     class LIMEN_API Texture2D : public Texture
     {
     public:
-        /**
-         * @brief 从图片文件加载纹理。
-         */
-        static Ref<Texture2D> Create(const char* path);
 
         /**
          * @brief 根据规格创建一张没有初始像素内容的纹理。

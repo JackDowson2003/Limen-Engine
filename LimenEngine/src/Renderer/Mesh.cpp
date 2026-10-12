@@ -20,7 +20,7 @@ namespace Limen
             "Cannot create Mesh without Indices"
         );
 
-        const auto indexSize = data.Vertices.size();
+        const auto indexSize = data.Vertices.getSize();
 
         //1. 每个索引都必须指向一个真实存在的顶点。
         for (const uint32_t index: data.Indices)
@@ -63,10 +63,10 @@ namespace Limen
 
         const uint32_t vertexBufferSize =
                 static_cast<uint32_t>(
-                    data.Vertices.size() * sizeof(MeshVertex)
+                    data.Vertices.getSize() * sizeof(MeshVertex)
                 );
         vertexBuffer.reset(VertexBuffer::Create(
-            data.Vertices.data(), vertexBufferSize
+            data.Vertices.getData(), vertexBufferSize
         ));
 
         const VertexBufferLayout vertexLayout{
@@ -86,8 +86,8 @@ namespace Limen
 
         indexBuffer.reset(
             IndexBuffer::Create(
-                data.Indices.data(),
-                static_cast<uint32_t>(data.Indices.size())
+                data.Indices.getData(),
+                data.Indices.getSize()
             )
         );
 

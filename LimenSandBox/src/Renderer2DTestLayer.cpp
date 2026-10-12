@@ -6,6 +6,9 @@
 #include "imgui.h"
 #include "Limen/Renderer/Renderer2D.h"
 #include "Limen/Core/Log.h"
+#include "Limen/Asset/AssetManager.h"
+#include "Limen/RHI/IndexBuffer.h"
+#include "Limen/Renderer/Renderer.h"
 
 namespace SandBox
 {
@@ -79,8 +82,119 @@ namespace SandBox
             return;
         }
 
-        m_CheckerboardTexture = Limen::Texture2D::Create(
-            "assets/textures/checkerboard.png"
+        Limen::FramebufferSpecification displaySpec;
+        displaySpec.Width = m_ViewportWidth;
+        displaySpec.Height = m_ViewportHeight;
+        displaySpec.Samples = 1;
+        displaySpec.Attachments = {Limen::FramebufferAttachmentFormat::RGBA8};
+
+        m_DisplayFramebuffer = Limen::Framebuffer::Create(displaySpec);
+
+        LM_CORE_ASSERT(m_DisplayFramebuffer, "Renderer2D display Framebuffer creation failed");
+
+        if (!m_DisplayFramebuffer)
+        {
+            m_SceneRenderPass.reset();
+            m_SceneFramebuffer.reset();
+            return;
+        }
+
+        Limen::RenderPassSpecification displayPassSpec;
+        displayPassSpec.TargetFramebuffer = m_DisplayFramebuffer.get();
+        displayPassSpec.ColorLoadOperation = Limen::AttachmentLoadOperation::Clear;
+        displayPassSpec.ColorStoreOperation = Limen::AttachmentStoreOperation::Store;
+        displayPassSpec.DepthLoadOperation = Limen::AttachmentLoadOperation::DontCare;
+        displayPassSpec.DepthStoreOperation = Limen::AttachmentStoreOperation::DontCare;
+        displayPassSpec.StencilLoadOperation = Limen::AttachmentLoadOperation::DontCare;
+        displayPassSpec.StencilStoreOperation = Limen::AttachmentStoreOperation::DontCare;
+        displayPassSpec.ClearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+        displayPassSpec.DebugName = "Renderer2D Display RenderPass";
+
+        m_DisplayRenderPass = Limen::CreateScope<Limen::RenderPass>(displayPassSpec);
+
+        Limen::ShaderLibrary shaderLibrary;
+        m_DisplayShader = shaderLibrary.Load("Renderer2D/DisplayEncode");
+
+        LM_CORE_ASSERT(m_DisplayShader, "Renderer2D display Shader load failed");
+
+        if (!m_DisplayShader)
+        {
+            m_DisplayRenderPass.reset();
+            m_DisplayFramebuffer.reset();
+            m_SceneRenderPass.reset();
+            m_SceneFramebuffer.reset();
+            return;
+        }
+
+        m_DisplayShader->Bind();
+        m_DisplayShader->SetInt("u_SceneColor", 0);
+        m_DisplayShader->UnBind();
+
+        Limen::GraphicsPipelineSpecification displayPipelineSpec;
+        displayPipelineSpec.ShaderProgram = m_DisplayShader;
+        displayPipelineSpec.Blend = Limen::BlendMode::Opaque;
+        displayPipelineSpec.Topology = Limen::PrimitiveTopology::TriangleList;
+        displayPipelineSpec.Culling = Limen::CullMode::None;
+        displayPipelineSpec.DepthWriteEnabled = false;
+        displayPipelineSpec.DepthTestEnabled = false;
+        displayPipelineSpec.FrontFaceWinding = Limen::FrontFace::CounterClockwise;
+        displayPipelineSpec.DebugName = "Renderer2D Display Pipeline";
+
+        m_DisplayPipeline = Limen::GraphicsPipeline::Create(displayPipelineSpec);
+
+        LM_CORE_ASSERT(m_DisplayPipeline, "Renderer2D display Pipeline creation failed");
+
+        if (!m_DisplayPipeline)
+        {
+            m_DisplayShader.reset();
+            m_DisplayRenderPass.reset();
+            m_DisplayFramebuffer.reset();
+            m_SceneRenderPass.reset();
+            m_SceneFramebuffer.reset();
+            return;
+        }
+
+        m_DisplayVertexArray.reset(Limen::VertexArray::Create());
+
+        LM_CORE_ASSERT(m_DisplayVertexArray, "Renderer2D display VertexArray creation failed");
+
+        if (!m_DisplayVertexArray)
+        {
+            m_DisplayPipeline.reset();
+            m_DisplayShader.reset();
+            m_DisplayRenderPass.reset();
+            m_DisplayFramebuffer.reset();
+            m_SceneRenderPass.reset();
+            m_SceneFramebuffer.reset();
+            return;
+        }
+        m_DisplayVertexArray->Bind();
+        constexpr uint32_t fullscreenIndices[] = {0, 1, 2};
+        Limen::Ref<Limen::IndexBuffer> indexBuffer;
+        indexBuffer.reset(Limen::IndexBuffer::Create(fullscreenIndices, 3));
+
+        LM_CORE_ASSERT(indexBuffer, "Renderer2D display IndexBuffer creation failed");
+        if (!indexBuffer)
+        {
+            m_DisplayVertexArray->UnBind();
+            m_DisplayVertexArray.reset();
+            m_DisplayPipeline.reset();
+            m_DisplayShader.reset();
+            m_DisplayRenderPass.reset();
+            m_DisplayFramebuffer.reset();
+            m_SceneRenderPass.reset();
+            m_SceneFramebuffer.reset();
+            return;
+        }
+
+        m_DisplayVertexArray->SetIndexBuffer(indexBuffer);
+        m_DisplayVertexArray->UnBind();
+
+        // 棋盘格是颜色纹理：GPU 采样时将 RGB 解码到 Linear；Alpha 保持原值。
+        // Display Pass 在所有场景绘制完成后统一编码输出。
+        m_CheckerboardTexture = Limen::AssetManager::LoadTexture2D(
+            "textures/checkerboard.png",
+            Limen::TextureColorSpace::SRGB
         );
 
         LM_CORE_ASSERT(
@@ -90,6 +204,11 @@ namespace SandBox
 
         if (!m_CheckerboardTexture)
         {
+            m_DisplayShader.reset();
+            m_DisplayVertexArray.reset();
+            m_DisplayPipeline.reset();
+            m_DisplayRenderPass.reset();
+            m_DisplayFramebuffer.reset();
             m_SceneRenderPass.reset();
             m_SceneFramebuffer.reset();
             return;
@@ -98,17 +217,38 @@ namespace SandBox
 
     void Renderer2DTestLayer::OnDetach()
     {
+        m_DisplayShader.reset();
+        m_DisplayVertexArray.reset();
+        m_DisplayPipeline.reset();
         m_CheckerboardTexture.reset();
+        m_DisplayRenderPass.reset();
+        m_DisplayFramebuffer.reset();
         m_SceneRenderPass.reset();
         m_SceneFramebuffer.reset();
     }
 
     void Renderer2DTestLayer::OnUpdate(Limen::DeltaTime &deltaTime)
     {
-        if (!m_SceneFramebuffer ||
+        if (!m_DisplayVertexArray ||
+            !m_DisplayPipeline ||
+            !m_DisplayShader ||
+            !m_SceneFramebuffer ||
             !m_SceneRenderPass ||
-            !m_CheckerboardTexture)
+            !m_DisplayFramebuffer ||
+            !m_DisplayRenderPass ||
+            !m_CheckerboardTexture
+        )
+        {
             return;
+        }
+
+        if (m_ReferenceViewEnabled)
+        {
+            constexpr uint32_t referenceWidth = 1280;
+            constexpr uint32_t referenceHeight = 720;
+            m_ViewportWidth = referenceWidth;
+            m_ViewportHeight = referenceHeight;
+        }
 
         //窗口发生变化时，重新创建FBO的附件
         if (m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
@@ -124,13 +264,20 @@ namespace SandBox
             );
         }
 
+        if (m_ViewportWidth > 0 && m_ViewportHeight > 0 &&
+            (m_ViewportWidth != m_DisplayFramebuffer->GetSpecification().Width ||
+             m_ViewportHeight != m_DisplayFramebuffer->GetSpecification().Height))
+        {
+            m_DisplayFramebuffer->Resize(m_ViewportWidth, m_ViewportHeight);
+        }
+
         m_CameraController.OnResize(
             static_cast<float>(m_ViewportWidth),
             static_cast<float>(m_ViewportHeight)
         );
 
-
-        m_CameraController.OnUpdate(deltaTime);
+        if (!m_ReferenceViewEnabled)
+            m_CameraController.OnUpdate(deltaTime);
 
         m_ParticleSystem.Update(deltaTime);
 
@@ -184,7 +331,11 @@ namespace SandBox
          */
         Limen::Renderer2D::BeginScene(m_CameraController.GetCamera());
 
-        m_ParticleSystem.Render();
+        // 参考模式只隐藏粒子绘制；模拟继续运行，切回普通模式仍保持正常时间推进。
+        if (!m_ReferenceViewEnabled)
+        {
+            m_ParticleSystem.Render();
+        }
 
         /*
          * 左侧纯色 Quad。
@@ -211,22 +362,50 @@ namespace SandBox
          * 解绑场景 Framebuffer，并执行 MSAA Resolve。
          */
         m_SceneRenderPass->End();
+
+        if (m_DisplayRenderPass->IsActive())
+        {
+            LM_CORE_ASSERT(false, "Renderer2D display RenderPass is already active");
+            return;
+        }
+
+        m_DisplayRenderPass->Begin();
+        if (!m_DisplayRenderPass->IsActive())
+            return;
+
+        constexpr uint32_t sceneColorTextureSlot = 0;
+        m_SceneFramebuffer->BindColorAttachment(sceneColorTextureSlot);
+
+        Limen::Renderer::SubmitFullscreen(*m_DisplayPipeline, *m_DisplayVertexArray);
+        m_DisplayRenderPass->End();
     }
 
     void Renderer2DTestLayer::OnImGuiRender()
     {
         //更新分辨率
         if (const bool sceneVisible = ImGui::Begin("Renderer2D Test Layer");
-            sceneVisible && m_SceneRenderPass)
+            sceneVisible && m_DisplayFramebuffer)
         {
+            if (ImGui::Checkbox("Fixed 2D reference view", &m_ReferenceViewEnabled) &&
+                m_ReferenceViewEnabled)
+            {
+                auto &camera = m_CameraController.GetCamera();
+                camera.SetPosition(glm::vec3{0.0f, 0.0f, 0.0f});
+                camera.SetRotation(0.0f);
+                m_CameraController.SetZoomLevel(1.0f);
+            }
+
             if (const ImVec2 &viewportSize = ImGui::GetContentRegionAvail();
                 viewportSize.x > 0.0f && viewportSize.y > 0.0f)
             {
-                m_ViewportWidth = static_cast<uint32_t>(viewportSize.x);
-                m_ViewportHeight = static_cast<uint32_t>(viewportSize.y);
+                if (!m_ReferenceViewEnabled)
+                {
+                    m_ViewportWidth = static_cast<uint32_t>(viewportSize.x);
+                    m_ViewportHeight = static_cast<uint32_t>(viewportSize.y);
+                }
 
                 const ImTextureID textureID =
-                        m_SceneFramebuffer->GetColorAttachmentHandle();
+                        m_DisplayFramebuffer->GetColorAttachmentHandle();
 
                 ImGui::Image(
                     ImTextureRef(textureID),
@@ -241,6 +420,7 @@ namespace SandBox
 
     void Renderer2DTestLayer::OnEvent(Limen::Event &event)
     {
-        m_CameraController.OnEvent(event);
+        if (!m_ReferenceViewEnabled)
+            m_CameraController.OnEvent(event);
     }
 }

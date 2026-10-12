@@ -7,11 +7,10 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <vector>
-
 #include <glad/gl.h>
 
 #include "Limen/Renderer/GPUProfiler.h"
+#include "Limen/Tool/LArray.h"
 
 
 namespace Limen
@@ -66,14 +65,14 @@ namespace Limen
             ProfileNode *Parent = nullptr;
 
             // 子节点独占拥有，整棵树所有权由此串起。
-            std::vector<Scope<ProfileNode> > Children;
+            LArray<Scope<ProfileNode> > Children;
         };
 
         // 一整帧GPU 工作的暂存记录，唤醒缓冲按槽复用（对齐 UE FGPUProfierEventNodeFrame）
         struct FrameRecord
         {
             // 顶层根节点 （Shadow Pass / Main Pass / UI 等并列阶段），独占拥有整棵树
-            std::vector<Scope<ProfileNode> > RootNodes;
+            LArray<Scope<ProfileNode> > RootNodes;
 
             // 帧序号：读回时复制到结果，也用于核对环形槽对应哪一帧
             uint64_t FrameIndex = 0;
@@ -113,8 +112,9 @@ namespace Limen
         // 旧槽不可读取的时候，仅跳过本次的 Profiler 采样，不影响场景渲染
         bool m_SkippingFrame = false;
 
-        // 当前未闭合的节点路径，决定新节点挂载位置与 Depth（借用指针）。
-        std::vector<ProfileNode *> m_NodeStack;
+        // 当前未闭合节点的借用指针；LArray 扩容只移动 Scope，不移动堆上的 ProfileNode。
+        // FrameRecord 的节点树仍拥有这些对象，节点销毁前指针保持有效。
+        LArray<ProfileNode *> m_NodeStack;
 
         // 最近一次读回完成的成品帧。
         GPUProfileFrameResult m_LatestCompletedResult;

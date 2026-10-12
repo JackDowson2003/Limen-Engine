@@ -165,8 +165,6 @@ namespace Limen
         return false;
     }
 
-
-
     void OrthoGraphicCameraController::SetZoomLevel(const float zoomLevel)
     {
         m_ZoomLevel = std::max(zoomLevel, m_MinZoomLevel);

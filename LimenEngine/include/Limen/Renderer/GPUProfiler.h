@@ -8,8 +8,8 @@
 #include <cstdint>
 #include <string_view>
 #include <string>
-#include <vector>
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen
 {
@@ -65,7 +65,7 @@ namespace Limen
         double FrameDurationMilliseconds = 0.0;
 
         // 已测得的具名范围结果；后端不支持范围计时时可以为空。
-        std::vector<GPUProfileScopeResult> Scopes;
+        LArray<GPUProfileScopeResult> Scopes;
     };
 
 

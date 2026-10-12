@@ -3,10 +3,9 @@
 //
 #pragma once
 
-#include <vector>
-
 #include "Limen/RHI/VertexBuffer.h"
 #include "Limen/RHI/IndexBuffer.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen
 {
@@ -23,7 +22,7 @@ namespace Limen
 
         virtual void SetIndexBuffer(const Ref<IndexBuffer> &indexBuffer) = 0;
 
-        virtual const std::vector<Ref<VertexBuffer>>& GetVertexBuffers() const = 0;
+        virtual const LArray<Ref<VertexBuffer>>& GetVertexBuffers() const = 0;
         virtual const Ref<IndexBuffer>& GetIndexBuffer() const = 0;
 
         static VertexArray *Create();

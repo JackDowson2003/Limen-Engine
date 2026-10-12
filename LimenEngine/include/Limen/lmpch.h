@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include <vector>
+#include "Limen/Tool/LArray.h"
 #include <cstdint>
 #if defined(LIMEN_PLATFORM_WINDOWS)
     #include <Windows.h>

@@ -14,15 +14,15 @@
 
 namespace Limen
 {
-    std::vector<Ref<Material> > ModelMaterialBuilder::BuildBlinnPhong(const Model &model, const Ref<GraphicsPipeline> &pipeline)
+    LArray<Ref<Material>> ModelMaterialBuilder::BuildBlinnPhong(const Model &model, const Ref<GraphicsPipeline> &pipeline)
     {
         if (!pipeline)
             return {};
 
-        const std::vector<ModelMaterialSlot> &materialSlots = model.GetMaterialSlots();
+        const LArray<ModelMaterialSlot> &materialSlots = model.GetMaterialSlots();
 
-        std::vector<Ref<Material> > materials;
-        materials.reserve(materialSlots.size());
+        LArray<Ref<Material>> materials;
+        materials.reserve(materialSlots.getSize());
 
         // 没有Albedo纹理时使用共享白纹理，保持材质颜色不变。
         const Ref<Texture2D> &whiteTexture = AssetManager::GetWhiteTexture();

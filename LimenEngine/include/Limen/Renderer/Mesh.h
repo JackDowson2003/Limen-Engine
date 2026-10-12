@@ -4,8 +4,8 @@
 
 #pragma once
 #include <cstdint>
-#include <vector>
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LArray.h"
 #include "glm/vec3.hpp"
 #include "glm/vec4.hpp"
 #include "glm/vec2.hpp"
@@ -41,15 +41,16 @@ namespace Limen
     /**
      * @brief 创建一个Mesh所需的CPU端的几何数据
      *
-     * MeshData 只保存顶点和索引，还没有创建VAO VBO IBO
+     * MeshData 拥有顶点和索引的 CPU 数组，尚未创建 VAO、VBO 或 IBO。
+     * Mesh 构造时借用这些数组上传数据，不保留指向 MeshData 的指针。
      */
     struct MeshData
     {
-        // positions of geometry
-        std::vector<MeshVertex> Vertices;
+        // 完整的顶点属性（位置、法线、UV、切线等）。
+        LArray<MeshVertex> Vertices;
 
-        // indices of geometry
-        std::vector<uint32_t> Indices;
+        // 按三角形顺序引用 Vertices 的下标。
+        LArray<uint32_t> Indices;
     };
 
 

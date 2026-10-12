@@ -36,7 +36,7 @@ namespace Limen
         // glVertexAttribPointer 会把当前 GL_ARRAY_BUFFER 记录进 VAO 状态。
         vertexBuffer->Bind();
 
-        LM_CORE_ASSERT(vertexBuffer->GetLayout().GetElements().size(), "Vertex Buffer has no layout!");
+        LM_CORE_ASSERT(!vertexBuffer->GetLayout().GetElements().empty(), "Vertex Buffer has no layout!");
 
         const auto &layout = vertexBuffer->GetLayout();
         const int stride = static_cast<int>(layout.GetStride());
@@ -90,7 +90,7 @@ namespace Limen
         m_IndexBuffer = indexBuffer;
     }
 
-    const std::vector<Ref<VertexBuffer> > &OpenGLVertexArray::GetVertexBuffers() const
+    const LArray<Ref<VertexBuffer> > &OpenGLVertexArray::GetVertexBuffers() const
     {
         return m_VertexBuffers;
     }

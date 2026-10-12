@@ -3,7 +3,6 @@
 //
 #pragma once
 
-
 #include "ParticleSystem.h"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/DeltaTime.h"
@@ -12,7 +11,9 @@
 #include "Limen/Renderer/RenderPass.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/RHI/Framebuffer.h"
-
+#include "Limen/RHI/Shader.h"
+#include "Limen/RHI/GraphicsPipeline.h"
+#include "Limen/RHI/VertexArray.h"
 
 namespace SandBox
 {
@@ -78,6 +79,21 @@ namespace SandBox
          */
         Limen::Scope<Limen::RenderPass> m_SceneRenderPass;
 
+        // 最终显示所用的Pipeline
+        Limen::Ref<Limen::GraphicsPipeline> m_DisplayPipeline;
+
+        // 全屏三角形的 VAO, 他持有IBO共享引用
+        Limen::Scope<Limen::VertexArray> m_DisplayVertexArray;
+
+        // 最终提供 ImGUI 显示的单采样的 RGBA8 颜色目标
+        Limen::Scope<Limen::Framebuffer> m_DisplayFramebuffer;
+
+        // 借用m_DisplayFramebuffer,管理最终输出阶段
+        Limen::Scope<Limen::RenderPass> m_DisplayRenderPass;
+
+        // 显示阶段的线性 RGB 到 sRGB 编码shader
+        Limen::Ref<Limen::Shader> m_DisplayShader;
+
         /**
          * @brief 用于验证 Renderer2D 纹理绘制接口的测试纹理。
          */
@@ -88,6 +104,8 @@ namespace SandBox
          */
         uint32_t m_ViewportWidth = 1280;
         uint32_t m_ViewportHeight = 720;
+        // 固定离屏尺寸与相机，用于后续像素回归
+        bool m_ReferenceViewEnabled = false;
 
         /**
          * @brief Particle的统一设置

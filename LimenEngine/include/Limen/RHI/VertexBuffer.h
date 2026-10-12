@@ -5,9 +5,9 @@
 
 #include <initializer_list>
 #include <string>
-#include <vector>
 
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LArray.h"
 
 
 namespace Limen
@@ -304,7 +304,7 @@ namespace Limen
             CalculateOffsetAndStride();
         }
 
-        [[nodiscard]] const std::vector<BufferElement> &GetElements() const noexcept
+        [[nodiscard]] const LArray<BufferElement> &GetElements() const noexcept
         {
             return m_Elements;
         }
@@ -331,7 +331,7 @@ namespace Limen
             m_Stride = offset;
         }
 
-        std::vector<BufferElement> m_Elements;
+        LArray<BufferElement> m_Elements;
         uint32_t m_Stride = 0;
     };
 

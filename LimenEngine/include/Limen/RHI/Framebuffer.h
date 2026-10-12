@@ -3,8 +3,8 @@
 //
 #pragma once
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LArray.h"
 #include <initializer_list>
-#include <vector>
 
 
 namespace Limen
@@ -60,7 +60,7 @@ namespace Limen
         /**
          * 允许使用下面这种形式描述附件：
          *
-         * { RGB, RGB8, RGBA8, Depth24Stencil8 }
+         * { RGBA16F, Depth24Stencil8 }
          *
          * 或者：
          *
@@ -74,20 +74,16 @@ namespace Limen
         /**
          * @brief Framebuffer所需的全部附件格式。
          *
-         * 第一版允许：
+         * 当前 OpenGL 后端允许：
          * - 一个颜色附件；
          * - 一个深度或深度模板附件。
          */
-        std::vector<FramebufferAttachmentFormat> Formats;
+        LArray<FramebufferAttachmentFormat> Formats;
     };
 
     /**
-    * @brief Framebuffer 的创建参数。
-     *
-     * 第一版固定使用：
-     * - 一个 RGBA8 颜色附件；
-     * - 一个 Depth24Stencil8 深度/模板附件；
-     * - 使用MSAA 级别定为4
+     * @brief Framebuffer 的创建参数。
+     * 默认使用 RGBA8 + Depth24Stencil8、4 倍 MSAA；调用方可覆盖格式和采样数。
      */
     struct FramebufferSpecification
     {

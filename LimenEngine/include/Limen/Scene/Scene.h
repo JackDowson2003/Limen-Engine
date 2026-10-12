@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include <vector>
 #include <limits>
 #include <glm/mat4x4.hpp>
 
 #include "Limen/Core/Core.h"
 #include "Limen/Scene/Light.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen
 {
@@ -57,7 +57,7 @@ namespace Limen
     /**
      * @brief 标识 Scene 中的一个可渲染对象。
      *
-     * 当前第一版使用 vector 下标作为句柄。
+     * 当前第一版使用 Scene 内部数组的下标作为句柄，不保存元素指针。
      * 因为 Scene 暂时不支持删除和重新排序，所以对象加入后，
      * 它的下标在 Scene 生命周期内保持不变。
      *
@@ -80,7 +80,7 @@ namespace Limen
          * @brief 判断句柄是否至少不是默认的无效值。
          *
          * 这里只检查是否拥有下标；
-         * Scene 后续还要检查 Index 是否越过 vector 边界。
+         * Scene 访问时还要检查 Index 是否越过当前数组边界。
          */
         [[nodiscard]]
         bool IsValid() const noexcept
@@ -92,7 +92,7 @@ namespace Limen
     /**
      * @brief 标识Scene中的一个点光源
      *
-     * 当前第一版使用m_PointLights中的vector下标作为句柄。
+     * 当前第一版使用 Scene 点光源数组的下标作为句柄，不保存元素指针。
      * 由于暂时不支持删除和重新排序，点光源加入Scene后，
      * 对应下标在Scene生命周期内保持不变。
      *
@@ -111,7 +111,7 @@ namespace Limen
          * @brief 判断句柄是否至少拥有一个有效形式的下标。
          *
          * 这里只排除InvalidIndex；
-         * Scene访问时还必须继续检查是否越过vector边界。
+         * Scene 访问时还必须检查是否越过当前数组边界。
          */
         [[nodiscard]]
         bool IsValid() const noexcept
@@ -123,8 +123,8 @@ namespace Limen
     /**
      * @brief 保存一个场景中的对象数据
      *
-     * Scene 只负责拥有和组织厂家数据，不负责发出任何渲染指令，只负责拥有RenderObjects, lights
-     * SceneRenderer 后续会通过 GetRendererObjects() 读取这些对象并提交渲染
+     * Scene 拥有并组织可渲染对象和光源数据，不发出渲染指令。
+     * SceneRenderer 通过 GetRenderObjects() 读取对象并提交渲染。
      */
     class LIMEN_API Scene final
     {
@@ -229,7 +229,7 @@ namespace Limen
          * 同时防止外部绕过Scene直接增删光源。
          */
         [[nodiscard]]
-        const std::vector<PointLight>&
+        const LArray<PointLight>&
         GetPointLights() const noexcept;
 
         /**
@@ -259,7 +259,7 @@ namespace Limen
          * 在渲染过程中意外增删场景对象。
          */
         [[nodiscard]]
-        const std::vector<SceneRenderObject> &
+        const LArray<SceneRenderObject> &
         GetRenderObjects() const noexcept;
 
         /**
@@ -276,10 +276,10 @@ namespace Limen
         /**
          * @brief 当前场景拥有的全部可渲染对象。
          *
-         * vector 拥有 SceneRenderObject；其中的 Ref 共同持有对应的
+         * LArray 拥有 SceneRenderObject；其中的 Ref 共同持有对应的
          * Mesh 和 Material 资源。
          */
-        std::vector<SceneRenderObject> m_RenderObjects;
+        LArray<SceneRenderObject> m_RenderObjects;
 
         /**
          * @brief 当前场景的主平行光。
@@ -295,7 +295,7 @@ namespace Limen
          * 每个点光源都会在着色时产生一份漫反射和镜面反射贡献，
          * 最终由Renderer累加。
          */
-        std::vector<PointLight> m_PointLights;
+        LArray<PointLight> m_PointLights;
 
         /**
          * @brief 当前场景的常量环境光。

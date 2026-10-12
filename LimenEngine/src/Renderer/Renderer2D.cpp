@@ -40,7 +40,6 @@
 
 namespace Limen
 {
-    // 匿名命名空间中的名字只在当前 cpp 内可见，
     // QuadVertex 是 Renderer2D 的内部 CPU/GPU 顶点格式，不属于公共接口。
     namespace
     {
@@ -233,7 +232,6 @@ namespace Limen
          */
         Ref<Shader> TextureShader;
 
-
         /**
          * @brief Renderer2D 统一使用的图形管线。
          *
@@ -259,6 +257,9 @@ namespace Limen
          * StartBatch() 会清空数组，Flush() 会按照下标逐一绑定。
          */
         std::array<Ref<Texture2D>, MaxTextureSlots> TextureSlots{};
+
+        // 供本批次未使用的采样槽绑定，不计入TextureSlotCount
+        Ref<Texture2D> FallbackTexture;
 
         /**
          * @brief 当前批次已经占用的纹理槽数量。
@@ -375,21 +376,17 @@ namespace Limen
          * 完全一致。这样 Fragment Shader 才会从正确的 sampler2D
          * 槽位中取得对应纹理。
          */
-        for (uint32_t textureSlot = 0;
-             textureSlot < s_Data->TextureSlotCount;
-             ++textureSlot)
+        for (uint32_t i = 0; i < MaxTextureSlots; ++i)
         {
-            LM_CORE_ASSERT(
-                s_Data->TextureSlots[textureSlot],
-                "Renderer2D batch contains a null texture"
-            );
+            const Ref<Texture2D> &texture =
+                    i < s_Data->TextureSlotCount
+                        ? s_Data->TextureSlots[i]
+                        : s_Data->FallbackTexture;
 
-            if (!s_Data->TextureSlots[textureSlot])
-                continue;
-
-            s_Data->TextureSlots[textureSlot]->Bind(
-                textureSlot
-            );
+            LM_CORE_ASSERT(texture, "Renderer2D sampler slot has no texture");
+            if (!texture)
+                return;
+            texture->Bind(i);
         }
 
         /*
@@ -457,6 +454,30 @@ namespace Limen
 
         // 从这里开始，s_Data 成为所有 Renderer2D 资源的唯一入口。
         s_Data = CreateScope<Renderer2DData>();
+
+        const Texture2DSpecification fallbackSpec{
+            .Width = 1,
+            .Height = 1,
+            .Format = TextureFormat::RGBA8,
+            .ColorSpace = TextureColorSpace::Linear,
+            .GenerateMipmaps = false
+        };
+
+        s_Data->FallbackTexture = Texture2D::Create(fallbackSpec);
+        LM_CORE_ASSERT(s_Data->FallbackTexture, "Renderer2D fallback texture creation failed");
+
+        if (!s_Data->FallbackTexture)
+        {
+            s_Data.reset();
+            return;
+        }
+
+        // 洋红色只用于暴露意外采样；正常 Quad 不应读到后备纹理。
+        constexpr std::array<unsigned char, 4> fallbackPixel{255, 0, 255, 255};
+        s_Data->FallbackTexture->SetData(
+            fallbackPixel.data(),
+            fallbackPixel.size()
+        );
 
         // 第1步：创建 VAO。VAO 稍后会记录动态 VBO 的布局以及静态 IBO。
         s_Data->QuadVertexArray.reset(VertexArray::Create());
@@ -813,7 +834,6 @@ namespace Limen
 
         if (!s_Data->SceneActive)
             return;
-
 
         // DrawQuad() 只向 CPU 缓存写入顶点。
         // 到 EndScene() 时统一上传并绘制剩余批次。

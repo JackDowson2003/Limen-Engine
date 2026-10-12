@@ -265,7 +265,6 @@ namespace Limen
             .Width = static_cast<uint32_t>(width),
             .Height = static_cast<uint32_t>(height),
             .Format = format,
-            // 迁移阶段暂时保持Linear，下一步由调用方传入。
             .ColorSpace = colorSpace,
             .GenerateMipmaps = true
         };

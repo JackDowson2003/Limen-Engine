@@ -21,7 +21,12 @@ namespace Limen {
 
 	void LayerStack::PushLayer(Layer* layer)
 	{
-		m_Layers.emplace(m_Layers.begin() + m_LayerInsertIndex, layer);
+		// 普通 Layer 位于 Overlay 前；先在末尾增加一个元素，再将 Overlay 向后移动一格。
+		const uint32_t oldSize = m_Layers.getSize();
+		m_Layers.push_back(layer);
+		for (uint32_t index = oldSize; index > m_LayerInsertIndex; --index)
+			m_Layers[index] = m_Layers[index - 1];
+		m_Layers[m_LayerInsertIndex] = layer;
 		m_LayerInsertIndex++;
 	}
 
@@ -32,24 +37,32 @@ namespace Limen {
 
 	void LayerStack::PopLayer(Layer* layer)
 	{
-		const auto it = std::find(m_Layers.begin(),
-			m_Layers.begin() + m_LayerInsertIndex, layer);
-		if (it != m_Layers.begin() + m_LayerInsertIndex)
+		for (uint32_t index = 0; index < m_LayerInsertIndex; ++index)
 		{
+			if (m_Layers[index] != layer)
+				continue;
+
 			layer->OnDetach();
-			m_Layers.erase(it);
+			for (uint32_t next = index + 1; next < m_Layers.getSize(); ++next)
+				m_Layers[next - 1] = m_Layers[next];
+			m_Layers.pop_back();
 			m_LayerInsertIndex--;
+			return;
 		}
 	}
 
 	void LayerStack::PopOverlay(Layer* overlay)
 	{
-		const auto it = std::find(m_Layers.begin() + m_LayerInsertIndex,
-			m_Layers.end(), overlay);
-		if (it != m_Layers.end())
+		for (uint32_t index = m_LayerInsertIndex; index < m_Layers.getSize(); ++index)
 		{
+			if (m_Layers[index] != overlay)
+				continue;
+
 			overlay->OnDetach();
-			m_Layers.erase(it);
+			for (uint32_t next = index + 1; next < m_Layers.getSize(); ++next)
+				m_Layers[next - 1] = m_Layers[next];
+			m_Layers.pop_back();
+			return;
 		}
 	}
 

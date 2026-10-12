@@ -6,9 +6,9 @@
 #include <glad/gl.h>
 
 #include <string>
-#include <vector>
 
 #include "Limen/Core/Log.h"
+#include "Limen/Tool/LArray.h"
 #include "glm/gtc/type_ptr.hpp"
 
 namespace Limen
@@ -42,13 +42,13 @@ namespace Limen
             GLint logLength = 0;
             glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
 
-            std::vector<GLchar> infoLog(static_cast<size_t>(logLength > 0 ? logLength : 1));
+            LArray<GLchar> infoLog(static_cast<uint32_t>(logLength > 0 ? logLength : 1));
             GLsizei written = 0;
-            glGetShaderInfoLog(shader, logLength, &written, infoLog.data());
+            glGetShaderInfoLog(shader, logLength, &written, infoLog.begin());
 
             LM_CORE_ERROR("{} shader compilation failed:\n{}",
                           ShaderStageName(stage),
-                          std::string(infoLog.data(), static_cast<size_t>(written)));
+                          std::string(infoLog.begin(), static_cast<size_t>(written)));
 
             glDeleteShader(shader);
             return 0;
@@ -88,12 +88,12 @@ namespace Limen
             GLint logLength = 0;
             glGetProgramiv(m_RendererID, GL_INFO_LOG_LENGTH, &logLength);
 
-            std::vector<GLchar> infoLog(static_cast<size_t>(logLength > 0 ? logLength : 1));
+            LArray<GLchar> infoLog(static_cast<uint32_t>(logLength > 0 ? logLength : 1));
             GLsizei written = 0;
-            glGetProgramInfoLog(m_RendererID, logLength, &written, infoLog.data());
+            glGetProgramInfoLog(m_RendererID, logLength, &written, infoLog.begin());
 
             LM_CORE_ERROR("OpenGL shader program linking failed:\n{}",
-                          std::string(infoLog.data(), static_cast<size_t>(written)));
+                          std::string(infoLog.begin(), static_cast<size_t>(written)));
 
             glDeleteProgram(m_RendererID);
             m_RendererID = 0;

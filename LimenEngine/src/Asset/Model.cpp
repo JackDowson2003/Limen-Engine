@@ -10,7 +10,7 @@
 
 namespace Limen
 {
-    Model::Model(std::vector<ModelPart> parts, std::vector<ModelMaterialSlot> materialSlots)
+    Model::Model(LArray<ModelPart> parts, LArray<ModelMaterialSlot> materialSlots)
         : m_Parts(std::move(parts)), m_MaterialSlots(std::move(materialSlots))
     {
         // 一个有效的 Model 至少应当包含一个可绘制部分。
@@ -51,7 +51,7 @@ namespace Limen
              */
             LM_CORE_ASSERT(
                 MaterialSlot == ModelPart::InvalidMaterialSlot ||
-                MaterialSlot < m_MaterialSlots.size(),
+                MaterialSlot < m_MaterialSlots.getSize(),
                 "Model part '{}' contains invalid material slot {}",
                 Name,
                 MaterialSlot
@@ -65,7 +65,7 @@ namespace Limen
 
     }
 
-    const std::vector<ModelPart> &Model::GetParts() const noexcept
+    const LArray<ModelPart> &Model::GetParts() const noexcept
     {
         return m_Parts;
     }
@@ -75,7 +75,7 @@ namespace Limen
         return m_LocalBounds;
     }
 
-    const std::vector<ModelMaterialSlot> &Model::GetMaterialSlots() const noexcept
+    const LArray<ModelMaterialSlot> &Model::GetMaterialSlots() const noexcept
     {
         return m_MaterialSlots;
     }

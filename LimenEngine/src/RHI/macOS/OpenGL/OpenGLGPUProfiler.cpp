@@ -120,14 +120,14 @@ namespace Limen
         const uint64_t handleValue = m_NextScopeHandleValue++;
 
         // 压栈的 depth = 压栈前栈大小，也就是节点在栈中的位置
-        const auto depth = static_cast<uint32_t>(m_NodeStack.size());
+        const auto depth = m_NodeStack.getSize();
 
         // 创建独占节点：复制名字、记录深度、父节点只借用
         Scope<ProfileNode> node = CreateScope<ProfileNode>();
         node->Name = std::string(debugName);
         node->Depth = depth;
         node->HandleValue = handleValue;
-        node->Parent = m_NodeStack.empty() ? nullptr : m_NodeStack.back();
+        node->Parent = m_NodeStack.empty() ? nullptr : m_NodeStack[m_NodeStack.getSize() - 1];
 
         // 整帧查询进行期间这里只记录 Scope 层级与配对，不提交 Scope GPU 查询。
 
@@ -139,7 +139,7 @@ namespace Limen
             m_CurrentFrame->RootNodes.push_back(std::move(node));
         else
             // 在顶层挂载节点 看谁后来了
-            m_NodeStack.back()->Children.push_back(std::move(node));
+            m_NodeStack[m_NodeStack.getSize() - 1]->Children.push_back(std::move(node));
 
         // 压栈：记录当前未闭合路径
         m_NodeStack.push_back(nodePtr);
@@ -160,7 +160,7 @@ namespace Limen
             return;
         }
 
-        if (ProfileNode *activeNode = m_NodeStack.back();
+        if (ProfileNode *activeNode = m_NodeStack[m_NodeStack.getSize() - 1];
             !handle.IsValid() || activeNode->HandleValue != handle.Value
         )
         {
@@ -193,7 +193,7 @@ namespace Limen
         {
             LM_CORE_WARN(
                 "GPUProfiler::EndFrame has {} unclosed scopes",
-                m_NodeStack.size()
+                m_NodeStack.getSize()
             );
             return;
         }

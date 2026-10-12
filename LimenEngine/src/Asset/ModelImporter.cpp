@@ -213,11 +213,11 @@ namespace Limen
             if (!vertex.has_value())
                 return false;
 
-            if (buildMeshData.Geometry.Vertices.size() >= std::numeric_limits<uint32_t>::max())
+            if (buildMeshData.Geometry.Vertices.getSize() >= std::numeric_limits<uint32_t>::max())
                 return false;
 
 
-            const uint32_t newVertexIndex = static_cast<uint32_t>(buildMeshData.Geometry.Vertices.size());
+            const uint32_t newVertexIndex = buildMeshData.Geometry.Vertices.getSize();
 
             buildMeshData.Geometry.Vertices.push_back(*vertex);
             buildMeshData.Geometry.Indices.push_back(newVertexIndex);
@@ -236,16 +236,16 @@ namespace Limen
         [[nodiscard]]
         bool GenerateVertexNormals(MeshData &meshData)
         {
-            if (meshData.Indices.size() % 3 != 0)
+            if (meshData.Indices.getSize() % 3 != 0)
                 return false;
 
             // 清空默认法线
             for (MeshVertex &vertex: meshData.Vertices)
                 vertex.Normal = glm::vec3(0.0f);
 
-            const std::size_t indexCount = meshData.Indices.size();
+            const std::size_t indexCount = meshData.Indices.getSize();
 
-            const std::size_t vertexCount = meshData.Vertices.size();
+            const std::size_t vertexCount = meshData.Vertices.getSize();
             for (std::size_t i = 0; i < indexCount; i += 3)
             {
                 const uint32_t firstIndex = meshData.Indices[i + 0];
@@ -302,23 +302,23 @@ namespace Limen
         [[nodiscard]]
         bool GenerateVertexTangents(MeshData &meshData)
         {
-            if (meshData.Vertices.empty() || meshData.Indices.size() % 3 != 0)
+            if (meshData.Vertices.empty() || meshData.Indices.getSize() % 3 != 0)
             {
                 return false;
             }
 
-            const std::size_t vertexCount = meshData.Vertices.size();
+            const uint32_t vertexCount = meshData.Vertices.getSize();
 
             /*
              * 一个顶点通常被多个三角形共享。
              * 因此先累加相邻三角形贡献的T和B，
              * 最后再统一正交化、归一化并计算手性。
              */
-            std::vector tangentSums(vertexCount, glm::vec3(0.0f));
+            LArray tangentSums(vertexCount, glm::vec3(0.0f));
 
-            std::vector bitangentSums(vertexCount, glm::vec3(0.0f));
+            LArray bitangentSums(vertexCount, glm::vec3(0.0f));
 
-            const std::size_t indexCount = meshData.Indices.size();
+            const std::size_t indexCount = meshData.Indices.getSize();
 
             // 收集每个三角形顶点对 B T的贡献
             for (std::size_t i = 0; i < indexCount; i += 3)
@@ -540,8 +540,8 @@ namespace Limen
         //现在只是取得 tinyobjloader 的解析结果, 下一步才会转换为 Limen::MeshData
 
         const tinyobj::attrib_t &attributes = reader.GetAttrib();
-        const std::vector<tinyobj::shape_t> &shapes = reader.GetShapes();
-        const std::vector<tinyobj::material_t> &materials = reader.GetMaterials();
+        const auto &shapes = reader.GetShapes();
+        const auto &materials = reader.GetMaterials();
 
         LM_CORE_INFO(
             "Parsed OBJ '{}': {} positions, {} shapes, {} materials",
@@ -551,14 +551,22 @@ namespace Limen
             materials.size()
         );
 
+        // tinyobjloader 使用 size_t，LArray 的容量使用 uint32_t；不能截断后再预留空间。
+        if (materials.size() > std::numeric_limits<uint32_t>::max()
+            || shapes.size() > std::numeric_limits<uint32_t>::max())
+        {
+            LM_CORE_ERROR("OBJ '{}' exceeds LArray capacity", sourcePath.string());
+            return nullptr;
+        }
+
         /**
          * 保存源模型中的材质名称和基础Blinn-Phong参数。
          *
          * 它仍然只是CPU端资源描述，
          * 不是Renderer使用的Material。
          */
-        std::vector<ModelMaterialSlot> materialSlots;
-        materialSlots.reserve(materials.size());
+        LArray<ModelMaterialSlot> materialSlots;
+        materialSlots.reserve(static_cast<uint32_t>(materials.size()));
 
         for (const tinyobj::material_t &material: materials)
         {
@@ -569,7 +577,7 @@ namespace Limen
              * 名称处理与材质参数转换彼此独立。
              */
             if (material.name.empty())
-                slot.Name = "Material_" + std::to_string(materialSlots.size());
+                slot.Name = "Material_" + std::to_string(materialSlots.getSize());
             else
                 slot.Name = material.name;
 
@@ -638,8 +646,8 @@ namespace Limen
          * 每个输出ModelPart只对应一个材质槽，
          * 并在自己的Mesh内部进行顶点去重。
          */
-        std::vector<ModelPart> modelParts;
-        modelParts.reserve(shapes.size());
+        LArray<ModelPart> modelParts;
+        modelParts.reserve(static_cast<uint32_t>(shapes.size()));
 
         for (const tinyobj::shape_t &shape: shapes)
         {
@@ -730,10 +738,10 @@ namespace Limen
             /*
              * 一个Shape可能使用多个材质。
              *
-             * vector保持材质第一次出现时的稳定顺序；
+             * LArray保持材质第一次出现时的稳定顺序；
              * unordered_map用于根据源材质编号快速找到构建器。
              */
-            std::vector<OBJMeshBuildData> meshBuildDataList;
+            LArray<OBJMeshBuildData> meshBuildDataList;
 
             std::unordered_map<int, std::size_t> materialToBuildData;
 
@@ -772,7 +780,7 @@ namespace Limen
                 } else
                 {
                     //第一次遇到这个 Material 创建新的 构造器
-                    buildDataIndex = meshBuildDataList.size();
+                    buildDataIndex = meshBuildDataList.getSize();
 
                     OBJMeshBuildData newBuildData;
                     newBuildData.SourceMaterialIndex = sourceMaterialIndex;
@@ -873,8 +881,8 @@ namespace Limen
                 LM_CORE_INFO(
                     "Built OBJ part '{}': {} vertices, {} indices, normals={}",
                     part.Name,
-                    buildData.Geometry.Vertices.size(),
-                    buildData.Geometry.Indices.size(),
+                    buildData.Geometry.Vertices.getSize(),
+                    buildData.Geometry.Indices.getSize(),
                     buildData.RequiresGeneratedNormals
                     ? "generated"
                     : "source"
@@ -899,7 +907,7 @@ namespace Limen
         LM_CORE_INFO(
             "Imported OBJ '{}' as {} model parts",
             sourcePath.string(),
-            modelParts.size()
+            modelParts.getSize()
         );
 
         return CreateRef<Model>(std::move(modelParts), std::move(materialSlots));

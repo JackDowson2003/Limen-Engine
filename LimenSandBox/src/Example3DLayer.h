@@ -10,6 +10,7 @@
 #include "Limen/RHI/Shader.h"
 #include "Limen/Scene/Scene.h"
 #include "Limen/Scene/SceneRenderer.h"
+#include "Limen/Tool/LArray.h"
 
 namespace SandBox
 {
@@ -79,7 +80,7 @@ namespace SandBox
          * 数组下标与ModelMaterialSlot下标保持一致：
          * m_ImportedMaterials[0]对应模型的MaterialSlot 0。
          */
-        std::vector<Limen::Ref<Limen::Material>> m_ImportedMaterials;
+        Limen::LArray<Limen::Ref<Limen::Material>> m_ImportedMaterials;
 
         /**
          * @brief 当前测试层的场景数据。
@@ -108,7 +109,7 @@ namespace SandBox
         /**
          * @brief m_Scene 中立方体对象的句柄。
          *
-         * Layer 不保存 vector 元素的指针或引用，
+         * Layer 不保存数组元素的指针或引用，
          * 而是通过该句柄请求 Scene 修改立方体。
          */
         Limen::SceneRenderObjectHandle m_CubeObjectHandle;

@@ -96,7 +96,7 @@ namespace SandBox
         particle.LifeRemaining = specification.LifeTime;
 
         //到达末尾进行循环
-        m_NextParticleIndex = (m_NextParticleIndex + 1) % m_Particles.size();
+        m_NextParticleIndex = (m_NextParticleIndex + 1) % m_Particles.getSize();
     }
 
     void ParticleSystem::Update(const Limen::DeltaTime &deltaTime)

@@ -21,13 +21,13 @@ namespace Limen
 
         void SetIndexBuffer(const Ref<IndexBuffer> &indexBuffer) override;
 
-        const std::vector<Ref<VertexBuffer>>& GetVertexBuffers() const override;
+        const LArray<Ref<VertexBuffer>>& GetVertexBuffers() const override;
 
         const Ref<IndexBuffer>& GetIndexBuffer() const override;
 
     private:
         uint32_t m_RendererID;
-        std::vector<Ref<VertexBuffer>> m_VertexBuffers;
+        LArray<Ref<VertexBuffer>> m_VertexBuffers;
         Ref<IndexBuffer> m_IndexBuffer;
     };
 }

@@ -14,16 +14,14 @@ namespace Limen
     class Model;
 
     /**
-     * @brief 统一加载、缓存和管理引擎资源
+     * @brief 统一加载、缓存和管理纹理与模型资源。
      *
-     * 第一版只管理 Textrue2D
+     * - 解析逻辑路径；
+     * - 缓存同一路径的不同颜色空间纹理和已加载模型；
+     * - 提供默认白纹理和平坦法线纹理；
+     * - 在 GraphicsContext 销毁前清空管理器持有的资源引用。
      *
-     * - 逻辑路径解析；
-     * - 避免相同纹理重复加载；
-     * - 提供默认白纹理；
-     * - 在GraphicsContext销毁前统一释放GPU资源。
-     *
-     * 后续再加入Model缓存，不提前做泛型资源系统。
+     * 当前不是泛型资源系统。
      */
     class LIMEN_API AssetManager final
     {
@@ -32,23 +30,23 @@ namespace Limen
         AssetManager() = delete;
 
         /**
-         * @brief 初始化资源管理器。
+         * @brief 初始化资源管理器并创建默认 GPU 纹理。
          *
-         * 必须在GraphicsContext和Renderer初始化之后调用，
-         * 因为初始化过程会创建默认白色GPU纹理。
+         * 必须在 GraphicsContext 和 Renderer 初始化之后调用：
+         * 此处会创建 1×1 白色 Albedo 纹理和平坦法线纹理。
          *
-         * @param assetRoot
-         * 当前程序使用的资源根目录。
+         * @param assetRoot 当前程序使用的资源根目录。
          */
         static void Init(
             const std::filesystem::path &assetRoot = "assets"
         );
 
         /**
-         * @brief 释放缓存中的全部资源。
+         * @brief 清空 AssetManager 持有的缓存和默认资源引用。
          *
-         * 必须在GraphicsContext销毁之前调用，
-         * 否则Texture析构时无法安全调用底层图形API。
+         * 必须在 GraphicsContext 销毁之前调用。
+         * 若调用方仍持有资源 Ref，资源会继续存活；
+         * 调用方也必须在 GraphicsContext 销毁前释放这些引用。
          */
         static void Shutdown();
 

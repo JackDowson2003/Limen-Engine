@@ -48,6 +48,7 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实�
 - 键盘、鼠标、窗口事件和跨平台键码接口；
 - 正交相机、透视相机与相机控制器；
 - 日志、断言、`DeltaTime`、`Scope` 与 `Ref`；
+- 自研连续动态数组 `LArray`：原先使用 `std::vector` 的 Scene、Model、Mesh、RHI 等自有数据现由它管理元素生命周期；
 - ImGui Dockspace、Scene Viewport、光源与曝光参数面板、Shadow Map 调试显示；
 - 静态库、动态库与 Debug/Release CMake Preset；
 - Debug 模式下的 ASan 与 UBSan。
@@ -114,13 +115,14 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 - Tone Mapping 目前只有基础 Reinhard 算子；没有自动曝光、相机 EV、可选 Tone Mapper 或完整显示管理；
 - 最终输出是 8-bit `RGBA8` 不透明 Scene 图像，尚无透明合成与 HDR 显示输出；
 - 阴影只有单平行光硬阴影，没有 PCF、CSM、Shadow Atlas 和点光阴影；
-- Scene 句柄仍是 `vector` 下标，不支持删除和 Generation；
+- Scene 句柄仍是 Scene 内部 `LArray` 的下标，不支持删除和 Generation；
+- `LArray` 当前只实现引擎已用到的动态数组操作，长度与容量使用 `uint32_t`，不是完整的 `std::vector` 替代接口；
 - 只支持 OBJ/MTL，不支持 glTF/GLB；
 - 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
-- 已有 PostProcess CPU 数值 CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
+- 已有 PostProcess、AABB、AssetPath、LArray 的 CPU CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
 - 当前 ImGui 面板是 Sandbox 调试界面，不是完整 Editor；
 - 没有场景序列化、脚本、动画、物理、音频和网络；
-- 旧的 `Texture2D::Create(path)` 与 AssetManager 路径仍然并存；
+- 2D Sandbox 的颜色纹理暂按 `Linear` 加载以保持旧显示数值，迁移后的画面仍待复验；
 - Direct3D 12 所需的显式命令、描述符、资源状态和同步模型尚未建立。
 
 ## 获取、构建与运行
@@ -148,6 +150,8 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 | GLM           | 向量与矩阵          | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
 | ImGui         | 编辑器与调试 UI     | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
 | spdlog        | 日志                | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
+
+需要动态连续存储的自有数据已从 `std::vector` 迁移到 `LArray`；第三方库（例如 tinyobjloader）仍可在其内部使用 `std::vector`。导入器只借用第三方解析结果，再转换为 Limen 自有数据；不修改 `vendor`，也不让第三方容器成为公共引擎接口。
 
 `.gitmodules` 由 CLion 生成和维护，不手动编辑。GLM、ImGui、spdlog 以及后续新增的第三方库保留各自的外部依赖目录或仓库，不要求重新登记为 Limen Engine 父仓库的 gitlink。
 
@@ -191,13 +195,20 @@ cmake --build --preset build-debug
 (cd out && ./LimenSandBox)
 ```
 
+只验证自研数组时，在仓库根目录执行：
+
+```bash
+cmake --build --preset build-debug --target LimenLArrayTests
+ctest --test-dir out/cmake-build-debug-clang17 -R '^LimenLArray$' --output-on-failure
+```
+
 ### Preset 与输出目录
 
-| 配置 | Configure Preset | Build Preset | 构建树 | Engine 类型 | Sanitizer |
-| --- | --- | --- | --- | --- | --- |
-| Debug | `ninja-debug` | `build-debug` | `out/cmake-build-debug-clang17/` | Static | ASan + UBSan |
-| Shared Debug | `ninja-shared-debug` | `build-shared-debug` | `out/cmake-build-shared-debug-clang17/` | Shared | ASan + UBSan |
-| Release | `ninja-release` | `build-release` | `out/cmake-build-release-clang17/` | Static | 关闭 |
+| 配置         | Configure Preset     | Build Preset         | 构建树                                  | Engine 类型 | Sanitizer    |
+|--------------|----------------------|----------------------|-----------------------------------------|-------------|--------------|
+| Debug        | `ninja-debug`        | `build-debug`        | `out/cmake-build-debug-clang17/`        | Static      | ASan + UBSan |
+| Shared Debug | `ninja-shared-debug` | `build-shared-debug` | `out/cmake-build-shared-debug-clang17/` | Shared      | ASan + UBSan |
+| Release      | `ninja-release`      | `build-release`      | `out/cmake-build-release-clang17/`      | Static      | 关闭         |
 
 三个配置最终都会输出到：
 
@@ -231,14 +242,14 @@ cmake --build --preset build-debug
 
 正式构建入口是 CMake Preset。`scripts/` 当前包含辅助脚本和历史脚本：
 
-| 路径 | 实际用途 | 当前状态 |
-| --- | --- | --- |
-| `scripts/RUN_TEST.sh` | 构建并运行 PostProcess CPU/GPU 数值测试 | GPU 测试需要 macOS 桌面 OpenGL Context；从仓库根目录或 `scripts/` 运行 |
-| `scripts/test-shared.sh` | 配置 Shared Debug、检查 `.dylib` 链接并运行数秒 | macOS 冒烟测试；不是 CTest 或画面回归 |
-| `scripts/POST_BUILD.sh` | 手动复制 Sandbox assets | 未被 CMake 调用；依赖调用目录；不复制 Engine assets |
-| `scripts/sub_module.sh` | 历史 submodule 添加命令 | 非幂等，路径与当前仓库不完全一致，不作为入口 |
-| `scripts/sub_module.cmd` | 历史 Windows 初始化尝试 | 当前语法与平台构建均不可用，不作为入口 |
-| `scripts/out/` | 本地生成残留目录 | 被忽略，不属于源码或正式构建输出 |
+| 路径                     | 实际用途                                        | 当前状态                                                               |
+|--------------------------|-------------------------------------------------|------------------------------------------------------------------------|
+| `scripts/RUN_TEST.sh`    | 构建并运行 PostProcess CPU/GPU 数值测试         | GPU 测试需要 macOS 桌面 OpenGL Context；从仓库根目录或 `scripts/` 运行 |
+| `scripts/test-shared.sh` | 配置 Shared Debug、检查 `.dylib` 链接并运行数秒 | macOS 冒烟测试；不是 CTest 或画面回归                                  |
+| `scripts/POST_BUILD.sh`  | 手动复制 Sandbox assets                         | 未被 CMake 调用；依赖调用目录；不复制 Engine assets                    |
+| `scripts/sub_module.sh`  | 历史 submodule 添加命令                         | 非幂等，路径与当前仓库不完全一致，不作为入口                           |
+| `scripts/sub_module.cmd` | 历史 Windows 初始化尝试                         | 当前语法与平台构建均不可用，不作为入口                                 |
+| `scripts/out/`           | 本地生成残留目录                                | 被忽略，不属于源码或正式构建输出                                       |
 
 Shared Library 冒烟测试当前应从 `out/` 工作目录启动，以保证运行时能够找到资源：
 
@@ -283,7 +294,8 @@ Limen-Engine/
 │   │       ├── Math/
 │   │       ├── Renderer/
 │   │       ├── RHI/
-│   │       └── Scene/
+│   │       ├── Scene/
+│   │       └── Tool/                 # LArray
 │   ├── src/
 │   │   ├── Application/
 │   │   ├── Asset/
@@ -315,6 +327,8 @@ Limen-Engine/
 │       ├── SandBox2D.*
 │       └── ParticleSystem.*
 │
+├── tests/                            # CTest 与可选的 macOS OpenGL 测试
+│
 └── out/                              # CMake 构建树、程序与运行时资源
 ```
 
@@ -334,18 +348,18 @@ RHI 公共接口
 macOS OpenGL 4.1 后端
 ```
 
-| 模块 | 当前职责 | 不负责什么 |
-| --- | --- | --- |
-| `Scene` | 保存可渲染对象、Transform 和光源数据 | 不发出 GPU 命令 |
-| `SceneRenderer` | 组织 Shadow Pass、Main Pass、PostProcess Pass 和场景提交 | 不解析模型文件 |
-| `Renderer` | 准备每帧、每视图、每物体数据并提交 Draw | 不拥有 Scene |
-| `RenderPass` | 描述目标、开始、清理、保存、Resolve 和结束 | 不定义材质外观 |
-| `Framebuffer` | 拥有颜色、深度和 MSAA 附件 | 不决定使用哪个 Shader |
-| `GraphicsPipeline` | 保存 Shader 和固定功能状态 | 不拥有几何资源 |
-| `Material` | 保存 Pipeline、材质参数和纹理绑定 | 不拥有场景 Transform |
-| `Mesh` | 拥有可绘制几何资源和局部 AABB | 不选择光照模型 |
-| `AssetManager` | 路径解析、加载、缓存和默认资源 | 不执行场景渲染 |
-| `RendererCommand / RendererAPI` | 转发跨后端渲染命令 | 不理解 Scene 或 Material |
+| 模块                            | 当前职责                                                 | 不负责什么               |
+|---------------------------------|----------------------------------------------------------|--------------------------|
+| `Scene`                         | 保存可渲染对象、Transform 和光源数据                     | 不发出 GPU 命令          |
+| `SceneRenderer`                 | 组织 Shadow Pass、Main Pass、PostProcess Pass 和场景提交 | 不解析模型文件           |
+| `Renderer`                      | 准备每帧、每视图、每物体数据并提交 Draw                  | 不拥有 Scene             |
+| `RenderPass`                    | 描述目标、开始、清理、保存、Resolve 和结束               | 不定义材质外观           |
+| `Framebuffer`                   | 拥有颜色、深度和 MSAA 附件                               | 不决定使用哪个 Shader    |
+| `GraphicsPipeline`              | 保存 Shader 和固定功能状态                               | 不拥有几何资源           |
+| `Material`                      | 保存 Pipeline、材质参数和纹理绑定                        | 不拥有场景 Transform     |
+| `Mesh`                          | 拥有可绘制几何资源和局部 AABB                            | 不选择光照模型           |
+| `AssetManager`                  | 路径解析、加载、缓存和默认资源                           | 不执行场景渲染           |
+| `RendererCommand / RendererAPI` | 转发跨后端渲染命令                                       | 不理解 Scene 或 Material |
 
 公共接口位于 `LimenEngine/include/Limen/`。OpenGL 原生类型和实现只允许出现在 `LimenEngine/src/RHI/macOS/OpenGL/` 等后端私有目录中。
 
@@ -436,7 +450,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     A[已具备: OBJ,Normal Map,sRGB] --> B[已具备:HDR + PostProcess + 整帧计时]
-    B --> C[当前: 回归测试与旧纹理入口收尾]
+    B --> C[当前: 回归测试与 2D 色彩链路收尾]
     C --> D[PBR Metallic-Roughness]
     D --> E[glTF/GLB + IBL]
     E --> F[PCF + CSM + Shadow Atlas]
@@ -454,7 +468,7 @@ flowchart LR
 
 1. 已能构建运行 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；Sandbox 有 Linear/sRGB 缓存检查入口；
 2. 仍需把颜色空间、Normal Mapping 的固定参考姿态变成可重复的视觉基线；
-3. 迁移剩余 `Texture2D::Create(path)` 调用后再删除旧加载路径。
+3. 仓库内旧 `Texture2D::Create(path)` 调用已迁移并删除旧入口；2D Sandbox 仍需视觉复验。
 
 ### 阶段 1：验证基础设施（部分完成）
 
@@ -588,7 +602,7 @@ flowchart LR
 
 1. 固定当前场景与参数，复验曝光 `0`、默认曝光和高强度光照下的画面、Shadow Map 与最终不透明输出；记录预期结果；
 2. 将颜色空间、Normal Mapping 和 HDR/后处理检查转成可重复的测试（先 CPU 数值测试，再增加带容差的截图回归）；
-3. 确认旧 `Texture2D::Create(path)` 的调用方并迁移，再删除旧入口；
+3. 复验 2D Sandbox 迁移后的纹理画面；在接入正确的 sRGB 读取与输出前，颜色纹理暂按 `Linear` 加载；
 4. 补齐 Shader 编译失败检查和当前 OpenGL 环境可用的诊断路径；
 5. 完成上述基线后，定义 PBR 材质语义与纹理颜色空间，开始 Metallic-Roughness PBR；
 6. 随后进入 glTF/GLB、IBL 与阴影升级；DX12 和 DXR 继续按后续阶段推进。
@@ -597,16 +611,17 @@ flowchart LR
 
 环境：macOS OpenGL 4.1。重新启动 Sandbox，点击 `Freeze reference pose`，保持相机、Scene 视口尺寸、光源方向和其他光源参数不变。默认环境光强度为 `0.35`，第一个点光源强度为 `10.00`。
 
-| 条件                                | 预期                                | 本次验证结果                              | 状态            |
-|-------------------------------------|-------------------------------------|-------------------------------------------|-----------------|
-| 曝光 `1.00`、平行光强度 `1.00`      | 显示固定参考场景与 Shadow Map       | 参考画面已截图，参数与默认值一致          | 人工基线        |
-| 曝光 `0.00`，其他参数不变           | Scene 视口变黑，Shadow Map 图案不变 | 两项均符合预期                            | 人工通过        |
-| 曝光恢复 `1.00`、平行光强度 `10.00` | 受照区域变亮，Shadow Map 图案不变   | 两项均符合预期                            | 人工通过        |
+| 条件                                | 预期                                | 本次验证结果                                              | 状态         |
+|-------------------------------------|-------------------------------------|-----------------------------------------------------------|--------------|
+| 曝光 `1.00`、平行光强度 `1.00`      | 显示固定参考场景与 Shadow Map       | 参考画面已截图，参数与默认值一致                          | 人工基线     |
+| 曝光 `0.00`，其他参数不变           | Scene 视口变黑，Shadow Map 图案不变 | 两项均符合预期                                            | 人工通过     |
+| 曝光恢复 `1.00`、平行光强度 `10.00` | 受照区域变亮，Shadow Map 图案不变   | 两项均符合预期                                            | 人工通过     |
 | PostProcess 测试附件的 Alpha        | 应为 `255`（不透明）                | 2026-10-10：真实 Shader 绘制后，曝光 `1`/`0` 均读回 `255` | GPU 数值通过 |
 
 以上是手工观察，不等于带容差的截图回归。强度 `10.00` 是当前面板范围内的测试，不代表此前 `100000` 强度情形已被验证。
 
 PostProcess 数值测试从仓库根目录运行 `bash scripts/RUN_TEST.sh`。CPU 测试检查参考公式；macOS GPU 测试将已知 `RGBA16F` 像素送入真实 Shader，在测试用 `RGBA8` 附件读回曝光 `1` 时的 `{225, 188, 0, 255}` 与曝光 `0` 时的 `{0, 0, 0, 255}`；RGB 容差为 ±2 字节，Alpha 必须精确为 `255`。2026-10-10 两项 CTest 均通过。GPU CTest 在全新构建中默认不注册，脚本会显式启用并由 CMake 缓存该开关；它需要桌面图形会话，也不直接读取 Sandbox 的 Scene FBO，不能替代场景或截图回归。
+2026-10-11：同一 OpenGL 测试还验证了 Renderer2D DisplayEncode：线性 RGBA8 输入 {128, 64, 0, 64}，显示 RGBA8 输出 {188, 137, 0, 64}，测试通过。
 
 ## 暂不阻塞当前主线的功能
 

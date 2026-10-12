@@ -8,7 +8,7 @@
 #include <sstream>
 #include <string>
 
-std::string ReadShaderFile(const char* path)
+std::string ReadShaderFile(const char *path)
 {
     std::ifstream input(path, std::ios::binary);
     if (!input)
@@ -29,7 +29,7 @@ std::string ReadShaderFile(const char* path)
     return content.str();
 }
 
-GLuint CompileShaderStage(GLenum stage, const std::string& source)
+GLuint CompileShaderStage(GLenum stage, const std::string &source)
 {
     const GLuint shader = glCreateShader(stage);
     if (shader == 0)
@@ -38,7 +38,7 @@ GLuint CompileShaderStage(GLenum stage, const std::string& source)
         return 0;
     }
 
-    const char* sourceText = source.c_str();
+    const char *sourceText = source.c_str();
     glShaderSource(shader, 1, &sourceText, nullptr);
     glCompileShader(shader);
 
@@ -52,16 +52,16 @@ GLuint CompileShaderStage(GLenum stage, const std::string& source)
         shader, static_cast<GLsizei>(sizeof(log)), nullptr, log
     );
     std::cerr << "Shader compilation failed ("
-              << (stage == GL_VERTEX_SHADER ? "vertex" : "fragment")
-              << "): " << log << '\n';
+            << (stage == GL_VERTEX_SHADER ? "vertex" : "fragment")
+            << "): " << log << '\n';
 
     glDeleteShader(shader);
     return 0;
 }
 
 GLuint LinkPostProcess(
-    const std::string& vertexSource,
-    const std::string& fragmentSource
+    const std::string &vertexSource,
+    const std::string &fragmentSource
 )
 {
     const GLuint vertex = CompileShaderStage(
@@ -118,20 +118,25 @@ GLuint LinkPostProcess(
 }
 
 bool CheckPixel(
-    const char* label,
+    const char *label,
     const GLubyte pixel[4],
     int expectedRed,
     int expectedGreen,
-    int expectedBlue
+    int expectedBlue,
+    int expectedAlpha = 255
 )
 {
-    const int expected[4]{expectedRed, expectedGreen, expectedBlue, 255};
+    const int expected[4]{
+        expectedRed, expectedGreen, expectedBlue, expectedAlpha
+    };
+
     bool passed = true;
     for (int channel = 0; channel < 4; ++channel)
     {
-        // RGB 允许量化/驱动舍入误差；不透明 Alpha 必须精确为 255。
+        // RGB 允许量化/驱动舍入误差；Alpha 必须精确匹配。
         const int tolerance = channel == 3 ? 0 : 2;
-        const int difference = static_cast<int>(pixel[channel]) - expected[channel];
+        const int difference =
+                static_cast<int>(pixel[channel]) - expected[channel];
         if (std::abs(difference) > tolerance)
             passed = false;
     }
@@ -143,19 +148,19 @@ bool CheckPixel(
     }
 
     std::cerr << label << ": expected ("
-              << expected[0] << ", " << expected[1] << ", "
-              << expected[2] << ", " << expected[3] << "), got ("
-              << static_cast<int>(pixel[0]) << ", "
-              << static_cast<int>(pixel[1]) << ", "
-              << static_cast<int>(pixel[2]) << ", "
-              << static_cast<int>(pixel[3]) << ")\n";
+            << expected[0] << ", " << expected[1] << ", "
+            << expected[2] << ", " << expected[3] << "), got ("
+            << static_cast<int>(pixel[0]) << ", "
+            << static_cast<int>(pixel[1]) << ", "
+            << static_cast<int>(pixel[2]) << ", "
+            << static_cast<int>(pixel[3]) << ")\n";
     return false;
 }
 
 bool DrawAndCheckExposure(
     GLint exposureLocation,
     float exposure,
-    const char* label,
+    const char *label,
     int expectedRed,
     int expectedGreen,
     int expectedBlue
@@ -182,7 +187,7 @@ bool DrawAndCheckExposure(
     );
 }
 
-bool CheckPostProcessPixels(GLuint program)
+bool CheckPostProcessPixels(GLuint program, GLuint displayProgram)
 {
     GLuint sceneTexture = 0;
     GLuint colorTexture = 0;
@@ -198,8 +203,7 @@ bool CheckPostProcessPixels(GLuint program)
         framebuffer == 0 || vertexArray == 0)
     {
         std::cerr << "PostProcess test resource creation failed\n";
-    }
-    else
+    } else
     {
         // 已知的线性 HDR 输入；源 Alpha=0.25 可检验最终输出是否强制不透明。
         const GLfloat hdrPixel[4]{3.0f, 1.0f, 0.0f, 0.25f};
@@ -231,8 +235,7 @@ bool CheckPostProcessPixels(GLuint program)
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         {
             std::cerr << "PostProcess RGBA8 framebuffer incomplete\n";
-        }
-        else
+        } else
         {
             const GLint sceneLocation = glGetUniformLocation(
                 program, "u_SceneColor"
@@ -243,8 +246,7 @@ bool CheckPostProcessPixels(GLuint program)
             if (sceneLocation < 0 || exposureLocation < 0)
             {
                 std::cerr << "PostProcess uniforms unavailable\n";
-            }
-            else
+            } else
             {
                 glViewport(0, 0, 1, 1);
                 glDisable(GL_BLEND);
@@ -269,7 +271,45 @@ bool CheckPostProcessPixels(GLuint program)
                 const bool zeroExposure = DrawAndCheckExposure(
                     exposureLocation, 0.0f, "exposure 0", 0, 0, 0
                 );
-                passed = normalExposure && zeroExposure;
+
+                // 2D 场景附件存放量化后的线性 RGBA8，而非 sRGB 纹理。
+                constexpr GLubyte linearPixel[4]{128, 64, 0, 64};
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, sceneTexture);
+                glTexImage2D(
+                    GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0,
+                    GL_RGBA, GL_UNSIGNED_BYTE, linearPixel
+                );
+
+                glUseProgram(displayProgram);
+                const GLint displaySceneLocation = glGetUniformLocation(
+                    displayProgram, "u_SceneColor"
+                );
+
+                bool displayEncode = false;
+                if (displaySceneLocation < 0)
+                {
+                    std::cerr << "Renderer2D display sampler unavailable\n";
+                } else
+                {
+                    glUniform1i(displaySceneLocation, 0);
+                    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                    glClear(GL_COLOR_BUFFER_BIT);
+                    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+                    GLubyte pixel[4]{};
+                    glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+
+                    const GLenum error = glGetError();
+                    if (error != GL_NO_ERROR)
+                        std::cerr << "2D display encode: OpenGL error " << error << '\n';
+                    else
+                        displayEncode = CheckPixel(
+                            "2D display encode", pixel, 188, 137, 0, 64
+                        );
+                }
+
+                passed = normalExposure && zeroExposure && displayEncode;
             }
         }
     }
@@ -306,7 +346,7 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    GLFWwindow* window = glfwCreateWindow(
+    GLFWwindow *window = glfwCreateWindow(
         16, 16, "Limen OpenGL test", nullptr, nullptr
     );
 
@@ -323,8 +363,7 @@ int main()
     if (!success)
     {
         std::cerr << "GLAD initialization failed\n";
-    }
-    else
+    } else
     {
         GLint major = 0;
         GLint minor = 0;
@@ -334,10 +373,10 @@ int main()
         success = major > 4 || (major == 4 && minor >= 1);
         if (success)
             std::cout << "OpenGL " << major << '.' << minor
-                      << " context ready\n";
+                    << " context ready\n";
         else
             std::cerr << "OpenGL 4.1 required; got "
-                      << major << '.' << minor << '\n';
+                    << major << '.' << minor << '\n';
 
         if (success)
         {
@@ -347,10 +386,17 @@ int main()
             const std::string fragmentSource = ReadShaderFile(
                 LIMEN_POSTPROCESS_FRAG_PATH
             );
+            const std::string displayVertexSource = ReadShaderFile(
+                LIMEN_RENDERER2D_DISPLAY_VERT_PATH
+            );
+            const std::string displayFragmentSource = ReadShaderFile(
+                LIMEN_RENDERER2D_DISPLAY_FRAG_PATH
+            );
 
-            if (vertexSource.empty() || fragmentSource.empty())
+            if (vertexSource.empty() || fragmentSource.empty() ||
+                displayVertexSource.empty() || displayFragmentSource.empty())
             {
-                std::cerr << "PostProcess shader source is empty\n";
+                std::cerr << "Color pipeline shader source is empty\n";
                 success = false;
             }
             else
@@ -358,14 +404,21 @@ int main()
                 const GLuint program = LinkPostProcess(
                     vertexSource, fragmentSource
                 );
-                success = program != 0;
+                const GLuint displayProgram = LinkPostProcess(
+                    displayVertexSource, displayFragmentSource
+                );
 
+                success = program != 0 && displayProgram != 0;
                 if (success)
                 {
-                    std::cout << "PostProcess shader linked\n";
-                    success = CheckPostProcessPixels(program);
-                    glDeleteProgram(program);
+                    std::cout << "PostProcess and Renderer2D display shaders linked\n";
+                    success = CheckPostProcessPixels(program, displayProgram);
                 }
+
+                if (displayProgram != 0)
+                    glDeleteProgram(displayProgram);
+                if (program != 0)
+                    glDeleteProgram(program);
             }
         }
     }

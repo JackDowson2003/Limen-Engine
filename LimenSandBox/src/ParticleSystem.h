@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <vector>
+#include "Limen/Tool/LArray.h"
 
 #include "glm/vec3.hpp"
 #include "glm/vec4.hpp"
@@ -133,7 +133,7 @@ namespace SandBox
         };
 
         //粒子对象池
-        std::vector<Particle> m_Particles;
+        Limen::LArray<Particle> m_Particles;
 
         //下一次Emit的时候的对象池的下标，到达末尾的时候回到0，从而进行循环
         //也就是从粒子系统的对象池的第一个对象的index

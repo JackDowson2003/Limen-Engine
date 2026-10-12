@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <vector>
-
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LArray.h"
 
 namespace Limen
 {
@@ -44,6 +43,6 @@ namespace Limen
          * 与Model材质槽顺序一致的运行时Material数组。
          */
         [[nodiscard]]
-        static std::vector<Ref<Material>> BuildBlinnPhong(const Model& model, const Ref<GraphicsPipeline>& pipeline);
+        static LArray<Ref<Material>> BuildBlinnPhong(const Model& model, const Ref<GraphicsPipeline>& pipeline);
     };
 }

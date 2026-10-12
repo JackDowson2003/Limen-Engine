@@ -8,6 +8,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/Log.h"
+#include "Limen/Asset/AssetManager.h"
 #include "Limen/Renderer/OrthoGraphicCameraController.h"
 
 #include "Limen/Renderer/PerspectiveCamera.h"
@@ -119,8 +120,15 @@ namespace SandBox
                 0
             );
 
-            m_Texture = Limen::Texture2D::Create("assets/textures/checkerboard.png");
-            m_LogoTexture = Limen::Texture2D::Create("assets/textures/cherno.png");
+            // 兼容旧 2D 显示路径；完成 2D 输出颜色编码后再改为 SRGB。
+            m_Texture = Limen::AssetManager::LoadTexture2D(
+                "textures/checkerboard.png",
+                Limen::TextureColorSpace::Linear
+            );
+            m_LogoTexture = Limen::AssetManager::LoadTexture2D(
+                "textures/cherno.png",
+                Limen::TextureColorSpace::Linear
+            );
 
             m_TextureShader->Bind();
             m_TextureShader->SetInt("u_Texture", 0);

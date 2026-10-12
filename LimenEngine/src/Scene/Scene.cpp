@@ -28,16 +28,16 @@ namespace Limen
             return {};
 
         LM_CORE_ASSERT(
-            m_RenderObjects.size() < SceneRenderObjectHandle::InvalidIndex,
+            m_RenderObjects.getSize() < SceneRenderObjectHandle::InvalidIndex,
             "Scene contains too many render objects"
         );
 
-        if (m_RenderObjects.size() >= SceneRenderObjectHandle::InvalidIndex)
+        if (m_RenderObjects.getSize() >= SceneRenderObjectHandle::InvalidIndex)
         {
             return {};
         }
 
-        const uint32_t objectIdx = static_cast<uint32_t>(m_RenderObjects.size());
+        const uint32_t objectIdx = static_cast<uint32_t>(m_RenderObjects.getSize());
 
         m_RenderObjects.push_back(renderObject);
 
@@ -106,21 +106,21 @@ namespace Limen
          * 所以不能让有效元素使用这个下标。
          */
         LM_CORE_ASSERT(
-            m_PointLights.size() <
+            m_PointLights.getSize() <
             ScenePointLightHandle::InvalidIndex,
             "Scene contains too many point lights"
         );
-        if (m_PointLights.size() >= ScenePointLightHandle::InvalidIndex)
+        if (m_PointLights.getSize() >= ScenePointLightHandle::InvalidIndex)
             return {};
         ScenePointLightHandle handle;
-        handle.Index = static_cast<uint32_t>(m_PointLights.size());
+        handle.Index = m_PointLights.getSize();
         m_PointLights.push_back(light);
         return handle;
     }
 
     bool Scene::SetPointLight(const ScenePointLightHandle handle, const PointLight &light)
     {
-        const bool handleIsValid = handle.IsValid() && handle.Index < m_PointLights.size();
+        const bool handleIsValid = handle.IsValid() && handle.Index < m_PointLights.getSize();
 
         LM_CORE_ASSERT(
             handleIsValid,
@@ -155,7 +155,7 @@ namespace Limen
     {
         const bool handleIsValid =
         handle.IsValid() &&
-        handle.Index < m_PointLights.size();
+        handle.Index < m_PointLights.getSize();
 
         /*
          * 函数名使用Try，表示查询失败属于正常结果，
@@ -175,7 +175,7 @@ namespace Limen
         return true;
     }
 
-    const std::vector<PointLight> &Scene::GetPointLights() const noexcept
+    const LArray<PointLight> &Scene::GetPointLights() const noexcept
     {
         return m_PointLights;
     }
@@ -187,7 +187,7 @@ namespace Limen
 
     bool Scene::SetRenderObjectTransform(SceneRenderObjectHandle handle, const glm::mat4 &transform)
     {
-        const bool handleIsValid = handle.IsValid() && handle.Index < m_RenderObjects.size();
+        const bool handleIsValid = handle.IsValid() && handle.Index < m_RenderObjects.getSize();
 
         LM_CORE_ASSERT(
             handleIsValid,
@@ -204,11 +204,11 @@ namespace Limen
 
     /*
      * 返回 const 引用：
-     * 1. 不复制整个 vector；
+     * 1. 不复制整个 LArray；
      * 2. Scene 仍然拥有数组；
      * 3. SceneRenderer 只能读取，不能擅自增删对象。
      */
-    const std::vector<SceneRenderObject> &Scene::GetRenderObjects() const noexcept
+    const LArray<SceneRenderObject> &Scene::GetRenderObjects() const noexcept
     {
         return m_RenderObjects;
     }

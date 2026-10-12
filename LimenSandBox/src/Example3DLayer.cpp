@@ -470,7 +470,7 @@ namespace SandBox
                 const uint32_t materialSlot = MaterialSlot;
 
                 LM_CORE_ASSERT(
-                    materialSlot < m_ImportedMaterials.size(),
+                    materialSlot < m_ImportedMaterials.getSize(),
                     "Imported model part '{}' has invalid material slot {}",
                     Name,
                     materialSlot
@@ -479,7 +479,7 @@ namespace SandBox
                 /*
                  * Release模式可能关闭断言，因此仍然保护数组访问。
                  */
-                if (materialSlot >= m_ImportedMaterials.size())
+                if (materialSlot >= m_ImportedMaterials.getSize())
                 {
                     LM_CORE_ERROR(
                         "Cannot assign material slot {} to model part '{}'",
@@ -608,7 +608,7 @@ namespace SandBox
         );
 
         /*
-         * Layer 不直接访问 Scene 内部 vector，
+         * Layer 不直接访问 Scene 内部数组，
          * 而是通过创建立方体时取得的句柄修改 Transform。
          */
         const bool transformUpdated = m_Scene.SetRenderObjectTransform(m_CubeObjectHandle, cubeTransform);
