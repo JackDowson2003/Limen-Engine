@@ -5,7 +5,6 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <cstdint>
 #include <variant>
 #include <glm/vec2.hpp>
@@ -13,6 +12,7 @@
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LMap.h"
 
 
 namespace Limen
@@ -170,11 +170,11 @@ namespace Limen
 
         // 参数名称  ->  参数值
         //Material 在 CPU 端保存的“普通 Shader 参数表”：
-        std::unordered_map<std::string, MaterialParameterValue> m_Parameters;
+        LMap<std::string, MaterialParameterValue> m_Parameters;
 
         // Shader sampler名称 -> 纹理绑定信息
         //Material 在 CPU 端保存的 Texture 表
-        std::unordered_map<std::string, MaterialTextureBinding> m_TexturesBindings;
+        LMap<std::string, MaterialTextureBinding> m_TexturesBindings;
 
         // Debug Name
         std::string m_DebugName;

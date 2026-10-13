@@ -5,12 +5,12 @@
 
 #include <filesystem>
 #include <string>
-#include <unordered_map>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LMap.h"
 
 namespace Limen
 {
@@ -245,7 +245,7 @@ namespace Limen
         Ref<Shader> Get(const std::string &name) const;
 
     private:
-        std::unordered_map<std::string, Ref<Shader> > m_Shaders;
+        LMap<std::string, Ref<Shader> > m_Shaders;
 
         /**
          * @brief 检查指定名称是否已经加载。

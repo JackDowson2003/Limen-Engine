@@ -7,6 +7,7 @@
 
 #include "Limen/RHI/Shader.h"
 #include <glm/glm.hpp>
+#include "Limen/Tool/LMap.h"
 
 namespace Limen
 {
@@ -79,7 +80,7 @@ namespace Limen
 
     private:
         uint32_t m_RendererID;
-        std::unordered_map<std::string, int> m_UniformLocations;
+        LMap<std::string, int> m_UniformLocations;
         std::string m_Name;
     };
 }

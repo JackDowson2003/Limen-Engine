@@ -4,10 +4,9 @@
 
 #pragma once
 
-#include <utility>
-
 #include "Limen/Core/Core.h"
 #include "Limen/Input/KeyCodes.h"
+#include "Limen/Tool/LTuple.h"
 
 
 namespace Limen
@@ -54,7 +53,11 @@ namespace Limen
             return s_Instance->IsMouseButtonPressedImpl(button);
         }
 
-        [[nodiscard]] static std::pair<float, float> GetMousePos()
+        /**
+         * 当前窗口内容区内的光标坐标，顺序为 (x, y)。
+         * 返回值按值持有两个 float；坐标来自窗口系统，并非帧缓冲像素索引。
+         */
+        [[nodiscard]] static LTuple<float, float> GetMousePos()
         {
             return s_Instance->GetMousePosImpl();
         }
@@ -72,7 +75,7 @@ namespace Limen
     protected:
         [[nodiscard]] virtual bool IsKeyPressedImpl(KeyCode keyCode) const = 0;
         [[nodiscard]] virtual bool IsMouseButtonPressedImpl(MouseButton button) const = 0;
-        [[nodiscard]] virtual std::pair<float, float> GetMousePosImpl() const = 0;
+        [[nodiscard]] virtual LTuple<float, float> GetMousePosImpl() const = 0;
         [[nodiscard]] virtual float GetMouseXImpl() const = 0;
         [[nodiscard]] virtual float GetMouseYImpl() const = 0;
 

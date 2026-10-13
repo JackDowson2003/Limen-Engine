@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <limits>
 #include <optional>
 #include <system_error>
@@ -14,6 +15,7 @@
 #include <tiny_obj_loader.h>
 
 #include "Limen/Core/Log.h"
+#include "Limen/Tool/LMap.h"
 
 namespace Limen
 {
@@ -48,7 +50,7 @@ namespace Limen
         };
 
         /**
-         * @brief 生成unordered_map需要的哈希值。
+         * @brief 生成顶点查重表需要的哈希值。
          */
         struct OBJVertexKeyHash final
         {
@@ -97,7 +99,7 @@ namespace Limen
              * 不同Mesh拥有不同顶点数组，
              * 因此不能跨材质分组共享顶点索引。
              */
-            std::unordered_map<OBJVertexKey, uint32_t, OBJVertexKeyHash> VertexLookup;
+            LMap<OBJVertexKey, uint32_t, OBJVertexKeyHash> VertexLookup;
         };
 
         /**
@@ -712,7 +714,7 @@ namespace Limen
              * 如果一个分组中有任何顶点缺少法线，
              * 后续构建该分组时就统一忽略所有源法线并重新生成。
              */
-            std::unordered_map<int, bool> materialRequiresGeneratedNormals;
+            LMap<int, bool> materialRequiresGeneratedNormals;
 
             for (std::size_t i = 0; i < triangleCount; ++i)
             {
@@ -743,7 +745,7 @@ namespace Limen
              */
             LArray<OBJMeshBuildData> meshBuildDataList;
 
-            std::unordered_map<int, std::size_t> materialToBuildData;
+            LMap<int, std::size_t> materialToBuildData;
 
             /*
              * 必须按三角形遍历，因为material_ids的一个元素

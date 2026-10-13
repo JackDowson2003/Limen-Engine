@@ -25,9 +25,6 @@
 // glm::translate 和 glm::scale 的定义。
 #include <glm/gtc/matrix_transform.hpp>
 
-// Renderer2DData 使用固定大小数组保存单位 Quad 和纹理槽。
-#include <array>
-
 // 以下头文件只放在 cpp 中，避免把具体 RHI 资源暴露给 Renderer2D.h。
 #include "Limen/RHI/VertexBuffer.h"
 #include "Limen/RHI/IndexBuffer.h"
@@ -37,6 +34,7 @@
 #include "Limen/Core/Log.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/RHI/Texture.h"
+#include "Limen/Tool/LStaticArray.h"
 
 namespace Limen
 {
@@ -174,7 +172,7 @@ namespace Limen
          * transform * QuadVertexPositions[i]。
          * w = 1 表示它是位置，会受到平移分量影响。
          */
-        std::array<glm::vec4, VerticesPerQuad> QuadVertexPositions{};
+        LStaticArray<glm::vec4, VerticesPerQuad> QuadVertexPositions{};
 
         /**
          * @brief 单位 Quad 四个顶点对应的纹理坐标。
@@ -182,7 +180,7 @@ namespace Limen
          * 顺序必须和 QuadVertexPositions 完全一致：
          * 左下、右下、右上、左上。
          */
-        std::array<glm::vec2, VerticesPerQuad> QuadTextureCoordinates{};
+        LStaticArray<glm::vec2, VerticesPerQuad> QuadTextureCoordinates{};
 
         /**
          * @brief CPU 端批处理顶点数组的所有者。
@@ -256,7 +254,7 @@ namespace Limen
          * Ref 保证纹理在本批次提交完成前不会被销毁。
          * StartBatch() 会清空数组，Flush() 会按照下标逐一绑定。
          */
-        std::array<Ref<Texture2D>, MaxTextureSlots> TextureSlots{};
+        LStaticArray<Ref<Texture2D>, MaxTextureSlots> TextureSlots{};
 
         // 供本批次未使用的采样槽绑定，不计入TextureSlotCount
         Ref<Texture2D> FallbackTexture;
@@ -473,7 +471,7 @@ namespace Limen
         }
 
         // 洋红色只用于暴露意外采样；正常 Quad 不应读到后备纹理。
-        constexpr std::array<unsigned char, 4> fallbackPixel{255, 0, 255, 255};
+        constexpr LStaticArray<unsigned char, 4> fallbackPixel{255, 0, 255, 255};
         s_Data->FallbackTexture->SetData(
             fallbackPixel.data(),
             fallbackPixel.size()

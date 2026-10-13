@@ -21,7 +21,7 @@ namespace Limen
     protected:
         [[nodiscard]] bool IsKeyPressedImpl(KeyCode keyCode) const override;
 
-        [[nodiscard]] std::pair<float,float> GetMousePosImpl() const override;
+        [[nodiscard]] LTuple<float, float> GetMousePosImpl() const override;
 
         [[nodiscard]] bool IsMouseButtonPressedImpl(MouseButton button) const override;
 

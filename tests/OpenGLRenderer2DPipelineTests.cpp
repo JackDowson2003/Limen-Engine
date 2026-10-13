@@ -75,11 +75,13 @@ int main()
         bool resolvedBackgroundCorrect = false;
         bool resolvedQuadCorrect = false;
         bool resolvedTextureCorrect = false;
+        bool resolvedTranslucentCorrect = false;
         bool displayPassReady = false;
         bool displayDrawReady = false;
         bool displayBackgroundCorrect = false;
         bool displayQuadCorrect = false;
         bool displayTextureCorrect = false;
+        bool displayTranslucentCorrect = false;
         bool displayShaderReady = false;
         bool displayPipelineReady = false;
         bool displayGeometryReady = false;
@@ -280,6 +282,12 @@ int main()
                         glm::vec2(1.0f, 1.0f),
                         glm::vec4(1.0f, 0.0f, 0.0f, 1.0f)
                     );
+                    // 放在左侧空白区域，与现有 Quad 不重叠；背景 Alpha 为 1。
+                    Limen::Renderer2D::DrawQuad(
+                        glm::vec3(-0.75f, 0.0f, 0.0f),
+                        glm::vec2(0.5f, 0.5f),
+                        glm::vec4(1.0f, 0.0f, 0.0f, 0.5f)
+                    );
                     if (testTexture)
                     {
                         Limen::Renderer2D::DrawQuad(
@@ -438,6 +446,27 @@ int main()
                                     << textureRed << ", " << textureGreen << ", "
                                     << textureBlue << ", " << textureAlpha << ")\n";
                         }
+
+                        // 左侧 Quad 中心：RGB 按 Source Alpha 混合；不透明背景上的最终 Alpha 仍须为 1。
+                        constexpr int translucentCenter = (8 * 16 + 2) * 4;
+                        const int translucentRed = pixels[translucentCenter + 0];
+                        const int translucentGreen = pixels[translucentCenter + 1];
+                        const int translucentBlue = pixels[translucentCenter + 2];
+                        const int translucentAlpha = pixels[translucentCenter + 3];
+
+                        resolvedTranslucentCorrect =
+                                translucentRed >= 135 && translucentRed <= 141 &&
+                                translucentGreen >= 8 && translucentGreen <= 12 &&
+                                translucentBlue >= 10 && translucentBlue <= 16 &&
+                                translucentAlpha == 255;
+
+                        if (!resolvedTranslucentCorrect)
+                        {
+                            std::cerr << "Resolve translucent quad expected about "
+                                    << "(138, 10, 13, 255), got ("
+                                    << translucentRed << ", " << translucentGreen << ", "
+                                    << translucentBlue << ", " << translucentAlpha << ")\n";
+                        }
                     }
 
                     if (displayPassReady)
@@ -489,6 +518,9 @@ int main()
                             displayTextureCorrect = checkDisplayPixel(
                                 "Display texture quad", (8 * 16 + 13) * 4, 128, 64, 0
                             );
+                            displayTranslucentCorrect = checkDisplayPixel(
+                                "Display translucent quad", (8 * 16 + 2) * 4, 194, 56, 63
+                            );
                         }
                     }
                 }
@@ -507,11 +539,13 @@ int main()
            resolvedBackgroundCorrect &&
            resolvedQuadCorrect &&
            resolvedTextureCorrect &&
+           resolvedTranslucentCorrect &&
            displayPassReady &&
            displayDrawReady &&
            displayBackgroundCorrect &&
            displayQuadCorrect &&
            displayTextureCorrect &&
+           displayTranslucentCorrect &&
            displayShaderReady &&
            displayPipelineReady &&
            displayGeometryReady &&

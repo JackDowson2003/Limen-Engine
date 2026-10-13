@@ -42,7 +42,7 @@ namespace Limen
         return key == GLFW_PRESS || key == GLFW_REPEAT;
     }
 
-    std::pair<float, float> GLFWInput::GetMousePosImpl() const
+    LTuple<float, float> GLFWInput::GetMousePosImpl() const
     {
         const auto &window = Application::GetApp().GetWindow();
         const auto macWindow = window.GetNativeWindow();

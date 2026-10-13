@@ -53,6 +53,67 @@ add_test(
         COMMAND $<TARGET_FILE:LimenLArrayTests>
 )
 
+add_executable(LimenLStaticArrayTests
+        LStaticArrayTests.cpp
+)
+
+limen_configure_target(LimenLStaticArrayTests)
+
+target_include_directories(LimenLStaticArrayTests
+        PRIVATE
+        "${CMAKE_SOURCE_DIR}/LimenEngine/include"
+)
+
+add_test(
+        NAME LimenLStaticArray
+        COMMAND $<TARGET_FILE:LimenLStaticArrayTests>
+)
+
+add_executable(LimenLTupleTests
+        LTupleTests.cpp
+)
+
+limen_configure_target(LimenLTupleTests)
+
+target_include_directories(LimenLTupleTests
+        PRIVATE
+        "${CMAKE_SOURCE_DIR}/LimenEngine/include"
+)
+
+add_test(
+        NAME LimenLTuple
+        COMMAND $<TARGET_FILE:LimenLTupleTests>
+)
+
+add_executable(LimenLMapTests
+        LMapTests.cpp
+)
+
+limen_configure_target(LimenLMapTests)
+
+target_include_directories(LimenLMapTests
+        PRIVATE
+        "${CMAKE_SOURCE_DIR}/LimenEngine/include"
+)
+
+add_test(
+        NAME LimenLMap
+        COMMAND $<TARGET_FILE:LimenLMapTests>
+)
+
+add_executable(LimenLayerStackSceneRegressionTests
+        LayerStackSceneRegressionTests.cpp
+)
+
+limen_configure_target(LimenLayerStackSceneRegressionTests)
+
+target_link_libraries(LimenLayerStackSceneRegressionTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenLayerStackSceneRegression
+        COMMAND $<TARGET_FILE:LimenLayerStackSceneRegressionTests>
+)
+
 if (APPLE)
     option(
             LIMEN_ENABLE_OPENGL_GPU_TESTS
@@ -93,6 +154,24 @@ if (APPLE)
             glad
     )
 
+    add_executable(LimenOpenGLModelImportTests
+            OpenGLModelImportTests.cpp
+    )
+
+    limen_configure_target(LimenOpenGLModelImportTests)
+
+    target_link_libraries(LimenOpenGLModelImportTests
+            PRIVATE
+            LimenEngine
+            glfw
+            glad
+    )
+
+    target_compile_definitions(LimenOpenGLModelImportTests
+            PRIVATE
+            LIMEN_TEST_TWO_MATERIAL_MODEL_PATH="${CMAKE_SOURCE_DIR}/LimenSandBox/assets/models/TestTwoMaterials.obj"
+    )
+
     if (LIMEN_ENABLE_OPENGL_GPU_TESTS)
         add_test(
                 NAME LimenOpenGLPostProcess
@@ -108,5 +187,11 @@ if (APPLE)
                 LABELS "gpu"
                 WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/LimenEngine"
         )
+
+        add_test(
+                NAME LimenOpenGLModelImport
+                COMMAND $<TARGET_FILE:LimenOpenGLModelImportTests>
+        )
+        set_tests_properties(LimenOpenGLModelImport PROPERTIES LABELS "gpu")
     endif ()
 endif ()

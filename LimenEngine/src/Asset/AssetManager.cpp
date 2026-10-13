@@ -3,7 +3,6 @@
 //
 
 #include <string>
-#include <unordered_map>
 #include <limits>
 
 #include "stb_image/stb_image.h"
@@ -13,6 +12,7 @@
 #include "Limen/Asset/ModelImporter.h"
 #include "Limen/Core/Log.h"
 #include "Limen/RHI/Texture.h"
+#include "Limen/Tool/LMap.h"
 
 namespace Limen
 {
@@ -28,13 +28,13 @@ namespace Limen
     /**
      * AssetManager的内部数据。
      *
-     * 放在.cpp中，避免把unordered_map等实现细节暴露到公共头文件。
+     * 放在.cpp中，避免把缓存表等实现细节暴露到公共头文件。
      */
     struct AssetManager::AssetManagerData
     {
         // 实际文件路径 -> 已加载的纹理。
         // 实际文件路径 -> 不同颜色空间的GPU纹理资源。
-        std::unordered_map<std::string, TextureCacheEntry> TextureCache;
+        LMap<std::string, TextureCacheEntry> TextureCache;
 
         // 没有Albedo纹理时使用的1×1白纹理。
         Ref<Texture2D> WhiteTexture;
@@ -43,7 +43,7 @@ namespace Limen
         Ref<Texture2D> FlatNormalTexture;
 
         // 实际文件路径 -> 已加载的模型。
-        std::unordered_map<std::string, Ref<Model> > ModelCache;
+        LMap<std::string, Ref<Model> > ModelCache;
     };
 
 
