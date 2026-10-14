@@ -28,8 +28,8 @@ if (APPLE)
     )
     list(APPEND LIMEN_ENGINE_SOURCES ${LIMEN_ENGINE_MACOS_OPENGL_SOURCES})
 elseif (WIN32)
-    message(FATAL_ERROR
-            "The Windows D3D11/D3D12 backend has not been implemented yet"
+    message(
+            "Developer LYH is developing Limen-Engine now....."
     )
 elseif (UNIX)
     message(FATAL_ERROR
