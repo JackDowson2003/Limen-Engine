@@ -24,7 +24,7 @@ namespace Limen
         static Ref<spdlog::logger> s_ClientLogger;
     };
 }
-
+#ifdef LM_ENABLE_ASSERTS
 // 引擎核心日志宏。
 #define LM_CORE_TRACE(...) ::Limen::Log::GetCoreLogger()->trace(__VA_ARGS__)
 #define LM_CORE_INFO(...) ::Limen::Log::GetCoreLogger()->info(__VA_ARGS__)
@@ -39,3 +39,19 @@ namespace Limen
 #define LM_WARN(...) ::Limen::Log::GetClientLogger()->warn(__VA_ARGS__)
 #define LM_ERROR(...) ::Limen::Log::GetClientLogger()->error(__VA_ARGS__)
 #define LM_FATAL(...) ::Limen::Log::GetClientLogger()->critical(__VA_ARGS__)
+#else
+// 引擎核心日志宏。
+#define LM_CORE_TRACE(...) ((void)0)
+#define LM_CORE_INFO(...) ((void)0)
+#define LM_CORE_WARN(...) ((void)0)
+#define LM_CORE_ERROR(...) ((void)0)
+#define LM_CORE_FATAL(...) ((void)0)
+
+
+// 客户端日志宏。
+#define LM_TRACE(...) ((void)0)
+#define LM_INFO(...) ((void)0)
+#define LM_WARN(...) ((void)0)
+#define LM_ERROR(...) ((void)0)
+#define LM_FATAL(...) ((void)0)
+#endif

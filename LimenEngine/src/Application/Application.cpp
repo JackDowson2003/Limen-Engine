@@ -16,9 +16,18 @@ namespace Limen
 {
     Application *Application::s_Instance = nullptr;
 
-    Application::Application(
-        const bool isVSYNC,
-        const RendererAPI::API rendererAPI
+    /**
+     * @brief 创建应用，并在窗口创建前选择图形 API。
+     *
+     * @param isVSYNC 是否启用垂直同步。
+     * @param rendererAPI 本次运行使用的图形 API。
+     * @param enableImGuiDebugLayer 是否启用 Sandbox 使用的 ImGui 调试层；
+     *                              正式 Editor 默认不启用。
+     */
+     Application::Application(
+        const bool isVSYNC ,
+        const RendererAPI::API rendererAPI,
+        const bool enableImGuiDebugLayer
     )
     {
         LM_CORE_ASSERT(!s_Instance, "Application already initialized!");
@@ -41,9 +50,15 @@ namespace Limen
         AssetManager::Init("assets");
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
-        // 编辑器 UI 由 Application 统一管理，客户端只需实现 OnImGuiRender()。
-        m_ImGUILayer = new ImGUILayer();
-        PushOverlay(m_ImGUILayer);
+         if (enableImGuiDebugLayer)
+         {
+             // 调试 UI 由客户端显式选择；LayerStack 拥有该 Layer。
+             m_ImGUILayer = new ImGUILayer();
+             PushOverlay(m_ImGUILayer);
+         }
+#else
+         // 这些平台当前没有启用该调试层，避免未使用参数警告。
+         (void)enableImGuiDebugLayer;
 #endif
     }
 
@@ -88,24 +103,27 @@ namespace Limen
                     layer->OnUpdate(deltaTime); //更新数据
 
                 /*
-                 * 所有离屏场景渲染结束后，Example3DLayer 已经解绑场景 FBO，
-                 * 当前渲染目标重新是窗口默认 Framebuffer。
-                 *
-                 * 清理上一帧窗口内容，随后 ImGui 会重新绘制编辑器界面。
+                 * 各 Layer 完成当前的离屏场景绘制后，清理窗口默认 Framebuffer。
+                 * Sandbox 启用调试层时，它会在清理后绘制；
+                 * 正式 Editor 的 C++ UI 绘制阶段将在后续单独接入。
                  */
                 RendererCommand::SetClearColor(
                     {0.04f, 0.04f, 0.04f, 1.0f}
                 );
-
                 RendererCommand::Clear();
+                // 所有场景更新结束、窗口清屏之后，才允许提交正式 UI。
+                for (const auto & layer : m_LayerStack)
+                    layer->OnUIRender(*m_Window);
             }
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
-            LM_CORE_ASSERT(m_ImGUILayer, "ImGui layer was not initialized");
-            m_ImGUILayer->Begin();
-            for (Layer *&layer: m_LayerStack)
-                layer->OnImGuiRender(); //设置好imgui的数据
-            m_ImGUILayer->End();
+            if (m_ImGUILayer)
+            {
+                m_ImGUILayer->Begin();
+                for (Layer* layer : m_LayerStack)
+                    layer->OnImGuiRender();
+                m_ImGUILayer->End();
+            }
 #endif
 
             Renderer::EndFrame();

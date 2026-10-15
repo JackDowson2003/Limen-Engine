@@ -94,6 +94,7 @@ endfunction ()
 # 子目录分别定义 LimenEngine 库与 LimenSandBox 可执行文件。
 add_subdirectory(LimenEngine)
 add_subdirectory(LimenSandBox)
+add_subdirectory(Limen-Editor)
 
 if (BUILD_TESTING)
     add_subdirectory(tests)

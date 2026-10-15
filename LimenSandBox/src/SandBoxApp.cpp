@@ -13,7 +13,8 @@ namespace
         SandBoxApp()
             : Application(
                 false,
-                Limen::RendererAPI::API::OPENGL
+                Limen::RendererAPI::API::OPENGL,
+                true // Sandbox 显式启用 ImGui 调试层。
             )
         {
             // 当前只运行 3D 测试层，便于隔离验证透视、深度与 Pipeline。

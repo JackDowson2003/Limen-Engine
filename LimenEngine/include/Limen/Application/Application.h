@@ -18,15 +18,17 @@ namespace Limen
     public:
 
         /**
-         * @brief 创建应用并在窗口创建前选择图形API。
+         * @brief 创建应用，并在窗口创建前选择图形 API。
          *
          * @param isVSYNC 是否启用垂直同步。
-         * @param rendererAPI 本次运行使用的图形API。macOS可选择OpenGL或Metal；
-         *                    当前阶段仅OpenGL后端已经实现。
+         * @param rendererAPI 本次运行使用的图形 API。
+         * @param enableImGuiDebugLayer 是否启用 Sandbox 使用的 ImGui 调试层；
+         *                              正式 Editor 默认不启用。
          */
         explicit Application(
             bool isVSYNC = true,
-            RendererAPI::API rendererAPI = RendererAPI::API::OPENGL
+            RendererAPI::API rendererAPI = RendererAPI::API::OPENGL,
+            bool enableImGuiDebugLayer = false
         );
 
         virtual ~Application();
