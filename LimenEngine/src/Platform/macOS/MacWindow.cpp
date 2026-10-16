@@ -8,16 +8,35 @@
 #include "Limen/Events/ApplicationEvent.h"
 #include "Limen/Events/KeyEvent.h"
 #include "Limen/Events/MouseEvent.h"
+#include "Limen/Input/Input.h"
 #include "Platform/GLFW/GLFWKeyCodes.h"
+
 namespace Limen
 {
     static bool s_GLFWInitialized = false;
 
-    static void GLFWErrorCallback(int error_code, const char* description)
+    static void GLFWErrorCallback(int error_code, const char *description)
     {
-        LM_CORE_ERROR("GLFW Error: {0} {1}",error_code, description);
+        LM_CORE_ERROR("GLFW Error: {0} {1}", error_code, description);
     }
 
+    static bool TryMapGLFWMouseButton(int nativeButton, MouseButton &result)
+    {
+        switch (nativeButton)
+        {
+            case GLFW_MOUSE_BUTTON_LEFT: result = MouseButton::Left;
+                return true;
+            case GLFW_MOUSE_BUTTON_RIGHT: result = MouseButton::Right;
+                return true;
+            case GLFW_MOUSE_BUTTON_MIDDLE: result = MouseButton::Middle;
+                return true;
+            case GLFW_MOUSE_BUTTON_4: result = MouseButton::Button4;
+                return true;
+            case GLFW_MOUSE_BUTTON_5: result = MouseButton::Button5;
+                return true;
+            default: return false;
+        }
+    }
 
 
     MacWindow::MacWindow(const WindowProps &props)
@@ -60,8 +79,8 @@ namespace Limen
     void MacWindow::Init(const WindowProps &props)
     {
         m_Data.Title = props.Title;
-        m_Data.Width = props.Width;
-        m_Data.Height = props.Height;
+        m_Data.Width = 0;
+        m_Data.Height = 0;
 
         LM_CORE_INFO("Create Window Title: {0}, Width: {1}, Height :{2}", props.Title, props.Width, props.Height);
         LM_CORE_TRACE("Creating Window Now");
@@ -107,6 +126,24 @@ namespace Limen
         if (!m_Window)
             return;
 
+        int fboWidth = 0;
+        int fboHeight = 0;
+        glfwGetFramebufferSize(m_Window, &fboWidth, &fboHeight);
+
+        m_Data.Width = fboWidth > 0 ? static_cast<unsigned int>(fboWidth) : 0u;
+        m_Data.Height = fboHeight > 0 ? static_cast<unsigned int>(fboHeight) : 0u;
+
+        int windowWidth = 0;
+        int windowHeight = 0;
+        glfwGetWindowSize(m_Window, &windowWidth, &windowHeight);
+
+        m_Data.WindowWidth = windowWidth > 0
+                                 ? static_cast<unsigned int>(windowWidth)
+                                 : 0u;
+        m_Data.WindowHeight = windowHeight > 0
+                                  ? static_cast<unsigned int>(windowHeight)
+                                  : 0u;
+
         // Context的具体类型由RendererAPI决定，而不是由MacWindow写死。
         m_Context = GraphicsContext::Create(m_Window);
         LM_CORE_ASSERT(m_Context, "Failed to create the selected GraphicsContext");
@@ -122,23 +159,30 @@ namespace Limen
          * 这个回调会告诉你输入了什么字符
          * codepoint 是按下的字符 例如 'a'
          */
-        glfwSetCharCallback(m_Window, [](GLFWwindow *window, unsigned int codepoint)
+        glfwSetCharCallback(m_Window, [](GLFWwindow *window, const unsigned int codepoint)
         {
             const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             KeyTypedEvent event(static_cast<char32_t>(codepoint));
             data.EventCallBack(event);
         });
 
-        // 将 GLFW 回调转换为引擎事件并交给 Application。
-        glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, int width, int height)
+        glfwSetWindowSizeCallback(m_Window, [](GLFWwindow *window, const int width, const int height)
         {
-            const auto cWidth = static_cast<unsigned int>(width);
-            const auto cHeight = static_cast<unsigned int>(height);
             WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
-            WindowResizeEvent event(cWidth, cHeight);
+            data.WindowWidth = width > 0 ? static_cast<unsigned int>(width) : 0u;
+            data.WindowHeight = height > 0 ? static_cast<unsigned int>(height) : 0u;
+        });
+
+        // 将 GLFW 回调转换为引擎事件并交给 Application。
+        glfwSetFramebufferSizeCallback(m_Window, [](GLFWwindow *window, const int width, const int height)
+        {
+            WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+            data.Width = width > 0 ? static_cast<unsigned int>(width) : 0u;
+            data.Height = height > 0 ? static_cast<unsigned int>(height) : 0u;
+
+
+            WindowResizeEvent event(data.Width, data.Height);
             data.EventCallBack(event);
-            data.Width = cWidth;
-            data.Height = cHeight;
         });
 
         glfwSetWindowCloseCallback(m_Window, [](GLFWwindow *window)
@@ -148,7 +192,7 @@ namespace Limen
             data.EventCallBack(event);
         });
 
-        glfwSetKeyCallback(m_Window, [](GLFWwindow *window, int key, int scancode, int action, int mods)
+        glfwSetKeyCallback(m_Window, [](GLFWwindow *window, const int key, int scancode, const int action, int mods)
         {
             const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
             const KeyCode keyCode = KeyCodeFromGLFW(key);
@@ -179,20 +223,25 @@ namespace Limen
             }
         });
 
-        glfwSetMouseButtonCallback(m_Window, [](GLFWwindow *window, int button, int action, int mods)
+        glfwSetMouseButtonCallback(m_Window, [](GLFWwindow *window, const int button, const int action, int mods)
         {
             const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
+
+            MouseButton engineButton{};
+            if (!TryMapGLFWMouseButton(button, engineButton))
+                return;
+
             switch (action)
             {
                 case GLFW_PRESS:
                 {
-                    MouseButtonPressedEvent event(button);
+                    MouseButtonPressedEvent event(engineButton);
                     data.EventCallBack(event);
                     break;
                 }
                 case GLFW_RELEASE:
                 {
-                    MouseButtonReleasedEvent event(button);
+                    MouseButtonReleasedEvent event(engineButton);
                     data.EventCallBack(event);
                     break;
                 }
@@ -200,11 +249,11 @@ namespace Limen
             }
         });
 
-        glfwSetScrollCallback(m_Window, [](GLFWwindow *window, double xoffset, double yoffset)
+        glfwSetScrollCallback(m_Window, [](GLFWwindow *window, const double xOffset, const double yOffset)
         {
             const WindowData &data = *static_cast<WindowData *>(glfwGetWindowUserPointer(window));
-            const auto uXOffset = static_cast<float>(xoffset);
-            const auto uYOffset = static_cast<float>(yoffset);
+            const auto uXOffset = static_cast<float>(xOffset);
+            const auto uYOffset = static_cast<float>(yOffset);
 
             MouseScrolledEvent event(uXOffset, uYOffset);
 

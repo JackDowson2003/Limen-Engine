@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "Limen/Events/Event.h"
+#include "Limen/Input/Input.h"
 namespace Limen {
 
 	class LIMEN_API MouseMovedEvent : public Event
@@ -52,26 +53,27 @@ namespace Limen {
 	class LIMEN_API MouseButtonEvent : public Event
 	{
 	public:
-		int GetMouseButton() const { return m_Button; }
+		[[nodiscard]] MouseButton GetButton() const { return m_Button; }
 
 		EVENT_CLASS_CATEGORY(EventCategoryMouse | EventCategoryInput | EventCategoryMouseButton)
-	protected:
-		MouseButtonEvent(const int button)
-			: m_Button(button) {}
 
-		int m_Button;
+	protected:
+		explicit MouseButtonEvent(const MouseButton button) : m_Button(button) {}
+		MouseButton m_Button;
 	};
+
+
 
 	class LIMEN_API MouseButtonPressedEvent : public MouseButtonEvent
 	{
 	public:
-		MouseButtonPressedEvent(const int button)
+		explicit MouseButtonPressedEvent(const MouseButton button)
 			: MouseButtonEvent(button) {}
 
 		std::string ToString() const override
 		{
 			std::stringstream ss;
-			ss << "MouseButtonPressedEvent: " << m_Button;
+			ss << "MouseButtonPressedEvent: " << static_cast<int>(m_Button);
 			return ss.str();
 		}
 
@@ -81,13 +83,13 @@ namespace Limen {
 	class LIMEN_API MouseButtonReleasedEvent : public MouseButtonEvent
 	{
 	public:
-		MouseButtonReleasedEvent(const int button)
+		MouseButtonReleasedEvent(const MouseButton button)
 			: MouseButtonEvent(button) {}
 
 		std::string ToString() const override
 		{
 			std::stringstream ss;
-			ss << "MouseButtonReleasedEvent: " << m_Button;
+			ss << "MouseButtonReleasedEvent: " << static_cast<int>(m_Button);
 			return ss.str();
 		}
 

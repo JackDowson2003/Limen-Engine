@@ -26,16 +26,16 @@ namespace Limen
 
         ~ImGUILayer() override;
 
-        virtual void OnAttach() override;
+        void OnAttach() override;
 
-        virtual void OnDetach() override;
+        void OnDetach() override;
 
-        virtual void OnEvent(Event &event) override;
+        void OnEvent(Event &event) override;
 
         // Begin() 与 End() 包围同一帧中所有 Layer 的 OnImGuiRender() 调用。
-         void Begin();
+        void Begin();
 
-         void End();
+        void End();
 
 
         virtual bool OnMouseButtonPressedEvent(const MouseButtonPressedEvent &event);

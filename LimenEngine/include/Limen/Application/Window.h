@@ -14,6 +14,7 @@ namespace Limen
     struct LIMEN_API WindowProps
     {
         std::string Title;
+        // 请求的窗口内容尺寸大小，单位是窗口坐标，不一定等于帧缓冲像素
         uint32_t Width;
         uint32_t Height;
 
@@ -49,8 +50,13 @@ namespace Limen
          */
         virtual void Present() = 0;
 
+        // 当前窗口缓冲尺寸，单位是像素；可以用于设置渲染viewport
         [[nodiscard]] virtual uint32_t GetWidth() const = 0;
         [[nodiscard]] virtual uint32_t GetHeight() const = 0;
+
+        // 当前窗口内容区尺寸，单位是窗口坐标，供 UI 布局和鼠标定位使用。
+        [[nodiscard]] virtual uint32_t GetWindowWidth() const = 0;
+        [[nodiscard]] virtual uint32_t GetWindowHeight() const = 0;
 
         // Window attributes
         inline virtual void SetEventCallback(const EventCallbackFn& callback) = 0;

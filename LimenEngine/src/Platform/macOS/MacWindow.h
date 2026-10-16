@@ -21,11 +21,21 @@ namespace Limen
 
         void Present() override;
 
-        [[nodiscard]] inline void *GetNativeWindow() const override { return m_Window; }
-        [[nodiscard]] inline unsigned int GetWidth() const override { return m_Data.Width; }
-        [[nodiscard]] inline unsigned int GetHeight() const override { return m_Data.Height; }
+        [[nodiscard]] void *GetNativeWindow() const override { return m_Window; }
+        [[nodiscard]] unsigned int GetWidth() const override { return m_Data.Width; }
+        [[nodiscard]] unsigned int GetHeight() const override { return m_Data.Height; }
 
-        inline void SetEventCallback(const EventCallbackFn &callback) override { m_Data.EventCallBack = callback; }
+        [[nodiscard]] unsigned int GetWindowWidth() const override
+        {
+            return m_Data.WindowWidth;
+        }
+
+        [[nodiscard]] unsigned int GetWindowHeight() const override
+        {
+            return m_Data.WindowHeight;
+        }
+
+        void SetEventCallback(const EventCallbackFn &callback) override { m_Data.EventCallBack = callback; }
 
         inline void SetVSync(bool enabled) override;
 
@@ -48,6 +58,9 @@ namespace Limen
             std::string Title;
             unsigned int Width;
             unsigned int Height;
+            // GLFW 窗口内容区尺寸；与上面的帧缓冲像素尺寸分别维护。
+            unsigned int WindowWidth = 0;
+            unsigned int WindowHeight = 0;
             bool VSync = false;
             EventCallbackFn EventCallBack;
         };

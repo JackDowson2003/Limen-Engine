@@ -15,6 +15,19 @@
 namespace Limen
 {
 
+    static int ToImGuiMouseButton(const MouseButton button)
+    {
+        switch (button)
+        {
+            case MouseButton::Left:   return ImGuiMouseButton_Left;
+            case MouseButton::Right:  return ImGuiMouseButton_Right;
+            case MouseButton::Middle: return ImGuiMouseButton_Middle;
+            case MouseButton::Button4: return 3;
+            case MouseButton::Button5: return 4;
+        }
+        return -1;
+    }
+
     static ImGuiKey ToImGuiKey(const KeyCode keyCode)
     {
         if (keyCode >= KeyCode::D0 && keyCode <= KeyCode::D9)
@@ -172,19 +185,25 @@ namespace Limen
 
     bool ImGUILayer::OnMouseButtonPressedEvent(const MouseButtonPressedEvent &e)
     {
+        const int imguiButton = ToImGuiMouseButton(e.GetButton());
+
+        if (imguiButton < 0)
+            return false;
+
         ImGuiIO &io = ImGui::GetIO();
-        io.AddMouseButtonEvent(e.GetMouseButton(), true);
+        io.AddMouseButtonEvent(imguiButton, true);
         return io.WantCaptureMouse;
     }
 
     bool ImGUILayer::OnMouseButtonReleaseEvent(const MouseButtonReleasedEvent &e)
     {
-        ImGui::GetIO().AddMouseButtonEvent(
-            e.GetMouseButton(),
-            false
-        );
+        const int imguiButton = ToImGuiMouseButton(e.GetButton());
+        if (imguiButton < 0)
+            return false;
 
-        return ImGui::GetIO().WantCaptureMouse;
+        ImGuiIO &io = ImGui::GetIO();
+        io.AddMouseButtonEvent(imguiButton, false);
+        return io.WantCaptureMouse;
     }
 
     bool ImGUILayer::OnMouseButtonScrolledEvent(const MouseScrolledEvent &e)
