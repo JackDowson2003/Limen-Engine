@@ -76,4 +76,11 @@ namespace LimenEditor
         if (m_Backend)
             m_Backend->DrawSolidRect(window, position, size, color);
     }
+
+    void EditorUIRenderer::DrawTexturedRect(const Limen::Window &window, const glm::vec2 &position,
+        const glm::vec2 &size, const Limen::Texture2D &texture) const
+    {
+        if (m_Backend)
+            m_Backend->DrawTexturedRect(window,position,size,texture);
+    }
 }

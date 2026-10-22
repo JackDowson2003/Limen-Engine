@@ -1,9 +1,8 @@
 #pragma once
 
-#include <string>
-
 #include "Limen/Core/DeltaTime.h"
 #include "Limen/Events/Event.h"
+#include "Limen/Tool/LString.h"
 
 namespace  Limen {
 
@@ -12,7 +11,7 @@ namespace  Limen {
 	class LIMEN_API Layer
 	{
 	public:
-		explicit Layer( std::string  name = "Layer");
+		explicit Layer( LString  name = "Layer");
 		virtual ~Layer() = default;
 
 		virtual void OnAttach() {}
@@ -29,9 +28,9 @@ namespace  Limen {
 		virtual void OnImGuiRender() {}
 		virtual void OnEvent(Event& ) {}
 
-		[[nodiscard]] const std::string& GetName() const { return m_DebugName; }
+		[[nodiscard]] const LString& GetName() const { return m_DebugName; }
 	protected:
-		std::string m_DebugName;
+		LString m_DebugName;
 	};
 
 }

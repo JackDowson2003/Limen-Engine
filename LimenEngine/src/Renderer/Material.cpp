@@ -9,7 +9,7 @@
 
 namespace Limen
 {
-    Material::Material(Ref<GraphicsPipeline> pipeline, std::string debugName)
+    Material::Material(Ref<GraphicsPipeline> pipeline, LString debugName)
         : m_Pipeline(std::move(pipeline)), m_DebugName(std::move(debugName))
     {
         // Material必须拥有一条有效Pipeline，
@@ -21,7 +21,7 @@ namespace Limen
         );
     }
 
-    void Material::SetFloat(const std::string &name, const float value)
+    void Material::SetFloat(const LString &name, const float value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -37,7 +37,7 @@ namespace Limen
         );
     }
 
-    void Material::SetInt(const std::string &name, const int32_t value)
+    void Material::SetInt(const LString &name, const int32_t value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -53,7 +53,7 @@ namespace Limen
         );
     }
 
-    void Material::SetUInt(const std::string &name, const uint32_t value)
+    void Material::SetUInt(const LString &name, const uint32_t value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -69,7 +69,7 @@ namespace Limen
         );
     }
 
-    void Material::SetFloat2(const std::string &name, const glm::vec2 &value)
+    void Material::SetFloat2(const LString &name, const glm::vec2 &value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -85,7 +85,7 @@ namespace Limen
         );
     }
 
-    void Material::SetFloat3(const std::string &name, const glm::vec3 &value)
+    void Material::SetFloat3(const LString &name, const glm::vec3 &value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -101,7 +101,7 @@ namespace Limen
         );
     }
 
-    void Material::SetFloat4(const std::string &name, const glm::vec4 &value)
+    void Material::SetFloat4(const LString &name, const glm::vec4 &value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -117,7 +117,7 @@ namespace Limen
         );
     }
 
-    void Material::SetMat4(const std::string &name, const glm::mat4 &value)
+    void Material::SetMat4(const LString &name, const glm::mat4 &value)
     {
         LM_CORE_ASSERT(
             !name.empty(),
@@ -133,7 +133,7 @@ namespace Limen
         );
     }
 
-    void Material::SetTexture(const std::string &samplerName, const Ref<Texture> &texture, const uint32_t slot)
+    void Material::SetTexture(const LString &samplerName, const Ref<Texture> &texture, const uint32_t slot)
     {
         LM_CORE_ASSERT(
             texture,
@@ -253,7 +253,7 @@ namespace Limen
         return *m_Pipeline.get();
     }
 
-    const std::string &Material::GetDebugName() const noexcept
+    const LString &Material::GetDebugName() const noexcept
     {
         return m_DebugName;
     }

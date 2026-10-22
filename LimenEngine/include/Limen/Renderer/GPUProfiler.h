@@ -7,9 +7,9 @@
 #include <limits>
 #include <cstdint>
 #include <string_view>
-#include <string>
 #include "Limen/Core/Core.h"
 #include "Limen/Tool/LArray.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -37,7 +37,7 @@ namespace Limen
      */
     struct GPUProfileScopeResult
     {
-        std::string Name;
+        LString Name;
 
         // 嵌套深度：0 表示帧的根级范围(Shadow/ Main)
         // 每向内嵌套一层+1，调试界面根据此做树形缩进

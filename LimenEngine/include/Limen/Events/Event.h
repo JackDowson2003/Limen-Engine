@@ -2,9 +2,9 @@
 
 #include <functional>
 #include <ostream>
-#include <string>
 
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LString.h"
 
 
 namespace Limen
@@ -73,7 +73,7 @@ namespace Limen
 
         [[nodiscard]] virtual EventCategory GetCategoryFlags() const = 0;
 
-        [[nodiscard]] virtual std::string ToString() const { return GetName(); }
+        [[nodiscard]] virtual LString ToString() const { return GetName(); }
 
         [[nodiscard]] bool IsHandled() const
         {

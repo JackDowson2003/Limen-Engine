@@ -33,7 +33,7 @@ namespace Limen
 
         [[nodiscard]] bool IsRepeat() const { return m_RepeatCount > 0; }
 
-        [[nodiscard]] std::string ToString() const override
+        [[nodiscard]] LString ToString() const override
         {
             std::stringstream stream;
             stream << "KeyPressedEvent: " << static_cast<int>(m_KeyCode)
@@ -55,7 +55,7 @@ namespace Limen
         {
         }
 
-        [[nodiscard]] std::string ToString() const override
+        [[nodiscard]] LString ToString() const override
         {
             std::stringstream stream;
             stream << "KeyReleasedEvent: " << static_cast<int>(m_KeyCode);
@@ -76,7 +76,7 @@ namespace Limen
 
         [[nodiscard]] char32_t GetCodepoint() const { return m_Codepoint; }
 
-        [[nodiscard]] std::string ToString() const override
+        [[nodiscard]] LString ToString() const override
         {
             std::stringstream stream;
             // char32_t 不能直接写入普通字符流，这里输出它的 Unicode 码点数值。

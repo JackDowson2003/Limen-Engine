@@ -3,6 +3,7 @@
 //
 #pragma once
 #include <algorithm>
+#include <utility>
 
 #include "Render/EditorUIRenderer.h"
 #include "Limen/Application/Layer.h"
@@ -11,6 +12,9 @@
 #include "Limen/Events/MouseEvent.h"
 #include "Limen/Input/Input.h"
 #include "Limen/Application/Application.h"
+#include "Limen/Asset/AssetManager.h"
+#include "UI/EditorUILayout.h"
+#include "Project/EditorSession.h"
 
 namespace LimenEditor
 {
@@ -18,8 +22,8 @@ namespace LimenEditor
     class EditorUILayer final : public Limen::Layer
     {
     public:
-        EditorUILayer()
-            : Layer("Limen Editor")
+        EditorUILayer(Limen::Ref<EditorSession> session = {})
+            : Layer("Limen Editor"), m_Session(std::move(session))
         {
         }
 
@@ -37,96 +41,64 @@ namespace LimenEditor
         // window 是本次绘制目标的非拥有引用；窗口及其图形 Context 由 Application 管理。
         void OnUIRender(Limen::Window &window) override
         {
-            // 清除上一帧命中区域；窗口最小化或右侧栏消失时不能继续命中旧位置。
-            m_RightSplitterRect = {};
-            // UI 使用左上角为原点的逻辑窗口坐标，不使用帧缓冲像素尺寸。
-            // width 是当前窗口内容区的逻辑宽度，转为 float 供布局计算使用。
+            // 每次都当前窗口的逻辑尺寸，普通缩放，普通缩放和非全屏最大化走同一套布局
             const float width = static_cast<float>(window.GetWindowWidth());
-            // height 是当前窗口内容区的逻辑高度，不是帧缓冲像素高度。
             const float height = static_cast<float>(window.GetWindowHeight());
+            const EditorUILayoutResult &layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
+            // 输入命中区域必须与本次实际绘制的分隔条一致。
+            m_RightSplitterRect = layout.RightSplitter;
 
-            // 窗口最小化时无需渲染
-            if (width <= 0.0f || height <= 0.0f)
+            if (layout.Top.Width <= 0.0f || layout.Top.Height <= 0.0f)
                 return;
 
-            // topHeight 是实际顶部占位区高度，不超过当前窗口高度。
-            const float topHeight = std::min(kTopPlaceholderHeight, height);
             m_UIRenderer.DrawSolidRect(
                 window,
-                {0.0f, 0.0f},
-                {width, topHeight},
+                {layout.Top.X, layout.Top.Y},
+                {layout.Top.Width, layout.Top.Height},
                 {0.17f, 0.18f, 0.20f, 1.0f}
             );
-
-            // kMiddlePreferredPercent 是中央工作区的目标宽度占比，并非固定像素宽度。
-            constexpr float kMiddlePreferredPercent = 0.65f;
-            // kMinMiddleWidth 是窗口有足够空间时希望保留的中央最小逻辑宽度。
-            constexpr float kMinMiddleWidth = 240.0f;
-
-            // middleWidth 是受窗口宽度限制后的实际中央宽度；不能超过窗口。
-            const float middleWidth = std::min(
-                width,
-                std::max(kMinMiddleWidth, width * kMiddlePreferredPercent)
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.Left.X, layout.Left.Y},
+                {layout.Left.Width, layout.Left.Height},
+                {0.13f, 0.14f, 0.16f, 1.0f}
             );
-            // sideWidth 是左、右两个侧栏各自的逻辑宽度，均分中央以外的空间。
-            const float sideWidth = (width - middleWidth) * 0.5f;
-
-            // bodyHeight 是顶部占位区下方的高度；三栏只在这块区域内绘制。
-            if (const float bodyHeight = height - topHeight; bodyHeight > 0.0f)
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.Center.X, layout.Center.Y},
+                {layout.Center.Width, layout.Center.Height},
+                {0.08f, 0.09f, 0.11f, 1.0f}
+            );
+            if (layout.Center.Width >= 64.0f && layout.Center.Height >= 64.0f)
             {
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {0.0f, topHeight},
-                    {sideWidth, bodyHeight},
-                    {0.13f, 0.14f, 0.16f, 1.0f}
-                );
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {sideWidth, topHeight},
-                    {middleWidth, bodyHeight},
-                    {0.08f, 0.09f, 0.11f, 1.0f}
-                );
-                // rightX 是右侧栏的左边界，坐标原点仍为窗口左上角。
-                const float rightX = sideWidth + middleWidth;
-
-                // splitterHeight 是实际分隔条高度；正文不足 4 单位时随正文缩小。
-                const float splitterHeight = std::min(kRightSplitterHeight, bodyHeight);
-                // availableHeight 只分给右上、右下面板，不包含分隔条本身。
-                const float availableHeight = bodyHeight - splitterHeight;
-                // rightTopHeight 是可用高度乘以当前比例得到的实际右上高度。
-                const float rightTopHeight = availableHeight * m_RightTopRatio;
-                // rightBottomHeight 占据扣除右上面板后的全部剩余可用高度。
-                const float rightBottomHeight = availableHeight - rightTopHeight;
-                // splitterY 是分隔条上沿的逻辑 Y 坐标，紧接右上面板。
-                const float splitterY = topHeight + rightTopHeight;
-                // 保存本帧实际绘制边界，供之后的鼠标按下事件命中测试。
-                m_RightSplitterRect =
-                {
-                    .X = rightX,
-                    .Y = splitterY,
-                    .Width = sideWidth,
-                    .Height = splitterHeight
-                };
-
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {rightX, topHeight},
-                    {sideWidth, rightTopHeight},
-                    {0.15f, 0.16f, 0.18f, 1.0f}
-                );
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {m_RightSplitterRect.X, m_RightSplitterRect.Y},
-                    {m_RightSplitterRect.Width, m_RightSplitterRect.Height},
-                    {0.35f, 0.37f, 0.42f, 1.0f}
-                );
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {rightX, splitterY + splitterHeight},
-                    {sideWidth, rightBottomHeight},
-                    {0.21f, 0.22f, 0.24f, 1.0f}
-                );
+                const auto& white = Limen::AssetManager::GetWhiteTexture();
+                if (white)
+                    m_UIRenderer.DrawTexturedRect(
+                        window,
+                        {layout.Center.X + 16.0f, layout.Center.Y + 16.0f},
+                        {48.0f, 48.0f},
+                        *white
+                    );
             }
+
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.RightTop.X, layout.RightTop.Y},
+                {layout.RightTop.Width, layout.RightTop.Height},
+                {0.15f, 0.16f, 0.18f, 1.0f}
+            );
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.RightSplitter.X, layout.RightSplitter.Y},
+                {layout.RightSplitter.Width, layout.RightSplitter.Height},
+                {0.35f, 0.37f, 0.42f, 1.0f}
+            );
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.RightBottom.X, layout.RightBottom.Y},
+                {layout.RightBottom.Width, layout.RightBottom.Height},
+                {0.21f, 0.22f, 0.24f, 1.0f}
+            );
         }
 
         // event 是 Application 转发给本 Layer 的非拥有事件引用。
@@ -162,64 +134,63 @@ namespace LimenEditor
                     // window 是 Application 当前拥有的主窗口，此处只借用它读取最新逻辑高度。
                     const auto &window = Limen::Application::GetApp().GetWindow();
                     // height 是松开时窗口内容区的逻辑高度，不是帧缓冲像素高度。
+                    const float width = static_cast<float>(window.GetWindowWidth());
                     const float height = static_cast<float>(window.GetWindowHeight());
+                    const EditorUILayoutResult layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
 
-                    // topHeight 是实际顶部占位区高度，不超过当前窗口高度。
-                    const float topHeight = std::min(kTopPlaceholderHeight, height);
-                    // bodyHeight 是顶部占位区下方留给三栏的高度。
-                    const float bodyHeight = height - topHeight;
+                    // 右侧正文总高：右上区域、分隔条和右下区域都包含在内。
+                    const float rightBodyHeight =
+                            layout.RightTop.Height
+                            + layout.RightSplitter.Height
+                            + layout.RightBottom.Height;
 
-                    // 鼠标松开位置到上方的距离
-                    const float distanceTopOfMouse = mouseY - topHeight;
-
-                    // 当前按正文高度把松开位置换算为比例。
-                    m_RightTopRatio = std::clamp(distanceTopOfMouse/bodyHeight,0.00001f,1.0f);
+                    if (rightBodyHeight > 0.0f)
+                    {
+                        // 鼠标相对右侧正文顶部的位置，用于决定下一帧的上下比例。
+                        const float mouseOffset = mouseY - layout.RightTop.Y;
+                        m_RightTopRatio = std::clamp(
+                            mouseOffset / rightBodyHeight,
+                            0.000001f,
+                            0.999999f
+                        );
+                    }
+                    LM_INFO("m_RightTopRatio = {} ", m_RightTopRatio);
 
                     m_IsDraggingRightSplitter = false;
                     LM_INFO("Editor right splitter released");
                     return true;
                 });
+
+            // 尺寸变化后，上一次绘制的逻辑坐标命中区域立即失效；下次 OnUIRender 会重建。
+            dispatcher.Dispatch<Limen::WindowResizeEvent>(
+                [this](const Limen::WindowResizeEvent &resize)
+                {
+                    m_RightSplitterRect = {};
+                    if (resize.GetWidth() != 0 && resize.GetHeight() != 0)
+                        return false;
+
+                    if (m_IsDraggingRightSplitter)
+                        LM_INFO("Editor right splitter drag cancelled: framebuffer size is zero");
+
+                    m_IsDraggingRightSplitter = false;
+                    return false;
+                }
+            );
         }
 
     private:
-        // region struct definition
-        // 一次绘制得到的逻辑窗口坐标边界；只保存数字，不拥有窗口或 GPU 资源。
-        struct UIRect
-        {
-            // X 是矩形左边界的逻辑横坐标。
-            float X = 0.0f;
-            // Y 是矩形上边界的逻辑纵坐标。
-            float Y = 0.0f;
-            // Width 是矩形的逻辑宽度；零表示没有可命中的横向区域。
-            float Width = 0.0f;
-            // Height 是矩形的逻辑高度；零表示没有可命中的纵向区域。
-            float Height = 0.0f;
-
-            // x、y 是待检测的逻辑鼠标坐标；右边界和下边界不属于本矩形。
-            [[nodiscard]]
-            bool Contains(const float x, const float y) const
-            {
-                return Width > 0.0f && Height > 0.0f
-                       && x >= X && x < X + Width
-                       && y >= Y && y < Y + Height;
-            }
-        };
-
-        //endregion
         //region attributes definitions
+
         // 本 Layer 按值拥有 UI 绘制器；OnAttach 初始化，OnDetach 在 Context 销毁前关闭。
         EditorUIRenderer m_UIRenderer;
-        // 顶部占位区的期望高度，单位为逻辑窗口单位；实际高度受窗口限制。
-        static constexpr float kTopPlaceholderHeight = 128.0f;
-        // 右侧上下分隔条的期望高度，单位为逻辑窗口单位。
-        static constexpr float kRightSplitterHeight = 4.0f;
-
         // 右上面板的绘制比例；绘制时乘以扣除分隔条后的 availableHeight。
         float m_RightTopRatio = 0.5f;
-        // 最近一次 OnUIRender 实际绘制的分隔条命中区域；每次绘制前清空并重建。
+        // 最近一次 OnUIRender 实际绘制的分隔条命中区域；每次绘制前清空并重建，用于鼠标事件的判断
         UIRect m_RightSplitterRect{};
         // 左键是否从分隔条开始按下，等待松开时更新比例；当前并非实时拖动。
         bool m_IsDraggingRightSplitter = false;
+
+        Limen::Ref<EditorSession> m_Session;
         //endregion
     };
 }

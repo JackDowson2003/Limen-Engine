@@ -6,6 +6,7 @@
 namespace Limen
 {
     class Window;
+    class Texture2D;
 }
 
 namespace LimenEditor
@@ -17,14 +18,21 @@ namespace LimenEditor
         virtual ~EditorUIRenderBackend() = default;
 
         virtual bool Initialize() = 0;
+
         virtual void Shutdown() = 0;
 
         virtual void DrawSolidRect(
-            const Limen::Window& window,
-            const glm::vec2& position,
-            const glm::vec2& size,
-            const glm::vec4& color
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color
+        ) = 0;
+
+        virtual void DrawTexturedRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const Limen::Texture2D &texture
         ) = 0;
     };
-
 }

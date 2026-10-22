@@ -429,7 +429,7 @@ namespace Limen
              * pointLightIndex为0时，prefix为：
              * u_PointLights[0].
              */
-            const std::string uniformPrefix =
+            const LString uniformPrefix =
                     "u_PointLights[" + std::to_string(pointLightIndex) + "].";
 
             shader->SetFloat3(

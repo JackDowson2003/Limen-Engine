@@ -18,16 +18,28 @@ namespace LimenEditor
         ~OpenGLEditorUIRenderBackend() override;
 
         bool Initialize() override;
+
         void Shutdown() override;
+
         void DrawSolidRect(
-            const Limen::Window& window,
-            const glm::vec2& position,
-            const glm::vec2& size,
-            const glm::vec4& color
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color
+        ) override;
+
+        void DrawTexturedRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const Limen::Texture2D &texture
         ) override;
 
     private:
         Limen::Scope<Limen::VertexArray> m_VertexArray;
+
+        Limen::Ref<Limen::GraphicsPipeline> m_TexturedPipeline;
+
         Limen::Ref<Limen::GraphicsPipeline> m_Pipeline;
     };
 }

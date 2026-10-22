@@ -3,6 +3,7 @@ file(GLOB_RECURSE LIMEN_ENGINE_COMMON_SOURCES
         CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Core/*.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Application/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/Project/*.cpp"
 
         # 模型、资源导入器以及后续的资源处理代码。
         "${CMAKE_CURRENT_SOURCE_DIR}/src/Asset/*.cpp"
@@ -57,6 +58,10 @@ add_library(LimenEngine
         ${LIMEN_ENGINE_LIBRARY_TYPE}
         ${LIMEN_ENGINE_SOURCES}
         ${LIMEN_ENGINE_HEADERS}
+)
+# toml11 仅供项目配置实现使用，不向引擎公共接口传播。
+target_include_directories(LimenEngine SYSTEM PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/toml11"
 )
 
 # PCH 只加速引擎自身编译，不传播给 Sandbox，也不能替代公共头文件的自包含。

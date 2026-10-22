@@ -4,21 +4,21 @@
 #pragma once
 
 #include <functional>
-#include <string>
 #include <utility>
 
 #include "Limen/Events/Event.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
     struct LIMEN_API WindowProps
     {
-        std::string Title;
+        LString Title;
         // 请求的窗口内容尺寸大小，单位是窗口坐标，不一定等于帧缓冲像素
         uint32_t Width;
         uint32_t Height;
 
-        WindowProps(std::string  title = "Limen Engine",
+        WindowProps(LString  title = "Limen Engine",
                     const uint32_t width = 1600,
                     const uint32_t height = 900)
             : Title(std::move(title)), Width(width), Height(height)

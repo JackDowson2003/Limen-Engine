@@ -124,7 +124,7 @@ namespace Limen
 
         // 创建独占节点：复制名字、记录深度、父节点只借用
         Scope<ProfileNode> node = CreateScope<ProfileNode>();
-        node->Name = std::string(debugName);
+        node->Name = LString(debugName);
         node->Depth = depth;
         node->HandleValue = handleValue;
         node->Parent = m_NodeStack.empty() ? nullptr : m_NodeStack[m_NodeStack.getSize() - 1];

@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <cstring>
 #include <functional>
-#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <memory>
 #include <utility>
@@ -51,7 +51,7 @@ namespace Limen
 
         [[nodiscard]] bool isOwnData(const char* source) const noexcept {
             if (!data_ || !source) return false;
-            const std::less<const char*> less;
+            constexpr std::less<const char*> less;
             return !less(source, data_) && !less(data_ + size_, source);
         }
 
@@ -522,14 +522,11 @@ namespace Limen
     };
 }
 
-namespace std
+template<>
+struct std::hash<Limen::LString>
 {
-    template<>
-    struct hash<Limen::LString>
+    size_t operator()(const Limen::LString& value) const noexcept
     {
-        size_t operator()(const Limen::LString& value) const noexcept
-        {
-            return hash<string_view>{}(string_view(value.data(), value.size()));
-        }
-    };
-}
+        return hash<string_view>{}(string_view(value.data(), value.size()));
+    }
+};

@@ -15,7 +15,7 @@ namespace Limen {
 		float GetX() const { return m_MouseX; }
 		float GetY() const { return m_MouseY; }
 
-		std::string ToString() const override
+		LString ToString() const override
 		{
 			std::stringstream ss;
 			ss << "MouseMovedEvent: " << m_MouseX << ", " << m_MouseY;
@@ -37,7 +37,7 @@ namespace Limen {
 		[[nodiscard]] float GetXOffset() const { return m_XOffset; }
 		[[nodiscard]] float GetYOffset() const { return m_YOffset; }
 
-		[[nodiscard]] std::string ToString() const override
+		[[nodiscard]] LString ToString() const override
 		{
 			std::stringstream ss;
 			ss << "MouseScrolledEvent: " << GetXOffset() << ", " << GetYOffset();
@@ -70,7 +70,7 @@ namespace Limen {
 		explicit MouseButtonPressedEvent(const MouseButton button)
 			: MouseButtonEvent(button) {}
 
-		std::string ToString() const override
+		LString ToString() const override
 		{
 			std::stringstream ss;
 			ss << "MouseButtonPressedEvent: " << static_cast<int>(m_Button);
@@ -86,7 +86,7 @@ namespace Limen {
 		MouseButtonReleasedEvent(const MouseButton button)
 			: MouseButtonEvent(button) {}
 
-		std::string ToString() const override
+		LString ToString() const override
 		{
 			std::stringstream ss;
 			ss << "MouseButtonReleasedEvent: " << static_cast<int>(m_Button);

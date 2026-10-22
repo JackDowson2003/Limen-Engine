@@ -14,7 +14,7 @@ namespace Limen {
 		[[nodiscard]] unsigned int GetWidth() const { return m_Width; }
 		[[nodiscard]] unsigned int GetHeight() const { return m_Height; }
 
-		[[nodiscard]] std::string ToString() const override
+		[[nodiscard]] LString ToString() const override
 		{
 			std::stringstream ss;
 			ss << "WindowResizeEvent: " << m_Width << ", " << m_Height;

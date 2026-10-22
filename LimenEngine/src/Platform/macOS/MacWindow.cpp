@@ -13,6 +13,8 @@
 
 namespace Limen
 {
+
+
     static bool s_GLFWInitialized = false;
 
     static void GLFWErrorCallback(int error_code, const char *description)

@@ -16,6 +16,7 @@
 
 #include "Limen/Core/Log.h"
 #include "Limen/Tool/LMap.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -474,7 +475,7 @@ namespace Limen
          * 将扩展名转换为小写，使 .OBJ、.Obj 和 .obj
          * 都能够进入同一个导入实现。
          */
-        std::string extension = sourcePath.extension().string();
+        LString extension = sourcePath.extension().string();
 
         std::transform(
             extension.begin(),
@@ -862,7 +863,7 @@ namespace Limen
 
                 ModelPart part;
 
-                const std::string basePartName = shape.name.empty() ? "Unnamed Part" : shape.name;
+                const LString basePartName = shape.name.empty() ? "Unnamed Part" : shape.name;
 
                 if (buildData.SourceMaterialIndex >= 0)
                 {

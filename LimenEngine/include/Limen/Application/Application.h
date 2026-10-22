@@ -3,6 +3,8 @@
 //
 
 #pragma once
+
+#include <filesystem>
 #include "Limen/Core/Core.h"
 #include "Limen/Application/Window.h"
 #include "Limen/Events/ApplicationEvent.h"
@@ -28,7 +30,8 @@ namespace Limen
         explicit Application(
             bool isVSYNC = true,
             RendererAPI::API rendererAPI = RendererAPI::API::OPENGL,
-            bool enableImGuiDebugLayer = false
+            bool enableImGuiDebugLayer = false,
+            const std::filesystem::path& assetRoot = "assets"
         );
 
         virtual ~Application();
@@ -70,5 +73,5 @@ namespace Limen
     };
 
     // 由客户端实现，EntryPoint 使用它创建具体的 Application。
-    Application *CreateApplication();
+    Application *CreateApplication(int argc, char **argv);
 }

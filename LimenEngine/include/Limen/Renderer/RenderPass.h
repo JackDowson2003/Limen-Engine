@@ -4,12 +4,12 @@
 
 #pragma once
 
-#include <string>
 #include <cstdint>
 
 #include "glm/vec4.hpp"
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/GPUProfiler.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -124,7 +124,7 @@ namespace Limen
         glm::vec4 ClearColor{0.1f, 0.1f, 0.1f, 1.f};
 
         /** @brief 用于日志、调试器和未来 GPU Debug Marker 的名称。 */
-        std::string DebugName = "Unnamed RenderPass";
+        LString DebugName = "Unnamed RenderPass";
     };
 
     /**

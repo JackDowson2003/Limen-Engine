@@ -13,6 +13,7 @@
 #include "Limen/Core/Core.h"
 #include "Limen/Renderer/Mesh.h"
 #include "Limen/Tool/LArray.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -26,7 +27,7 @@ namespace Limen
     struct ModelMaterialSlot
     {
         // OBJ/MTL中的 new mtl 名称。
-        std::string Name;
+        LString Name;
 
         // MTL中的Ka：环境光反射系数。
         glm::vec3 AmbientReflectance{0.0f};
@@ -71,7 +72,7 @@ namespace Limen
         static constexpr uint32_t InvalidMaterialSlot = std::numeric_limits<uint32_t>::max();
 
         // 模型部分的名字，例如 Body, Hair
-        std::string Name;
+        LString Name;
 
         // 这个部分实际使用的几何资源
         Ref<Mesh> MeshResource;

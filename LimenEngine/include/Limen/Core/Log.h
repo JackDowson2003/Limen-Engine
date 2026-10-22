@@ -6,6 +6,7 @@
 #include "spdlog/spdlog.h"
 
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -24,6 +25,19 @@ namespace Limen
         static Ref<spdlog::logger> s_ClientLogger;
     };
 }
+
+// 日志层负责适配 fmt；LString 本身不依赖 spdlog/fmt。
+template<>
+struct fmt::formatter<Limen::LString> : fmt::formatter<fmt::string_view>
+{
+    template<typename FormatContext>
+    auto format(const Limen::LString &value, FormatContext &context) const
+    {
+        return fmt::formatter<fmt::string_view>::format(
+            fmt::string_view(value.data(), value.size()), context);
+    }
+};
+
 #ifdef LM_ENABLE_ASSERTS
 // 引擎核心日志宏。
 #define LM_CORE_TRACE(...) ::Limen::Log::GetCoreLogger()->trace(__VA_ARGS__)

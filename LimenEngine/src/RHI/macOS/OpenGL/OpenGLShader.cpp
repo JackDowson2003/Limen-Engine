@@ -25,7 +25,7 @@ namespace Limen
             }
         }
 
-        [[nodiscard]] uint32_t CompileShader(const GLenum stage, const std::string &source)
+        [[nodiscard]] uint32_t CompileShader(const GLenum stage, const LString &source)
         {
             const uint32_t shader = glCreateShader(stage);
             const char *sourceData = source.c_str();
@@ -48,7 +48,7 @@ namespace Limen
 
             LM_CORE_ERROR("{} shader compilation failed:\n{}",
                           ShaderStageName(stage),
-                          std::string(infoLog.begin(), static_cast<size_t>(written)));
+                          LString(infoLog.begin(), static_cast<size_t>(written)));
 
             glDeleteShader(shader);
             return 0;
@@ -56,9 +56,9 @@ namespace Limen
     }
 
     OpenGLShader::OpenGLShader(
-        const std::string &name,
-        const std::string &vertexSource,
-        const std::string &fragmentSource)
+        const LString &name,
+        const LString &vertexSource,
+        const LString &fragmentSource)
             :m_Name(name)
     {
         const uint32_t vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
@@ -93,7 +93,7 @@ namespace Limen
             glGetProgramInfoLog(m_RendererID, logLength, &written, infoLog.begin());
 
             LM_CORE_ERROR("OpenGL shader program linking failed:\n{}",
-                          std::string(infoLog.begin(), static_cast<size_t>(written)));
+                          LString(infoLog.begin(), static_cast<size_t>(written)));
 
             glDeleteProgram(m_RendererID);
             m_RendererID = 0;

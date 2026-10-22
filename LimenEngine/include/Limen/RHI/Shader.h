@@ -4,13 +4,13 @@
 #pragma once
 
 #include <filesystem>
-#include <string>
 
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
 #include "Limen/Core/Core.h"
 #include "Limen/Tool/LMap.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -95,7 +95,7 @@ namespace Limen
          * 该名称用于ShaderLibrary查找，不代表底层GPU对象ID。
          */
         [[nodiscard]]
-        virtual const std::string &GetName() const noexcept = 0;
+        virtual const LString &GetName() const noexcept = 0;
 
         /**
          * @brief 从内存中的源码字符串创建Shader。
@@ -108,9 +108,9 @@ namespace Limen
          */
         [[nodiscard]]
         static Ref<Shader> CreateFromSource(
-            const std::string &name,
-            const std::string &vertexSource,
-            const std::string &fragmentSource
+            const LString &name,
+            const LString &vertexSource,
+            const LString &fragmentSource
         );
         /**
          * @brief 从两个Shader源码文件创建一个图形Shader Program。
@@ -153,7 +153,7 @@ namespace Limen
          */
         [[nodiscard]]
         static Ref<Shader> CreateFromFiles(
-            std::string name,
+            LString name,
             const std::filesystem::path &vertexPath,
             const std::filesystem::path &fragmentPath
         );
@@ -171,9 +171,9 @@ namespace Limen
             "This function is deprecated, use Shader::CreateFromSource() or Shader::CreateFromFiles() instead"
         )]]
         static Ref<Shader> Create(
-            const std::string &name,
-            const std::string &vertexSource,
-            const std::string &fragmentSource
+            const LString &name,
+            const LString &vertexSource,
+            const LString &fragmentSource
         );
     };
 
@@ -203,7 +203,7 @@ namespace Limen
          * 会解析为DirectX11/DirectX12目录下的.vs.hlsl和.ps.hlsl文件。
          * Metal与Vulkan也保留各自的目录和扩展名规则。
          *
-         * 逻辑路径同时作为缓存键，因此不同目录可以拥有同名Shader。
+         * 逻辑路径从平台定位的引擎内置资源根加载，不从项目资产根加载
          *
          * @param logicalPath 相对于后端Shader目录的路径，不包含扩展名。
          */
@@ -231,7 +231,7 @@ namespace Limen
          */
         [[nodiscard]]
         Ref<Shader> Load(
-            std::string name,
+            LString name,
             const std::filesystem::path &vertexPath,
             const std::filesystem::path &fragmentPath
         );
@@ -242,10 +242,10 @@ namespace Limen
          * @return 找到时返回共享引用，否则返回nullptr并记录错误。
          */
         [[nodiscard]]
-        Ref<Shader> Get(const std::string &name) const;
+        Ref<Shader> Get(const LString &name) const;
 
     private:
-        LMap<std::string, Ref<Shader> > m_Shaders;
+        LMap<LString, Ref<Shader> > m_Shaders;
 
         /**
          * @brief 检查指定名称是否已经加载。
@@ -254,6 +254,6 @@ namespace Limen
          * @return 已加载时返回true，否则返回false。
          */
         [[nodiscard]]
-        bool Exists(const std::string &name) const noexcept;
+        bool Exists(const LString &name) const noexcept;
     };
 }

@@ -5,11 +5,11 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include "Limen/Core/Core.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -58,7 +58,7 @@ namespace Limen
         uint32_t ShadowMapResolution = 2048;
 
         // 用于日志、调试器和未来 GPU 标记的名称。
-        std::string DebugName = "Scene Renderer";
+        LString DebugName = "Scene Renderer";
     };
 
     /**
@@ -153,7 +153,7 @@ namespace Limen
          * @brief 获取 SceneRenderer 当前使用的规格。
          *
          * 返回 const 引用：
-         * 1. 不复制包含 std::string 的 Specification；
+         * 1. 不复制包含 LString 的 Specification；
          * 2. 外部只能读取，不能绕过 SceneRenderer 修改尺寸；
          * 3. Width 和 Height 会在 Resize() 成功后同步更新。
          */

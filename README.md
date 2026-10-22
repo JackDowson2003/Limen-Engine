@@ -1,29 +1,24 @@
 # Limen Engine
 
-Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实时渲染研究项目。
+Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎，现代实时渲染与光追研究是它的长期特色方向。
 
-当前阶段以 macOS OpenGL 4.1 后端验证引擎分层、资源管线、光栅化和实时光照；HDR 与基础后处理已有可运行版本，接下来重点验证现有链路并推进 PBR、glTF、IBL 和稳定实时阴影，之后再进入 Windows Direct3D 12、GPU Driven Rendering 与 NVIDIA DXR 混合实时光追。
-
-本项目的近期目标不是一次性补齐商业引擎的所有模块，而是先形成一套架构清晰、结果可验证、性能可测量的渲染研究引擎，再逐步增加场景编辑与游戏运行时能力。
+当前可运行基线是 macOS OpenGL 4.1 渲染、Sandbox 场景实验，以及独立的 C++ 自研 Editor UI 原型。近期首要目标是贯通“创建项目 → 导入资源 → 编辑并保存场景 → 编写游戏行为 → 独立运行 → 构建发布”的工作流，让一个小型游戏真正由 Limen 制作和交付。PBR、glTF、IBL、阴影升级继续推进，但不再全部排在场景、Editor 和运行时之前。
 
 ## 项目里程碑
 
-项目按三个完成节点推进：
+游戏交付主线按依赖推进，渲染和平台路线并行，不把某条研究路线的完成当作另一条路线的启动条件：
 
-1. **Limen Renderer v1**
-   - HDR、Tone Mapping、Metallic-Roughness PBR；
-   - glTF/GLB、IBL 和稳定实时阴影；
-   - 自动化回归与 CPU/GPU Profiling。
-2. **Limen Game Engine v1**
-   - 可保存和加载的场景；
-   - 基础 Editor、脚本、动画、物理、音频与打包；
-   - 能够制作一个小型可玩 Demo。
-3. **Limen Research Engine v2**
-   - Windows Direct3D 12；
-   - GPU Driven、时域渲染；
-   - DXR 与混合实时光追。
+| 节点                    | 可验收结果                                                                                                        |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------|
+| G0 工程基线             | Sandbox 与 Editor 都有明确构建/测试入口；当前渲染与 UI 纹理路径有可重复的回归检查。                               |
+| G1 项目、资源与场景     | 项目能重新打开；资产有稳定身份、导入记录和引用诊断；场景对象能安全删除，场景能保存并往返加载。                    |
+| G2 可用的 C++ Editor    | 用正式 Editor 查看、选择、修改、撤销和保存真实场景；重新打开后结果一致。                                          |
+| G3 独立运行时与 C#      | Player 从项目配置启动场景；Edit/Play 数据隔离；C# 游戏脚本可驱动一个有输入和反馈的游戏行为。C# 不用于 Editor UI。 |
+| G4 Limen Game Engine v1 | 一个小型可玩游戏完成必需的碰撞/物理、音频、动画与游戏 UI；资源经过处理并打包，脱离源码目录仍可启动和游玩。        |
+| R 渲染路线              | 在现有 HDR/后处理基线上按内容需要推进 PBR、glTF/GLB、IBL、阴影质量、自动化画质回归和 Profiling。                  |
+| P 平台与研究路线        | Windows/Direct3D 12 后端与跨平台验证；其后按需求推进 GPU Driven、时域渲染、DXR 与混合光追。                       |
 
-“完成引擎”在本仓库中指完成上述明确里程碑，不代表一次性达到 Unity、Unreal Engine 等商业引擎的功能规模。
+第一个可玩闭环先在已可运行的 macOS 后端完成；从 G0 起维护后端无关的公共接口，为 Windows/Direct3D 12 留出正确的命令与资源状态模型。“完成 v1”以上述 G4 的实测结果为准，不等于复制商业引擎的全部功能。
 
 ## 平台状态
 
@@ -36,7 +31,7 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎和现代实�
 | Linux         | OpenGL / Vulkan | 尚未实现                   | 远期方向   |
 | iOS / Android | Metal / Vulkan  | 尚未实现                   | 远期方向   |
 
-`RendererAPI::API` 中存在某个枚举，只表示公共架构预留，不表示对应后端已经可用。当前 CMake 会在 Windows 与 Linux 配置阶段主动报错，避免生成一个无法工作的工程。
+`RendererAPI::API` 中存在某个枚举，只表示公共架构预留，不表示对应后端已经可用。当前 Linux 配置阶段会主动报错；Windows 仍缺少可运行的窗口和图形后端，不能把配置成功视作 Windows 支持。
 
 [本机 M1 图形环境记录](docs/MacM1.md)是 2026-10-08 的配置快照，其中关于“主场景尚未启用 HDR”和手动复制资源的描述早于当前实现；涉及项目现状时以本 README 和当前代码为准。
 
@@ -120,7 +115,7 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 - 只支持 OBJ/MTL，不支持 glTF/GLB；
 - 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
 - 已有 PostProcess、AABB、AssetPath、LArray 的 CPU CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
-- 当前 ImGui 面板是 Sandbox 调试界面，不是完整 Editor；
+- 当前 ImGui 面板是 Sandbox 调试界面；独立的 `LimenEditor` 仍是单窗口 UI 原型，不是完整场景编辑器；
 - 没有场景序列化、脚本、动画、物理、音频和网络；
 - 2D Sandbox 的颜色纹理暂按 `Linear` 加载以保持旧显示数值，迁移后的画面仍待复验；
 - Direct3D 12 所需的显式命令、描述符、资源状态和同步模型尚未建立。
@@ -145,10 +140,11 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 |---------------|---------------------|-------------------------------------------------------|
 | GLAD          | 加载 OpenGL 函数    | 仓库内普通源码                                        |
 | stb_image     | 图片解码            | 仓库内普通源码                                        |
+| toml11        | 项目 TOML 解析     | 仓库内普通源码，仅供项目配置实现私有使用              |
 | GLFW          | 窗口、输入、Context | 当前由父仓库登记的既有 submodule                      |
 | tinyobjloader | OBJ/MTL 解析        | 当前由父仓库登记的既有 submodule                      |
 | GLM           | 向量与矩阵          | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
-| ImGui         | 编辑器与调试 UI     | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
+| ImGui         | Sandbox 调试 UI    | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
 | spdlog        | 日志                | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
 
 需要动态连续存储的自有数据已从 `std::vector` 迁移到 `LArray`；第三方库（例如 tinyobjloader）仍可在其内部使用 `std::vector`。导入器只借用第三方解析结果，再转换为 Limen 自有数据；不修改 `vendor`，也不让第三方容器成为公共引擎接口。
@@ -172,7 +168,22 @@ cmake --preset ninja-debug
 cmake --build --preset build-debug
 ```
 
-运行时必须让进程的工作目录位于 `out/`，因为当前 Asset 根目录是相对路径 `assets`：
+当前 `build-debug` Preset 默认只构建 `LimenSandBox`。需要验证正式 Editor 时，从仓库根目录显式构建并运行：
+
+```bash
+cmake --build --preset build-debug --target LimenEditor
+(cd out && ./LimenEditor)
+```
+
+现有 Editor 布局 CPU 测试可单独运行：
+
+```bash
+cmake --build --preset build-debug --target LimenEditorUILayoutTests
+ctest --test-dir out/cmake-build-debug-clang17 -R '^LimenEditorUILayout$' --output-on-failure
+```
+
+以下工作目录要求适用于 `LimenSandBox` 及未指定项目的 `LimenEditor`：它们仍使用相对路径 `assets` 作为资源根目录。
+指定 `--project /绝对路径/Game1.lmproject` 的 Editor 已从项目文件解析绝对资产根，引擎内置 Shader 也按可执行文件位置定位，不受当前工作目录影响：
 
 ```bash
 (cd out && ./LimenSandBox)
@@ -210,7 +221,7 @@ ctest --test-dir out/cmake-build-debug-clang17 -R '^LimenLArray$' --output-on-fa
 | Shared Debug | `ninja-shared-debug` | `build-shared-debug` | `out/cmake-build-shared-debug-clang17/` | Shared      | ASan + UBSan |
 | Release      | `ninja-release`      | `build-release`      | `out/cmake-build-release-clang17/`      | Static      | 关闭         |
 
-三个配置最终都会输出到：
+三个配置的 Sandbox 可执行文件最终都会输出到：
 
 ```text
 out/LimenSandBox
@@ -327,6 +338,13 @@ Limen-Engine/
 │       ├── SandBox2D.*
 │       └── ParticleSystem.*
 │
+├── Limen-Editor/                    # 独立 C++ 自研 Editor（当前为单窗口 UI 原型）
+│   ├── AGENTS.md
+│   ├── README.md
+│   ├── CMakeLists.txt
+│   ├── include/{Render,UI}/
+│   └── src/{Render,UI}/
+│
 ├── tests/                            # CTest 与可选的 macOS OpenGL 测试
 │
 └── out/                              # CMake 构建树、程序与运行时资源
@@ -424,6 +442,8 @@ flowchart TD
     P[CMakePresets.json] --> R[根 CMakeLists.txt]
     R --> E[LimenEngine CMakeLists]
     R --> S[LimenSandBox CMakeLists]
+    R --> ED[Limen-Editor CMakeLists]
+    R --> T[tests CMakeLists]
     E --> ET[LimenEngine]
     E --> G[glad]
     E --> F[glfw]
@@ -433,179 +453,104 @@ flowchart TD
     E --> OBJ[tinyobjloader]
     S --> APP[LimenSandBox]
     S --> ASSETS[LimenSandBoxAssets: 同步 Engine 与 Sandbox assets]
+    ED --> EDITOR[LimenEditor]
+    ED --> EDITOR_ASSETS[LimenEditorAssets: 同步 Engine assets]
+    EDITOR_ASSETS --> EDITOR
+    T --> TESTS[CTest 测试目标]
     ASSETS --> APP
     APP --> ET
     APP --> I
+    EDITOR --> ET
 ```
 
 - 根 `CMakeLists.txt` 统一设置 C++20、警告、Sanitizer 和静态/动态库选项；
 - `LimenEngine/CMakeLists.txt` 收集 Application、Asset、Renderer、Scene、RHI 与平台后端；
 - `LimenSandBox/CMakeLists.txt` 构建测试程序并部署运行时资源；
+- `Limen-Editor/CMakeLists.txt` 构建独立 Editor 并同步引擎内置资源；`tests/CMakeLists.txt` 定义 CPU 与可选 OpenGL 测试；
 - PCH 只属于 LimenEngine 私有编译优化，公共头文件仍必须自包含。
 
 ## 开发执行顺序
 
-测试与 Profiling 不是最后补充的独立阶段，而是从当前基线开始持续伴随所有后续功能。
+测试、错误诊断、Profiling 和发布验证伴随各阶段，不留到最后补做。G 节点是游戏交付主线；R、P 是并行路线，只有明确的接口依赖，不构成“先做完画质再做游戏”的顺序。
 
 ```mermaid
 flowchart LR
-    A[已具备: OBJ,Normal Map,sRGB] --> B[已具备:HDR + PostProcess + 整帧计时]
-    B --> C[当前: 回归测试与 2D 色彩链路收尾]
-    C --> D[PBR Metallic-Roughness]
-    D --> E[glTF/GLB + IBL]
-    E --> F[PCF + CSM + Shadow Atlas]
-    F --> G[G-Buffer + Motion Vector + TAA]
-    G --> H[Windows + Direct3D 12]
-    H --> I[DXR 混合实时光追]
-
-    B --> J[Entity + 序列化 + AssetID]
-    J --> K[正式 Editor]
-    K --> L[脚本 + 动画 + 物理 + 音频]
-    L --> M[打包小型可玩 Demo]
+    G0["G0 构建与回归基线"] --> G1["G1 项目 / 资产 / 场景"]
+    G1 --> G2["G2 真实 Editor 编辑与保存"]
+    G2 --> G3["G3 Player / Edit-Play / C#"]
+    G3 --> G4["G4 可玩 Demo / Cook / 发布"]
+    G0 --> R["R 并行渲染质量与内容格式"]
+    G1 --> R
+    G3 --> P["P Windows / DX12 平台验证"]
+    R --> X["后续 GPU Driven / DXR 研究"]
+    P --> X
 ```
 
-### 阶段 0：收尾当前渲染改动（部分完成）
+### G0：工程基线（当前）
 
-1. 已能构建运行 OBJ、Bounds、Tangent、Normal Mapping 与 sRGB 链路；Sandbox 有 Linear/sRGB 缓存检查入口；
-2. 仍需把颜色空间、Normal Mapping 的固定参考姿态变成可重复的视觉基线；
-3. 仓库内旧 `Texture2D::Create(path)` 调用已迁移并删除旧入口；2D Sandbox 仍需视觉复验。
+1. 现有 OBJ、Normal Mapping、Linear/sRGB、HDR、PostProcess 和整帧 GPU 计时保持可运行；固定参考场景并把关键数值与视觉结果变成可重复回归，补上 2D 色彩链路复验。
+2. 为 Sandbox、Editor 和测试分别提供明确的构建入口；当前 `build-debug` Preset 默认目标只有 `LimenSandBox`，验证 Editor 时须显式构建 `LimenEditor`。
+3. Editor 纹理矩形已有白图 smoke test，非对称 RGBA 的隐藏窗口 GPU 测试也已验证 UV 方位、sRGB、Alpha 和逻辑尺寸到 2 倍帧缓冲尺寸的映射；真实 Retina 窗口、缩放交互和最终画面仍需人工复验。
+4. 验收：两个客户端都能构建启动，现有回归通过，已知颜色/资源/布局问题有可复现记录；不在此阶段扩建完整 UI 框架。
 
-### 阶段 1：验证基础设施（部分完成）
+### G1：项目、资产与场景
 
-1. 已有 CPU 帧/场景渲染时间、OpenGL 整帧 `GL_TIME_ELAPSED` 查询，以及每次构建时的资源同步；
-2. 为 AABB、法线、切线和路径解析建立 CPU 单元测试；
-3. 增加 Shader 编译失败的自动检查和带容差的截图回归；
-4. OpenGL Debug Callback 仅在运行时确认扩展可用时启用；当前 M1 环境的 `GL_KHR_debug`、`GL_ARB_debug_output` 不可用，需保留其他诊断路径。
+1. 定义 TOML 格式的项目配置：项目描述文件使用 `Game1.lmproject` 一类的 `.lmproject` 单文件，运行设置使用 `.toml`；按[项目配置与跨平台启动设计](docs/ProjectConfiguration.md)确定资源根、起始场景、平台覆盖及启动校验，避免未来 Player 沿用 Sandbox 的工作目录依赖。当前加载器已校验项目文件后缀及核心字段/资源根路径；Editor 的 `--project` 已在创建窗口前解析配置并传入项目资产根，内置 Shader 从可执行文件旁独立定位。从仓库外工作目录启动临时项目已到达 OpenGL 4.1 初始化；项目身份尚未进入 Editor 会话，项目资产尚无真实消费者，Player 接线、运行设置合并与配置保存仍未完成。
+2. 为资产定义稳定 AssetID、导入设置、来源/依赖记录、重新导入与丢失引用诊断；解析库的结果仍转换为 Limen 自有资源。
+3. 为场景对象建立稳定身份、Generation Handle 与安全删除；完成 Transform 层级和最小 Render/Camera/Light 数据组织，不提前引入大型 ECS 或 Job System。
+4. 实现场景 schema/版本、原子保存与加载；资源引用不以临时数组下标或绝对路径充当长期身份。
+5. 验收：创建项目、导入资源、编辑并保存场景后，重启进程仍能恢复；缺失资源有明确错误，往返加载和安全删除有自动测试。
 
-### 阶段 2：HDR 与统一后处理（可运行第一版已完成）
+### G2：C++ 自研 Editor 的真实编辑闭环
 
-1. `RGBA16F` MSAA Main Pass 输出 Linear HDR，并 Resolve 为可采样的单采样颜色；
-2. `SceneRenderer` 组织独立全屏 PostProcess Pass；
-3. PostProcess 执行手动 Exposure、Reinhard Tone Mapping 和最终 Linear → sRGB；
-4. Blinn-Phong Shader 不再进行输出编码，后处理写入 `RGBA8`，输出 Alpha 固定为 1；
-5. 下一步是可重复的视觉与数值回归，不把“可运行”直接等同于“稳定完成”。
+1. 只补足真实面板必需的纹理、文字、裁剪、焦点与输入路由；UI 后端保持与图形 API 隔离。
+2. 接入 Scene 视口与共享 Editor 会话；Hierarchy/Outliner、Inspector/Details 和 Content Browser 操作同一活动场景、资产与选择状态。
+3. 实现选择/Picking、Transform 编辑与基本 Gizmo、Undo/Redo、脏状态和保存失败反馈；布局配置与场景数据分开保存。
+4. 验收：在正式 Editor 中完成创建、选择、修改、撤销、保存和重新打开场景；停靠与多原生窗口是已确认目标，但不是这个验收点的前置条件。
 
-### 阶段 3：PBR Metallic-Roughness
+### G3：独立 Player、Edit/Play 与 C# 游戏脚本
 
-1. 定义 Base Color、Metallic、Roughness、Normal、AO、Emissive 语义；
-2. 明确每种纹理的颜色空间与默认纹理；
-3. 实现 Cook-Torrance BRDF；
-4. 建立标准材质球测试场景；
-5. 保留 Blinn-Phong 作为教学和回归对照，而不是直接删除。
+1. 建立独立 Player 目标，从项目配置读取起始场景；明确游戏循环、输入映射和运行时对象生命周期。
+2. Edit/Play 使用隔离的运行世界；停止 Play 后编辑场景不被运行时变化污染，必要的“应用运行结果”必须是显式操作。
+3. C++ 引擎宿主加载 C# 游戏程序集，定义脚本与 Scene 对象的绑定、生命周期、错误诊断、重新加载边界及运行时依赖；C# 不承担 Editor UI。
+4. 验收：一个 C# 行为读取输入、修改场景对象并产生可观察反馈；Editor Play/Stop 与独立 Player 结果一致，错误脚本不会静默破坏场景。
 
-### 阶段 4：glTF/GLB 与 IBL
+### G4：可玩 Demo 与发布闭环——Limen Game Engine v1
 
-1. 选择只负责解析的 glTF 第三方库；
-2. 转换为 Limen 自有 Model、Mesh、Material 和 Texture；
-3. 支持节点层级、PBR 材质和切线数据；
-4. 加入环境贴图、Diffuse Irradiance、Prefilter 与 BRDF LUT；
-5. 使用公开标准 glTF 测试模型验证。
+1. 以选定的小型游戏为范围，补齐确实需要的碰撞/基础物理、音频、动画和游戏 UI；不把完整商业模块当作第一个 Demo 的条件。
+2. 建立资源处理、依赖收集、Cooker/manifest、构建与打包流程；发布包只依赖其内含内容和明确声明的系统运行时。
+3. 自动检查场景往返、资产缺失/重导入、Play 恢复、Cooker 完整性，并在脱离源码与 Editor 工作目录的环境中冷启动发布包。
+4. 验收：从空项目到小型可玩游戏，能在 Editor 中迭代、独立运行并交付可启动的 macOS 包。Windows 版本待对应后端与发布验证完成后再宣称支持。
 
-### 阶段 5：阴影升级
+### R：并行渲染路线
 
-1. PCF；
-2. 稳定的平行光阴影范围；
-3. Cascaded Shadow Maps；
-4. Shadow Atlas 与多光源阴影预算；
-5. 根据需求增加点光与聚光阴影。
+在已有 HDR/后处理与 Blinn-Phong 回归基线上，按 Demo 资产需求推进 Metallic-Roughness PBR、glTF/GLB 导入、IBL 与稳定阴影；随后评估 PCF/CSM、G-Buffer、Motion Vector、TAA 和更细粒度 Profiling。每项都应有实际内容场景、可重复数值或图像测试及性能预算；不把 CSM、Shadow Atlas 或 Render Graph 视作 G1–G4 的默认前置条件。
 
-### 阶段 6：Scene、资源与序列化
+### P：平台与长期研究路线
 
-1. Generation Handle 与安全删除；
-2. Entity、Transform 层级和 Render/Camera/Light 组织；
-3. 场景序列化与反序列化；
-4. AssetID、Registry、依赖关系和热重载基础；
-5. 先保持最小数据模型，不提前引入复杂 ECS 和 Job System。
-
-### 阶段 7：正式 Editor
-
-1. Hierarchy；
-2. Inspector；
-3. Content Browser；
-4. Picking 与 Transform Gizmo；
-5. Undo/Redo；
-6. Edit/Play 状态。
-
-### 阶段 8：可玩运行时
-
-1. 输入映射；
-2. Prefab；
-3. 脚本；
-4. 骨骼动画；
-5. 基础物理；
-6. 音频；
-7. 简单游戏 UI；
-8. 资源打包与可发布 Demo。
-
-### 阶段 9：现代实时渲染
-
-1. G-Buffer 与 Deferred/Hybrid 路径；
-2. Motion Vector；
-3. TAA；
-4. Frustum/Occlusion Culling；
-5. 更细粒度的 Pass/Scope GPU Profiling（当前 OpenGL 后端只有整帧计时）；
-6. GPU Driven Rendering；
-7. Pass 数量和资源依赖足够复杂后，再评估 Render Graph。
-
-### 阶段 10：Windows Direct3D 12
-
-1. Windows 构建与 Window/SwapChain；
-2. Device、Queue、Command Allocator/List；
-3. Fence 与 Frames in Flight；
-4. RTV、DSV、SRV、CBV Descriptor；
-5. Resource State 与 Barrier；
-6. Upload Heap 与资源生命周期；
-7. DXC、HLSL、Root Signature 与 PSO；
-8. 按清屏、三角形、Main Pass、Shadow、PBR、Renderer2D 顺序与 OpenGL 对齐。
-
-### 阶段 11：DXR 与混合实时光追
-
-1. BLAS/TLAS；
-2. Raytracing Pipeline；
-3. Shader Table；
-4. 光追阴影或反射的第一个混合效果；
-5. 时域累积与降噪；
-6. 后续研究 ReSTIR、混合 GI 和多光源预算。
+在公共接口持续保持后端无关的前提下，新增 Windows 构建、窗口/SwapChain 和 Direct3D 12 的显式命令、同步、资源状态、Descriptor 与 Shader 管线，逐步对齐现有场景和 2D 能力。完成 Windows 游戏构建与发布验证后，再立项 GPU Driven、DXR BLAS/TLAS、混合光追和时域研究；不靠 OpenGL 风格的 Bind/Unbind 抽象假装 DX12 已适配。
 
 ## 时间估算
 
-下面按单人、边学习边实现、从零开始估算；已经完成的第一版不应再算作剩余工作量。一个“有效开发日”按约 5 小时专注工作计算，包含设计、编码、调试、验证和文档。
+旧估算按“渲染功能逐项完成后才进入 Editor/运行时”计算，已不适用于当前交付顺序。下面是单人全职、现有代码为起点的**粗略风险区间**，包含设计、实现、调试与基本测试；多人协作和每周投入差异不能直接按人数等比换算。
 
-| 阶段                              | 可验证第一版 |         稳定可复用版本 |
-|-----------------------------------|-------------:|-----------------------:|
-| 0. 当前 sRGB、Normal、OBJ 收尾    |       1–2 天 |                 3–5 天 |
-| 1. 测试与 Profiling 基线          |       3–6 天 |                 2–3 周 |
-| 2. HDR、PostProcess、Tone Mapping |       4–8 天 |                 2–3 周 |
-| 3. Metallic-Roughness PBR         |      8–15 天 |                 3–5 周 |
-| 4. glTF/GLB 与 IBL                |     10–20 天 |               1–2 个月 |
-| 5. PCF、CSM、Shadow Atlas         |     12–25 天 |               2–4 个月 |
-| 6. Entity、序列化、AssetID        |     15–30 天 |               2–3 个月 |
-| 7. 正式 Editor                    |     20–40 天 |               3–6 个月 |
-| 8. 脚本、动画、物理、音频、打包   |     35–70 天 |              6–12 个月 |
-| 9. G-Buffer、TAA、GPU Driven      |     30–60 天 |               4–8 个月 |
-| 10. Windows Direct3D 12           |     40–80 天 |              6–12 个月 |
-| 11. DXR 与混合实时光追            |     30–70 天 | 持续研究，约 6–18 个月 |
+| 工作包                     | 可验收第一版的粗略区间   | 最大不确定性                     |
+|----------------------------|--------------------------|----------------------------------|
+| G0 工程基线                | 1–3 周                   | UI 图像/颜色问题与现有构建配置   |
+| G1 项目、资产、场景        | 1–3 个月                 | 稳定身份、格式演进和资源引用     |
+| G2 正式 Editor 编辑闭环    | 2–5 个月                 | 自研 UI 的文字、焦点、交互与撤销 |
+| G3 Player、Edit/Play、C#   | 2–4 个月                 | 原生/托管边界与生命周期          |
+| G4 游戏能力与发布          | 2–5 个月                 | Demo 范围、第三方集成和打包验证  |
+| R 渲染路线、P Windows/DX12 | 与主线并行，分别立项估算 | 内容目标、驱动差异与后端模型     |
 
-这些区间不是交付承诺。图形错误定位、平台驱动差异、第三方库选择和功能范围变化都可能显著影响时间；稳定版本中的测试、Profiling 和工具建设也会与后续阶段重叠，不应简单机械相加。
-
-大致日历时间：
-
-| 里程碑                   |     全职开发 | 每天约 2–3 小时 |
-|--------------------------|-------------:|----------------:|
-| Limen Renderer v1        |  约 3–5 个月 |    约 6–12 个月 |
-| Limen Game Engine v1     | 约 8–15 个月 |     约 1.5–3 年 |
-| Limen Research Engine v2 |  约 1.5–3 年 |       约 3–5 年 |
+这些不是交付承诺，也不应机械相加。先完成 G0/G1 并记录实际吞吐，再滚动修订 G2–G4 和 Windows 的日期；v1 的判定依据是可玩且可发布的验收结果，而不是日历或功能清单的勾选数量。
 
 ## 当前最先执行的清单
 
-现有 HDR 与后处理链路已接入，后续按以下顺序收尾并推进：
-
-1. 固定当前场景与参数，复验曝光 `0`、默认曝光和高强度光照下的画面、Shadow Map 与最终不透明输出；记录预期结果；
-2. 将颜色空间、Normal Mapping 和 HDR/后处理检查转成可重复的测试（先 CPU 数值测试，再增加带容差的截图回归）；
-3. 复验 2D Sandbox 迁移后的纹理画面；在接入正确的 sRGB 读取与输出前，颜色纹理暂按 `Linear` 加载；
-4. 补齐 Shader 编译失败检查和当前 OpenGL 环境可用的诊断路径；
-5. 完成上述基线后，定义 PBR 材质语义与纹理颜色空间，开始 Metallic-Roughness PBR；
-6. 随后进入 glTF/GLB、IBL 与阴影升级；DX12 和 DXR 继续按后续阶段推进。
+1. 为 `LimenEditor` 建立明确的构建/测试入口；验证已出现的白色 UI 纹理矩形在非对称 RGBA 测试图下的 UV、缩放、Alpha 与高 DPI 行为，不把白图 smoke test 当成功能完成。
+2. 将 HDR/颜色空间/Normal Mapping 的固定参考结果及 2D Sandbox 色彩链路收为回归基线；Shader 编译失败和当前 M1 可用的诊断路径继续补齐，但不因此暂停 G1 设计。
+3. 确定项目配置、AssetID、场景对象身份、场景 schema 与保存/加载边界，优先形成第一个“关闭再打开仍一致”的项目。
+4. 在这份真实数据上接入 Editor 视口和面板，接着推进 Player、Edit/Play、C# 游戏行为与发布包。PBR/glTF/IBL 由实际内容需求拉入并行路线。
 
 ### HDR 与后处理手工验收记录（2026-10-09）
 
@@ -625,7 +570,7 @@ PostProcess 数值测试从仓库根目录运行 `bash scripts/RUN_TEST.sh`。CP
 
 ## 暂不阻塞当前主线的功能
 
-以下功能有价值，但不是 Limen Renderer v1 的前置条件：
+以下功能有价值，但不是 G1–G4 可玩交付闭环的默认前置条件：
 
 - 网络与多人同步；
 - 大型通用 ECS；
@@ -638,7 +583,7 @@ PostProcess 数值测试从仓库根目录运行 `bash scripts/RUN_TEST.sh`。CP
 
 ## 协作与代码边界
 
-仓库协作、教学顺序、代码修改授权和架构约束见 [`AGENTS.md`](AGENTS.md)。核心原则包括：
+仓库协作、代码修改授权、工程验收和架构约束见 [`AGENTS.md`](AGENTS.md)。核心原则包括：
 
 - `Scene` 只保存数据；
 - `SceneRenderer` 组织场景 Pass；

@@ -55,7 +55,7 @@ namespace Limen
 
         struct WindowData
         {
-            std::string Title;
+            LString Title;
             unsigned int Width;
             unsigned int Height;
             // GLFW 窗口内容区尺寸；与上面的帧缓冲像素尺寸分别维护。

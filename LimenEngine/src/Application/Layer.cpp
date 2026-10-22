@@ -2,7 +2,7 @@
 
 namespace Limen {
 
-	Layer::Layer( std::string debugName)
+	Layer::Layer( LString debugName)
 		: m_DebugName(debugName)
 	{
 	}

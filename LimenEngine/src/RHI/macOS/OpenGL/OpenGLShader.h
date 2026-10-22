@@ -8,13 +8,14 @@
 #include "Limen/RHI/Shader.h"
 #include <glm/glm.hpp>
 #include "Limen/Tool/LMap.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
     class OpenGLShader : public Shader
     {
     public :
-        OpenGLShader(const std::string &name, const std::string &vertexSource, const std::string &fragmentSource);
+        OpenGLShader(const LString &name, const LString &vertexSource, const LString &fragmentSource);
 
         ~OpenGLShader() override;
 
@@ -57,7 +58,7 @@ namespace Limen
         ) override;
 
         [[nodiscard]]
-        const std::string &GetName() const noexcept override
+        const LString &GetName() const noexcept override
         {
             return m_Name;
         }
@@ -80,7 +81,7 @@ namespace Limen
 
     private:
         uint32_t m_RendererID;
-        LMap<std::string, int> m_UniformLocations;
-        std::string m_Name;
+        LMap<LString, int> m_UniformLocations;
+        LString m_Name;
     };
 }

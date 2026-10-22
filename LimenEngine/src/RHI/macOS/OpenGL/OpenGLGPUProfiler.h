@@ -11,6 +11,7 @@
 
 #include "Limen/Renderer/GPUProfiler.h"
 #include "Limen/Tool/LArray.h"
+#include "Limen/Tool/LString.h"
 
 
 namespace Limen
@@ -53,7 +54,7 @@ namespace Limen
         struct ProfileNode
         {
             // 复制名字：不能存入参 string_view（不拥有内存，可能悬空）。
-            std::string Name;
+            LString Name;
 
             // 创建时的嵌套深度（当时 m_NodeStack 的大小）；当前仅保存在 CPU 树中。
             uint32_t Depth = 0;

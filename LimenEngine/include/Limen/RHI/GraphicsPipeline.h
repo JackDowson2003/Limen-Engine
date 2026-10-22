@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <string>
+#include "Limen/Tool/LString.h"
 
 #include "Limen/Core/Core.h"
 #include "Limen/RHI/RenderState.h"
@@ -74,7 +74,7 @@ namespace Limen
          *
          * 该名称不是底层图形 API 对象句柄。
          */
-        std::string DebugName = "Unnamed Graphics Pipeline";
+        LString DebugName = "Unnamed Graphics Pipeline";
     };
 
     /**

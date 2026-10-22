@@ -2,7 +2,6 @@
 // Created by chenlong on 2026/9/16.
 //
 
-#include <string>
 #include <limits>
 
 #include "stb_image/stb_image.h"
@@ -13,6 +12,7 @@
 #include "Limen/Core/Log.h"
 #include "Limen/RHI/Texture.h"
 #include "Limen/Tool/LMap.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -34,7 +34,7 @@ namespace Limen
     {
         // 实际文件路径 -> 已加载的纹理。
         // 实际文件路径 -> 不同颜色空间的GPU纹理资源。
-        LMap<std::string, TextureCacheEntry> TextureCache;
+        LMap<LString, TextureCacheEntry> TextureCache;
 
         // 没有Albedo纹理时使用的1×1白纹理。
         Ref<Texture2D> WhiteTexture;
@@ -43,7 +43,7 @@ namespace Limen
         Ref<Texture2D> FlatNormalTexture;
 
         // 实际文件路径 -> 已加载的模型。
-        LMap<std::string, Ref<Model> > ModelCache;
+        LMap<LString, Ref<Model> > ModelCache;
     };
 
 
@@ -149,7 +149,7 @@ namespace Limen
         const std::filesystem::path normalizedPath =
                 filePath.lexically_normal();
 
-        const std::string key =
+        const LString key =
                 filePath.lexically_normal().generic_string();
 
         if (const auto iterator = s_Data->ModelCache.find(key); iterator != s_Data->ModelCache.end())
@@ -188,7 +188,7 @@ namespace Limen
             return nullptr;
         }
 
-        const std::string cacheKey = filePath.lexically_normal().generic_string();
+        const LString cacheKey = filePath.lexically_normal().generic_string();
 
         // 已经加载过时直接复用原纹理。
         if (const auto iterator = s_Data->TextureCache.find(cacheKey);

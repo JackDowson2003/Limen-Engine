@@ -660,7 +660,7 @@ namespace Limen
         for (uint32_t textureSlot = 0; textureSlot < MaxTextureSlots; ++textureSlot)
         {
             // 构造 u_Textures[0]、u_Textures[1] ... 这样的 Uniform 名称。
-            const std::string uniformName = "u_Textures[" + std::to_string(textureSlot) + "]";
+            const LString uniformName = "u_Textures[" + std::to_string(textureSlot) + "]";
 
             // Uniform 值就是它需要采样的 GPU texture unit 编号。
             s_Data->TextureShader->SetInt(uniformName.c_str(), textureSlot);

@@ -9,6 +9,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "Limen/Platform/PlatformPaths.h"
+
 namespace Limen
 {
     namespace
@@ -116,7 +118,7 @@ namespace Limen
          * @return 成功时返回文件内容，失败时返回空字符串。
          */
         [[nodiscard]]
-        std::string ReadTextFile(
+        LString ReadTextFile(
             const std::filesystem::path &requestedPath
         )
         {
@@ -161,14 +163,14 @@ namespace Limen
          * 例如BlinnPhong.asdasdsa的stem()为BlinnPhong。
          */
         [[nodiscard]]
-        std::string ExtractShaderName(
+        LString ExtractShaderName(
             const std::filesystem::path &path
         )
         {
             std::filesystem::path stem = path.stem();
 
             // 支持BlinnPhong.vs.hlsl和BlinnPhong.ps.hlsl这类双扩展名。
-            const std::string stageExtension = stem.extension().string();
+            const LString stageExtension = stem.extension().string();
             if (stageExtension == ".vs" ||
                 stageExtension == ".ps" ||
                 stageExtension == ".vert" ||
@@ -203,8 +205,8 @@ namespace Limen
         )
         {
             std::filesystem::path backendDirectory;
-            std::string vertexSuffix;
-            std::string fragmentSuffix;
+            LString vertexSuffix;
+            LString fragmentSuffix;
 
             switch (Renderer::GetRenderAPI())
             {
@@ -257,9 +259,9 @@ namespace Limen
     }
 
     Ref<Shader> Shader::CreateFromSource(
-        const std::string &name,
-        const std::string &vertexSource,
-        const std::string &fragmentSource)
+        const LString &name,
+        const LString &vertexSource,
+        const LString &fragmentSource)
     {
         switch (Renderer::GetRenderAPI())
         {
@@ -281,9 +283,9 @@ namespace Limen
     }
 
     Ref<Shader> Shader::Create(
-        const std::string &name,
-        const std::string &vertexSource,
-        const std::string &fragmentSource)
+        const LString &name,
+        const LString &vertexSource,
+        const LString &fragmentSource)
     {
         return CreateFromSource(
             name,
@@ -297,7 +299,7 @@ namespace Limen
         const std::filesystem::path &fragmentPath
     )
     {
-        const std::string shaderName =
+        const LString shaderName =
                 ExtractShaderName(vertexPath);
 
         if (shaderName.empty())
@@ -318,7 +320,7 @@ namespace Limen
     }
 
     Ref<Shader> Shader::CreateFromFiles(
-        std::string name,
+        LString name,
         const std::filesystem::path &vertexPath,
         const std::filesystem::path &fragmentPath
     )
@@ -336,10 +338,10 @@ namespace Limen
             return nullptr;
         }
 
-        const std::string vertexFileName =
+        const LString vertexFileName =
                 ExtractShaderName(vertexPath);
 
-        const std::string fragmentFileName =
+        const LString fragmentFileName =
                 ExtractShaderName(fragmentPath);
 
         if (!vertexFileName.empty() &&
@@ -354,10 +356,10 @@ namespace Limen
             );
         }
 
-        const std::string vertexSource =
+        const LString vertexSource =
                 ReadTextFile(vertexPath);
 
-        const std::string fragmentSource =
+        const LString fragmentSource =
                 ReadTextFile(fragmentPath);
 
         if (vertexSource.empty())
@@ -404,7 +406,7 @@ namespace Limen
             return;
         }
 
-        const std::string &name = shader->GetName();
+        const LString &name = shader->GetName();
 
         if (name.empty())
         {
@@ -451,7 +453,7 @@ namespace Limen
             return nullptr;
         }
 
-        const std::string shaderName =
+        const LString shaderName =
             normalizedPath.generic_string();
 
         if (Exists(shaderName))
@@ -467,11 +469,16 @@ namespace Limen
             return nullptr;
         }
 
-        return Load(
-            shaderName,
-            vertexPath,
-            fragmentPath
-        );
+        std::filesystem::path builtInAssetRoot;
+        LString pathError;
+        if (!TryGetBuiltInAssetRoot(builtInAssetRoot, pathError))
+        {
+            LM_CORE_ERROR("Cannot locate built-in shader '{}': {}", shaderName, pathError);
+            return nullptr;
+        }
+
+        const auto shaderRoot = builtInAssetRoot / "shaders";
+        return Load(shaderName, shaderRoot / vertexPath, shaderRoot / fragmentPath);
     }
 
     Ref<Shader> ShaderLibrary::Load(
@@ -487,7 +494,7 @@ namespace Limen
     }
 
     Ref<Shader> ShaderLibrary::Load(
-        std::string name,
+        LString name,
         const std::filesystem::path &vertexPath,
         const std::filesystem::path &fragmentPath
     )
@@ -528,7 +535,7 @@ namespace Limen
     }
 
     Ref<Shader> ShaderLibrary::Get(
-        const std::string &name
+        const LString &name
     ) const
     {
         const auto shader = m_Shaders.find(name);
@@ -547,7 +554,7 @@ namespace Limen
     }
 
     bool ShaderLibrary::Exists(
-        const std::string &name
+        const LString &name
     ) const noexcept
     {
         return m_Shaders.contains(name);

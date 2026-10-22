@@ -23,11 +23,13 @@ namespace Limen
      * @param rendererAPI 本次运行使用的图形 API。
      * @param enableImGuiDebugLayer 是否启用 Sandbox 使用的 ImGui 调试层；
      *                              正式 Editor 默认不启用。
+     * @param assetRoot 资源根
      */
-     Application::Application(
-        const bool isVSYNC ,
+    Application::Application(
+        const bool isVSYNC,
         const RendererAPI::API rendererAPI,
-        const bool enableImGuiDebugLayer
+        const bool enableImGuiDebugLayer,
+        const std::filesystem::path& assetRoot
     )
     {
         LM_CORE_ASSERT(!s_Instance, "Application already initialized!");
@@ -47,18 +49,18 @@ namespace Limen
 
         Renderer::Init();
 
-        AssetManager::Init("assets");
+        AssetManager::Init(assetRoot);
 
 #if defined(LIMEN_PLATFORM_LINUX) || defined(LIMEN_PLATFORM_MACOS)
-         if (enableImGuiDebugLayer)
-         {
-             // 调试 UI 由客户端显式选择；LayerStack 拥有该 Layer。
-             m_ImGUILayer = new ImGUILayer();
-             PushOverlay(m_ImGUILayer);
-         }
+        if (enableImGuiDebugLayer)
+        {
+            // 调试 UI 由客户端显式选择；LayerStack 拥有该 Layer。
+            m_ImGUILayer = new ImGUILayer();
+            PushOverlay(m_ImGUILayer);
+        }
 #else
-         // 这些平台当前没有启用该调试层，避免未使用参数警告。
-         (void)enableImGuiDebugLayer;
+        // 这些平台当前没有启用该调试层，避免未使用参数警告。
+        (void) enableImGuiDebugLayer;
 #endif
     }
 
@@ -112,7 +114,7 @@ namespace Limen
                 );
                 RendererCommand::Clear();
                 // 所有场景更新结束、窗口清屏之后，才允许提交正式 UI。
-                for (const auto & layer : m_LayerStack)
+                for (const auto &layer: m_LayerStack)
                     layer->OnUIRender(*m_Window);
             }
 
@@ -120,7 +122,7 @@ namespace Limen
             if (m_ImGUILayer)
             {
                 m_ImGUILayer->Begin();
-                for (Layer* layer : m_LayerStack)
+                for (Layer *layer: m_LayerStack)
                     layer->OnImGuiRender();
                 m_ImGUILayer->End();
             }
@@ -129,9 +131,9 @@ namespace Limen
             Renderer::EndFrame();
             const auto cpuFrameWorkEnd = std::chrono::steady_clock::now();
             m_LastCPUFrameWorkMilliseconds =
-                std::chrono::duration<double, std::milli>(
-                    cpuFrameWorkEnd - cpuFrameWorkStart
-                ).count();
+                    std::chrono::duration<double, std::milli>(
+                        cpuFrameWorkEnd - cpuFrameWorkStart
+                    ).count();
             // 所有场景与 ImGui 命令完成后再交换窗口缓冲。
             m_Window->Present(); //render
         }

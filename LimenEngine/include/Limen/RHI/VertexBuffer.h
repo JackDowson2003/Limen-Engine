@@ -4,8 +4,7 @@
 #pragma once
 
 #include <initializer_list>
-#include <string>
-
+#include "Limen/Tool/LString.h"
 #include "Limen/Core/Core.h"
 #include "Limen/Tool/LArray.h"
 
@@ -261,7 +260,7 @@ namespace Limen
      */
     struct BufferElement
     {
-        std::string Name;
+        LString Name;
         uint32_t Offset = 0;
         uint32_t Size = 0;
         ShaderDataType Type = ShaderDataType::None;
@@ -270,7 +269,7 @@ namespace Limen
 
         BufferElement() = default;
 
-        BufferElement(const ShaderDataType type, std::string name, const bool normalized = false)
+        BufferElement(const ShaderDataType type, LString name, const bool normalized = false)
             : Name(std::move(name)), Size(ShaderDataTypeSize(type)), Type(type), Normalized(normalized)
         {
         }

@@ -13,12 +13,12 @@
 
 #else
 
-int main(int argc, char **argv)
+int main(const int argc, char **argv)
 {
     Limen::Log::Init();
     LM_CORE_WARN("Initializing LIMEN");
     {
-        std::string deviceName;
+        Limen::LString deviceName;
         #if defined(LIMEN_PLATFORM_WINDOWS)
             deviceName = "Windows";
         #elif defined(LIMEN_PLATFORM_LINUX)
@@ -29,7 +29,9 @@ int main(int argc, char **argv)
 
         LM_INFO("Initializing Client : {}",deviceName);
     }
-    auto *app = Limen::CreateApplication();
+    auto *app = Limen::CreateApplication(argc, argv);
+    if (!app)
+        return 1;
     app->Run();
     delete app;
     return 0;

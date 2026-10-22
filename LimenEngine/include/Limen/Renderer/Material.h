@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <string>
 #include <cstdint>
 #include <variant>
 #include <glm/vec2.hpp>
@@ -13,6 +12,7 @@
 #include <glm/mat4x4.hpp>
 #include "Limen/Core/Core.h"
 #include "Limen/Tool/LMap.h"
+#include "Limen/Tool/LString.h"
 
 
 namespace Limen
@@ -79,7 +79,7 @@ namespace Limen
          */
         explicit Material(
             Ref<GraphicsPipeline> pipeline,
-            std::string debugName = "Unnamed Material"
+            LString debugName = "Unnamed Material"
         );
 
         /**
@@ -88,37 +88,37 @@ namespace Limen
         * SetFloat("u_Shininess", 64.0f);
         */
         void SetFloat(
-            const std::string &name,
+            const LString &name,
             float value
         ) ;
 
         void SetInt(
-            const std::string &name,
+            const LString &name,
             int32_t value
         ) ;
 
         void SetUInt(
-            const std::string &name,
+            const LString &name,
             uint32_t value
         ) ;
 
         void SetFloat2(
-            const std::string &name,
+            const LString &name,
             const glm::vec2 &value
         ) ;
 
         void SetFloat3(
-            const std::string &name,
+            const LString &name,
             const glm::vec3 &value
         ) ;
 
         void SetFloat4(
-            const std::string &name,
+            const LString &name,
             const glm::vec4 &value
         ) ;
 
         void SetMat4(
-            const std::string &name,
+            const LString &name,
             const glm::mat4 &value
         ) ;
 
@@ -131,7 +131,7 @@ namespace Limen
          *
          * @param slot 当前纹理的插槽位置
          */
-        void SetTexture(const std::string &samplerName,
+        void SetTexture(const LString &samplerName,
                         const Ref<Texture> &texture,
                         uint32_t slot
         );
@@ -162,7 +162,7 @@ namespace Limen
          * @brief 获取材质的调试名称。
          */
         [[nodiscard]]
-        const std::string &GetDebugName() const noexcept;
+        const LString &GetDebugName() const noexcept;
 
     private:
         // 多个Pipeline可以被多个材质共享
@@ -170,13 +170,13 @@ namespace Limen
 
         // 参数名称  ->  参数值
         //Material 在 CPU 端保存的“普通 Shader 参数表”：
-        LMap<std::string, MaterialParameterValue> m_Parameters;
+        LMap<LString, MaterialParameterValue> m_Parameters;
 
         // Shader sampler名称 -> 纹理绑定信息
         //Material 在 CPU 端保存的 Texture 表
-        LMap<std::string, MaterialTextureBinding> m_TexturesBindings;
+        LMap<LString, MaterialTextureBinding> m_TexturesBindings;
 
         // Debug Name
-        std::string m_DebugName;
+        LString m_DebugName;
     };
 }
