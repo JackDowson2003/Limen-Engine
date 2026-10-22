@@ -17,7 +17,7 @@ namespace Limen
         [[nodiscard]]
         constexpr bool isValid() const noexcept
         {
-            return High != 0 && Low != 0;
+            return High != 0 || Low != 0;
         }
 
         friend constexpr bool operator==(const AssetID&, const AssetID&) noexcept = default;
