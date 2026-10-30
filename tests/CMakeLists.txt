@@ -40,6 +40,32 @@ add_test(
         COMMAND $<TARGET_FILE:LimenAssetPathTests>
 )
 
+add_executable(LimenAssetIDTests
+        AssetIDTests.cpp
+)
+
+limen_configure_target(LimenAssetIDTests)
+
+target_link_libraries(LimenAssetIDTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenAssetID
+        COMMAND $<TARGET_FILE:LimenAssetIDTests>
+)
+
+add_executable(LimenAssetRegistryTests
+        AssetRegistryTests.cpp
+)
+
+limen_configure_target(LimenAssetRegistryTests)
+
+target_link_libraries(LimenAssetRegistryTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenAssetRegistry
+        COMMAND $<TARGET_FILE:LimenAssetRegistryTests>
+)
+
 add_executable(LimenProjectConfigurationTests
         ProjectConfigurationTests.cpp
 )

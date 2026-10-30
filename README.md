@@ -67,6 +67,7 @@ Limen Engine 是一个使用 C++20 与 CMake 开发的游戏引擎，现代实�
 ### Asset、Model 与材质
 
 - Asset 根目录与逻辑路径解析；
+- 已有 CPU 侧 `AssetID` 的生成、规范小写文本格式与严格解析；项目级 `AssetRegistry` 通过 `.lmmeta` 将 ID 持久关联到源资产，尚未接入 Editor 会话；
 - Texture 和 Model 缓存；
 - 同一文件按 Linear 与 sRGB 分别缓存 GPU 纹理；
 - 默认白纹理与默认平坦法线纹理；
@@ -113,8 +114,8 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 - Scene 句柄仍是 Scene 内部 `LArray` 的下标，不支持删除和 Generation；
 - `LArray` 当前只实现引擎已用到的动态数组操作，长度与容量使用 `uint32_t`，不是完整的 `std::vector` 替代接口；
 - 只支持 OBJ/MTL，不支持 glTF/GLB；
-- 没有 AssetID、Asset Registry、热重载、Cooker 和打包格式；
-- 已有 PostProcess、AABB、AssetPath、LArray 的 CPU CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
+- `AssetRegistry` 已完成独立的注册、扫描、重开和缺失源文件诊断，但尚未接入 Editor、Scene 资源引用、热重载、Cooker 和打包格式；
+- 已有 PostProcess、AABB、AssetPath、AssetID、AssetRegistry、LArray 的 CPU CTest 与可选的 macOS OpenGL GPU 数值测试，但尚无完整测试覆盖和截图回归；当前 OpenGL GPU Profiler 只测整帧，没有每个 Pass/Scope 的 GPU 时间；
 - 当前 ImGui 面板是 Sandbox 调试界面；独立的 `LimenEditor` 仍是单窗口 UI 原型，不是完整场景编辑器；
 - 没有场景序列化、脚本、动画、物理、音频和网络；
 - 2D Sandbox 的颜色纹理暂按 `Linear` 加载以保持旧显示数值，迁移后的画面仍待复验；
@@ -495,8 +496,8 @@ flowchart LR
 
 ### G1：项目、资产与场景
 
-1. 定义 TOML 格式的项目配置：项目描述文件使用 `Game1.lmproject` 一类的 `.lmproject` 单文件，运行设置使用 `.toml`；按[项目配置与跨平台启动设计](docs/ProjectConfiguration.md)确定资源根、起始场景、平台覆盖及启动校验，避免未来 Player 沿用 Sandbox 的工作目录依赖。当前加载器已校验项目文件后缀及核心字段/资源根路径；Editor 的 `--project` 已在创建窗口前解析配置并传入项目资产根，内置 Shader 从可执行文件旁独立定位。从仓库外工作目录启动临时项目已到达 OpenGL 4.1 初始化；项目身份尚未进入 Editor 会话，项目资产尚无真实消费者，Player 接线、运行设置合并与配置保存仍未完成。
-2. 为资产定义稳定 AssetID、导入设置、来源/依赖记录、重新导入与丢失引用诊断；解析库的结果仍转换为 Limen 自有资源。
+1. 定义 TOML 格式的项目配置：项目描述文件使用 `Game1.lmproject` 一类的 `.lmproject` 单文件，运行设置使用 `.toml`；按[项目配置与跨平台启动设计](docs/ProjectConfiguration.md)确定资源根、起始场景、平台覆盖及启动校验，避免未来 Player 沿用 Sandbox 的工作目录依赖。当前加载器已校验项目文件后缀及核心字段/资源根路径；Editor 的 `--project` 已在创建窗口前解析配置并传入项目资产根，`EditorSession` 已持有完整配置，内置 Shader 从可执行文件旁独立定位。从仓库外工作目录启动临时项目已到达 OpenGL 4.1 初始化；项目资产尚无真实消费者，Player 接线、运行设置合并与配置保存仍未完成。
+2. [Asset Registry 与资产元数据](docs/AssetRegistry.md)的首包已实现：已有源资产可注册并生成 `.lmmeta`，关闭后重开仍保持同一 `AssetID`，源文件缺失时保留身份并标记 `Missing`；纯 CPU 回归测试已通过。下一步让 Editor 项目会话拥有并加载 Registry，再逐步补导入设置、来源/依赖记录、重新导入及 Scene 引用诊断。解析库的结果仍转换为 Limen 自有资源。
 3. 为场景对象建立稳定身份、Generation Handle 与安全删除；完成 Transform 层级和最小 Render/Camera/Light 数据组织，不提前引入大型 ECS 或 Job System。
 4. 实现场景 schema/版本、原子保存与加载；资源引用不以临时数组下标或绝对路径充当长期身份。
 5. 验收：创建项目、导入资源、编辑并保存场景后，重启进程仍能恢复；缺失资源有明确错误，往返加载和安全删除有自动测试。
@@ -549,7 +550,7 @@ flowchart LR
 
 1. 为 `LimenEditor` 建立明确的构建/测试入口；验证已出现的白色 UI 纹理矩形在非对称 RGBA 测试图下的 UV、缩放、Alpha 与高 DPI 行为，不把白图 smoke test 当成功能完成。
 2. 将 HDR/颜色空间/Normal Mapping 的固定参考结果及 2D Sandbox 色彩链路收为回归基线；Shader 编译失败和当前 M1 可用的诊断路径继续补齐，但不因此暂停 G1 设计。
-3. 确定项目配置、AssetID、场景对象身份、场景 schema 与保存/加载边界，优先形成第一个“关闭再打开仍一致”的项目。
+3. `AssetID` 与 [Asset Registry 首包](docs/AssetRegistry.md)已有实现和 CPU 测试；接下来把 Registry 接入 Editor 项目会话，再确定场景对象身份、场景 schema 与保存/加载边界。
 4. 在这份真实数据上接入 Editor 视口和面板，接着推进 Player、Edit/Play、C# 游戏行为与发布包。PBR/glTF/IBL 由实际内容需求拉入并行路线。
 
 ### HDR 与后处理手工验收记录（2026-10-09）

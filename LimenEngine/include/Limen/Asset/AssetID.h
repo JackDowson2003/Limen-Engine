@@ -5,6 +5,10 @@
 #pragma once
 
 #include <cstdint>
+#include <string_view>
+
+#include "Limen/Core/Core.h"
+#include "Limen/Tool/LString.h"
 
 namespace Limen
 {
@@ -22,4 +26,7 @@ namespace Limen
 
         friend constexpr bool operator==(const AssetID&, const AssetID&) noexcept = default;
     };
+    [[nodiscard]] LIMEN_API AssetID GenerateAssetID();
+    [[nodiscard]] LIMEN_API LString AssetIDToString(AssetID id);
+    [[nodiscard]] LIMEN_API bool TryParseAssetID(std::string_view text, AssetID& output) noexcept;
 }

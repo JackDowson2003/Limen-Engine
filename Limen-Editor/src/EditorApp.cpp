@@ -2,6 +2,7 @@
 // Created by chenlong on 2026/10/14.
 //
 #include "Limen.h"
+#include "Limen/Asset/AssetRegistry.h"
 #include "Project/EditorSession.h"
 #include "UI/EditorUILayer.h"
 
@@ -61,7 +62,17 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
         return nullptr;
     }
 
+    auto registry = CreateScope<AssetRegistry>(pc.AssetRootAbsolute);
+    AssetRegistryError registryError;
+    if (!registry->TryLoad(registryError))
+    {
+        LM_ERROR("加载资产注册表失败: path='{}', reason='{}'",
+                 registryError.Path.string(), registryError.Message);
+        return nullptr;
+    }
 
-    auto session = CreateRef<LimenEditor::EditorSession>(std::move(pc));
+    auto session =
+        CreateRef<LimenEditor::EditorSession>(std::move(pc), std::move(registry));
+
     return new EditorApp(std::move(session));
 }

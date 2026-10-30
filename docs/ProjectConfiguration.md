@@ -86,7 +86,7 @@ vsync = true
 
 完整的直接打开项目与未来 Player 启动流程应在 `Application`、Window 和图形 Context 创建**之前**完成：启动入口取得 `.lmproject` 路径 → 校验并解析配置 → 按目标平台合并运行设置 → 验证资源与后端能力 → 构造活动项目会话 → 再初始化 Asset、Window 与 Renderer。当前 Editor `--project` 只完成核心配置预检与项目资产根传递，暂沿用固定的 OpenGL 启动设置；它不等于项目会话、运行设置合并或后端选择已完成。Editor 若先显示“选择/创建项目”窗口，可以先建立**无项目资源**的 Editor 外壳，再按同一规则打开项目；项目资产、场景和依赖项目配置的 Renderer 状态必须等校验通过后初始化。如果切换项目需要更换图形后端，第一版应明确要求重启或安全重建 Context，不能在旧 Context 上直接改枚举值。
 
-项目会话应拥有解析后的完整配置值和已规范化路径；Asset、Scene、Renderer 只使用各自需要的结果，不持有 TOML 解析器对象。关闭项目或应用时按现有 GPU Context 生命周期释放资源。目前 [EntryPoint.h](../LimenEngine/include/Limen/EntryPoint.h) 已把命令行传给客户端，[EditorApp.cpp](../Limen-Editor/src/EditorApp.cpp) 也已将绝对项目资产根交给 [Application.cpp](../LimenEngine/src/Application/Application.cpp)；但其余项目身份信息在启动局部变量离开作用域后丢失，尚无持有完整配置的 Editor 会话。
+项目会话应拥有解析后的完整配置值和已规范化路径；Asset、Scene、Renderer 只使用各自需要的结果，不持有 TOML 解析器对象。关闭项目或应用时按现有 GPU Context 生命周期释放资源。目前 [EntryPoint.h](../LimenEngine/include/Limen/EntryPoint.h) 已把命令行传给客户端，[EditorApp.cpp](../Limen-Editor/src/EditorApp.cpp) 已将绝对项目资产根交给 [Application.cpp](../LimenEngine/src/Application/Application.cpp)，[EditorSession.h](../Limen-Editor/src/Project/EditorSession.h) 已持有完整项目配置；项目级 Asset Registry 尚未接入会话。资产身份与元数据的下一步契约见[Asset Registry 与资产元数据设计](AssetRegistry.md)。
 
 对于不支持的 `schema_version`、无效 `project_id`、重复或未知核心键、越界/缺失资源、不可用后端，应拒绝启动或拒绝保存并报告具体文件及键；不要用默认值掩盖拼写错误。旧版本迁移必须显式、可备份、可回滚，不能读取时顺手重写共享文件。保存配置应采用临时文件加原子替换，失败时保留原文件。
 
