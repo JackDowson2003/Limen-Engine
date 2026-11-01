@@ -3,12 +3,93 @@
 //
 
 #include <glm/geometric.hpp>
-#include "Limen/Scene/Scene.h"
+#include <cstddef>
+#include <random>
 
+#include "Limen/Scene/Scene.h"
 #include "Limen/Core/Log.h"
 
 namespace Limen
 {
+    namespace
+    {
+        SceneObjectID GenerateSceneObjectID()
+        {
+            std::uint8_t bytes[16]{};
+            std::random_device device;
+            std::uniform_int_distribution<unsigned int> byte(0, 255);
+
+            for (auto &value: bytes)
+                value = static_cast<std::uint8_t>(byte(device));
+            // 与 AssetID 一样使用 UUID v4 的版本和 variant 位，但类型保持独立。
+            bytes[6] = static_cast<std::uint8_t>((bytes[6] & 0x0f) | 0x40);
+            bytes[8] = static_cast<std::uint8_t>((bytes[8] & 0x3f) | 0x80);
+
+            SceneObjectID id{};
+            for (std::size_t i = 0; i < 8; ++i)
+                id.High = (id.High << 8) | bytes[i];
+            for (std::size_t i = 8; i < 16; ++i)
+                id.Low = (id.Low << 8) | bytes[i];
+            return id;
+        }
+    }
+
+    SceneObjectHandle Scene::CreateObject()
+    {
+        constexpr auto invalidIndex = SceneObjectHandle::InvalidIndex;
+
+        // 没有可复用槽位时，InvalidIndex 不能成为有效对象下标。
+        if (m_FreeHead == invalidIndex && m_ObjectSlots.getSize() >= invalidIndex)
+            return {};
+
+        SceneObjectID id{};
+        while (true)
+        {
+            id = GenerateSceneObjectID();
+            if (!id.isValid())
+                continue;
+
+            bool duplicate = false;
+            for (const ObjectSlot &slot: m_ObjectSlots)
+            {
+                if (slot.Alive && slot.ID == id)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate)
+                break;
+        }
+
+        std::uint32_t index;
+        if (m_FreeHead != invalidIndex)
+        {
+            index = m_FreeHead;
+            const bool validFreeSlot =
+                    index < m_ObjectSlots.getSize() &&
+                    !m_ObjectSlots[index].Alive &&
+                    m_ObjectSlots[index].Generation != 0;
+
+            LM_CORE_ASSERT(validFreeSlot, "Scene object free list is corrupted");
+            if (!validFreeSlot)
+                return {};
+
+            m_FreeHead = m_ObjectSlots[index].NextFree;
+        } else
+        {
+            index = m_ObjectSlots.getSize();
+            m_ObjectSlots.emplace_back();
+        }
+
+        auto &[ID, Transform, Generation, NextFree, Alive] = m_ObjectSlots[index];
+        ID = id;
+        Transform = glm::mat4{1.0f};
+        NextFree = invalidIndex;
+        Alive = true;
+        return {.Index = index, .Generation = Generation};
+    }
+
     SceneRenderObjectHandle Scene::AddRenderObject(const SceneRenderObject &renderObject)
     {
         /*
@@ -78,7 +159,7 @@ namespace Limen
     void Scene::SetAmbientLight(const AmbientLight &light)
     {
         const bool intensityIsValid =
-        light.Intensity >= 0.0f;
+                light.Intensity >= 0.0f;
         LM_CORE_ASSERT(intensityIsValid, "AmbientLight intensity cannot be negative");
 
         if (!intensityIsValid)
@@ -87,7 +168,7 @@ namespace Limen
         m_AmbientLight = light;
     }
 
-    const AmbientLight & Scene::GetAmbientLight() const noexcept
+    const AmbientLight &Scene::GetAmbientLight() const noexcept
     {
         return m_AmbientLight;
     }
@@ -131,7 +212,7 @@ namespace Limen
             return false;
 
         const bool intensityIsValid =
-        light.Intensity >= 0.0f;
+                light.Intensity >= 0.0f;
 
         LM_CORE_ASSERT(
             intensityIsValid,
@@ -154,8 +235,8 @@ namespace Limen
     bool Scene::TryGetPointLight(const ScenePointLightHandle handle, PointLight &outLight) const noexcept
     {
         const bool handleIsValid =
-        handle.IsValid() &&
-        handle.Index < m_PointLights.getSize();
+                handle.IsValid() &&
+                handle.Index < m_PointLights.getSize();
 
         /*
          * 函数名使用Try，表示查询失败属于正常结果，
