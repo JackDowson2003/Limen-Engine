@@ -214,6 +214,19 @@ add_test(
         COMMAND $<TARGET_FILE:LimenLayerStackSceneRegressionTests>
 )
 
+add_executable(LimenSceneObjectTests
+        SceneObjectTests.cpp
+)
+
+limen_configure_target(LimenSceneObjectTests)
+
+target_link_libraries(LimenSceneObjectTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneObject
+        COMMAND $<TARGET_FILE:LimenSceneObjectTests>
+)
+
 add_executable(LimenEditorUILayoutTests
         EditorUILayoutTests.cpp
         "${CMAKE_SOURCE_DIR}/Limen-Editor/src/UI/EditorUILayout.cpp"
