@@ -1,7 +1,8 @@
 #pragma once
 
-#include "glm/vec2.hpp"
-#include "glm/vec4.hpp"
+#include <cstdint>
+#include <glm/vec2.hpp>
+#include <glm/vec4.hpp>
 
 namespace Limen
 {
@@ -33,6 +34,15 @@ namespace LimenEditor
             const glm::vec2 &position,
             const glm::vec2 &size,
             const Limen::Texture2D &texture
+        ) = 0;
+
+        // 绘制已经是显示编码的纹理：不做任何颜色空间转换，直接采样输出。
+        // textureHandle 是当前图形后端识别的原生纹理标识。
+        virtual void DrawNativeTextureRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            std::uintptr_t textureHandle
         ) = 0;
     };
 }

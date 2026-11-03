@@ -5,6 +5,7 @@
 #pragma once
 
 #include <limits>
+#include <cstdint>
 #include <glm/mat4x4.hpp>
 
 #include "Limen/Core/Core.h"
@@ -45,13 +46,43 @@ namespace Limen
        * 后续可以创建不同的 Material 实例。
        */
         Ref<Material> MaterialResource;
-
         /**
          * @brief 物体从模型空间变换到世界空间的矩阵。
          *
          * 单位矩阵表示物体保持 Mesh 原始的位置、旋转和大小。
          */
         glm::mat4 Transform{1.0f};
+    };
+
+    // 写入场景文件的对象身份 不同于资产身份AssetID
+    struct SceneObjectID
+    {
+        std::uint64_t High = 0;
+        std::uint64_t Low = 0;
+
+        [[nodiscard]]
+        constexpr bool isValid() const noexcept
+        {
+            return High !=0 || Low != 0;
+        }
+
+        friend constexpr bool operator==(const SceneObjectID&, const SceneObjectID&) noexcept = default;
+    };
+
+    // 只用于所属 Scene 的运行期访问，不序列化。
+    struct SceneObjectHandle
+    {
+        static constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
+
+        std::uint32_t Index = InvalidIndex;
+        std::uint32_t Generation = 0;
+
+        [[nodiscard]] constexpr bool IsValid() const noexcept
+        {
+            return Index != InvalidIndex && Generation != 0;
+        }
+
+        friend constexpr bool operator==(const SceneObjectHandle&, const SceneObjectHandle&) noexcept = default;
     };
 
     /**
@@ -132,6 +163,14 @@ namespace Limen
         Scene() = default;
 
         ~Scene() = default;
+
+        [[nodiscard]] SceneObjectHandle CreateObject();
+        [[nodiscard]] bool DestroyObject(SceneObjectHandle handle);
+        [[nodiscard]] bool IsObjectAlive(SceneObjectHandle handle) const noexcept;
+        [[nodiscard]] bool TryGetObjectID(SceneObjectHandle handle, SceneObjectID& outID) const noexcept;
+        [[nodiscard]] bool TryFindObject(SceneObjectID id, SceneObjectHandle& outHandle) const noexcept;
+        [[nodiscard]] bool SetObjectTransform(SceneObjectHandle handle, const glm::mat4& transform);
+        [[nodiscard]] bool TryGetObjectTransform(SceneObjectHandle handle, glm::mat4& outTransform) const noexcept;
 
         /**
          * @brief 向 Scene 中加入一个可渲染对象。
@@ -281,6 +320,25 @@ namespace Limen
          */
         LArray<SceneRenderObject> m_RenderObjects;
 
+        // 槽位下标可复用，Generation 用于让删除前的旧Handle失效
+        struct ObjectSlot
+        {
+            SceneObjectID ID{};
+            glm::mat4 Transform{1.0f};
+            std::uint32_t Generation = 1;
+            std::uint32_t NextFree = SceneObjectHandle::InvalidIndex;
+            bool Alive = false;
+        };
+        LArray<ObjectSlot> m_ObjectSlots;
+        std::uint32_t m_FreeHead = SceneObjectHandle::InvalidIndex;
+
+        #if defined(LIMEN_SCENE_TEST_HOOKS)
+        // 白盒测试接缝：SceneObjectTests 通过它把槽位 Generation 直接推到
+        // uint32 上限，覆盖“到达上限的槽位销毁后退休、不再进入空闲链”。
+        // 该宏只在 BUILD_TESTING 构建中定义；此声明不改变对象布局与接口。
+        friend struct SceneObjectSlotTestAccess;
+        #endif
+
         /**
          * @brief 当前场景的主平行光。
          *
@@ -304,5 +362,6 @@ namespace Limen
          * 因此直接按值保存。
          */
         AmbientLight m_AmbientLight;
+
     };
 }

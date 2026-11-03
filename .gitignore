@@ -9,3 +9,4 @@ LimenEngine/vendor/imgui
 .DS_Store
 /.vs
 /scripts/sub_module.cmd
+.aider*

@@ -1,10 +1,11 @@
 //
 // Created by chenlong on 2026/10/15.
 //
-#include "Render/OpenGL/OpenGLEditorUIRenderBackend.h"
-
+#include <glad/gl.h>
 #include <cstdint>
 
+
+#include "Render/OpenGL/OpenGLEditorUIRenderBackend.h"
 #include "Limen/Application/Window.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Renderer/Renderer.h"
@@ -80,6 +81,17 @@ namespace LimenEditor
                     LinearChannelToSRGB(sampled.b),
                     sampled.a
                 );
+            })";
+
+        constexpr char kNativeTextureFragmentSource[] = R"(#version 410 core
+            in vec2 v_TexCoord;
+            uniform sampler2D u_Texture;
+            layout(location = 0) out vec4 o_Color;
+
+            void main()
+            {
+                // SceneRenderer 最终图已经是显示编码，直接输出，不重复编码。
+                o_Color = texture(u_Texture, v_TexCoord);
             })";
     }
 
@@ -161,6 +173,25 @@ namespace LimenEditor
             Shutdown();
             return false;
         }
+
+        // 创建NativePipeline
+        const Limen::Ref<Limen::Shader> &nativeShader =
+              Limen::Shader::CreateFromSource("EditorUI/NativeTextureRect", kVertexSource, kNativeTextureFragmentSource);
+
+        if (!nativeShader)
+        {
+            LM_ERROR("Editor UI: failed to create native shader");
+            Shutdown();
+            return false;
+        }
+
+
+        Limen::GraphicsPipelineSpecification nativePipelineSpec = pipelineSpec;
+        nativePipelineSpec.ShaderProgram = nativeShader;
+        nativePipelineSpec.DebugName = "Editor UI Native Texture Rect";
+        m_NativePipeline = Limen::GraphicsPipeline::Create(nativePipelineSpec);
+
+
         return true;
     }
 
@@ -168,6 +199,7 @@ namespace LimenEditor
     {
         m_TexturedPipeline.reset();
         m_Pipeline.reset();
+        m_NativePipeline.reset();
         m_VertexArray.reset();
     }
 
@@ -241,6 +273,40 @@ namespace LimenEditor
         shader->SetFloat2("u_RectSize", size);
         shader->SetInt("u_Texture", 0);
         texture.Bind(0);
+        m_VertexArray->Bind();
+        Limen::RendererCommand::DrawIndexed(
+            *m_VertexArray,
+            Limen::PrimitiveTopology::TriangleList,
+            6
+        );
+    }
+
+    void OpenGLEditorUIRenderBackend::DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
+        const glm::vec2 &size, std::uintptr_t texture)
+    {
+        if (!m_NativePipeline || !m_VertexArray || size.x <= 0.0f || size.y <= 0)
+            return;
+
+        const uint32_t fboWidth = window.GetWidth();
+        const uint32_t fboHeight = window.GetHeight();
+        const uint32_t windowWidth = window.GetWindowWidth();
+        const uint32_t windowHeight = window.GetWindowHeight();
+
+        if (fboWidth == 0 || fboHeight == 0 || windowWidth == 0 || windowHeight == 0)
+            return;
+
+        Limen::RendererCommand::SetViewport(0, 0, fboWidth, fboHeight);
+        m_NativePipeline->Bind();
+        const auto &shader = m_NativePipeline->GetSpecification().ShaderProgram;
+        shader->SetFloat2("u_WindowSize", {
+                              static_cast<float>(windowWidth),
+                              static_cast<float>(windowHeight)
+                          });
+        shader->SetFloat2("u_RectPosition", position);
+        shader->SetFloat2("u_RectSize", size);
+        shader->SetInt("u_Texture", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(texture));
         m_VertexArray->Bind();
         Limen::RendererCommand::DrawIndexed(
             *m_VertexArray,

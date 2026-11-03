@@ -1,6 +1,7 @@
 #include "UI/EditorUILayout.h"
 
 #include <algorithm>
+#include <cmath>
 
 namespace LimenEditor
 {
@@ -86,5 +87,29 @@ namespace LimenEditor
 
 
         return result;
+    }
+
+    ViewportPixelSize CalculateViewportPixelSize(float logicalWindowWidth, float logicalWindowHeight, const UIRect &logicalRect, uint32_t framebufferWidth, uint32_t framebufferHeight)
+    {
+        ViewportPixelSize res{};
+
+        // 任一输入无效时返回最小 1x1, 避免视口尺寸为0
+        if (logicalWindowWidth <= 0.0f || logicalWindowHeight <= 0.0f  ||
+        framebufferWidth == 0 || framebufferHeight == 0 ||
+        logicalRect.Width <=0.0f || logicalRect.Height <= 0.0f
+        )
+        {
+            return res;
+        }
+
+        const float scaleX = static_cast<float>(framebufferWidth) / logicalWindowWidth;
+        const float scaleY = static_cast<float>(framebufferHeight) / logicalWindowHeight;
+
+        const long width = std::lround(logicalRect.Width * scaleX);
+        const long height = std::lround(logicalRect.Height * scaleY);
+
+        res.Width = static_cast<uint32_t>(std::max(1L,width));
+        res.Height = static_cast<uint32_t>(std::max(1L,height));
+        return res;
     }
 }

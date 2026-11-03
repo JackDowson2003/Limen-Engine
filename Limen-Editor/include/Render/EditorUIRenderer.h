@@ -18,26 +18,32 @@ namespace LimenEditor
     {
     public:
         EditorUIRenderer();
+
         ~EditorUIRenderer();
 
         bool Initialize();
+
         void Shutdown();
 
         // position、size 使用左上角为原点的逻辑窗口坐标。
         void DrawSolidRect(
-            const Limen::Window& window,
-            const glm::vec2& position,
-            const glm::vec2& size,
-            const glm::vec4& color
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color
         ) const;
 
         // 普通 UI 图片使用逻辑窗口坐标；texture 只在绘制调用期间借用。
         void DrawTexturedRect(
-            const Limen::Window& window,
-            const glm::vec2& position,
-            const glm::vec2& size,
-            const Limen::Texture2D& texture
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const Limen::Texture2D &texture
         ) const;
+
+        void DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
+                                   const glm::vec2 &size, std::uintptr_t textureHandle) const;
+
     private:
         Limen::Scope<EditorUIRenderBackend> m_Backend;
     };

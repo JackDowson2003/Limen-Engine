@@ -35,11 +35,20 @@ namespace LimenEditor
             const Limen::Texture2D &texture
         ) override;
 
+        void DrawNativeTextureRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            std::uintptr_t textureHandle
+        ) override;
+
     private:
         Limen::Scope<Limen::VertexArray> m_VertexArray;
 
         Limen::Ref<Limen::GraphicsPipeline> m_TexturedPipeline;
 
         Limen::Ref<Limen::GraphicsPipeline> m_Pipeline;
+
+        Limen::Ref<Limen::GraphicsPipeline> m_NativePipeline;
     };
 }

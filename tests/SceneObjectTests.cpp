@@ -1,9 +1,26 @@
 #include <cstdint>
 #include <iostream>
+#include <limits>
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Limen/Scene/Scene.h"
+
+namespace Limen
+{
+    // 与 Scene 中受 LIMEN_SCENE_TEST_HOOKS 保护的 friend 声明配对。
+    // 只用于把槽位 Generation 推进到 uint32 上限，覆盖槽位退休边界。
+    struct SceneObjectSlotTestAccess
+    {
+        static void SetSlotGeneration(
+            Scene& scene,
+            const std::uint32_t index,
+            const std::uint32_t generation)
+        {
+            scene.m_ObjectSlots[index].Generation = generation;
+        }
+    };
+}
 
 namespace
 {
@@ -248,122 +265,125 @@ namespace
 
         const auto handle = scene.AddRenderObject(source);
         Check("render object handle is valid", handle.IsValid());
-        Check("render object is alive", scene.IsObjectAlive(handle));
+        Check("render object enters render list",
+              scene.GetRenderObjects().getSize() == 1);
 
-        Limen::SceneObjectID renderID{};
-        Check("render object also has stable identity",
-              scene.TryGetObjectID(handle, renderID) && renderID.isValid());
-
-        Limen::SceneRenderObject actual;
-        Check("render object can be queried",
-              scene.TryGetRenderObject(handle, actual));
-        Check("queried mesh is preserved", actual.MeshResource == mesh);
-        Check("queried material is preserved",
-              actual.MaterialResource == material);
-        CheckTransform("queried render transform",
-                       actual.Transform,
+        const Limen::SceneRenderObject& stored =
+                scene.GetRenderObjects()[handle.Index];
+        Check("stored mesh is preserved", stored.MeshResource == mesh);
+        Check("stored material is preserved",
+              stored.MaterialResource == material);
+        CheckTransform("stored render transform",
+                       stored.Transform,
                        source.Transform);
 
         const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
-        Check("legacy render transform entry updates object",
+        Check("render transform entry updates render data",
               scene.SetRenderObjectTransform(handle, moved));
-
-        glm::mat4 actualTransform{};
-        Check("unified transform is visible through object query",
-              scene.TryGetObjectTransform(handle, actualTransform));
-        CheckTransform("render transform after compatibility update",
-                       actualTransform,
-                       moved);
-
-        const glm::mat4 movedAgain = Translation(7.0f, 8.0f, 9.0f);
-        Check("object transform entry updates render data",
-              scene.SetObjectTransform(handle, movedAgain));
-        Check("updated render object can be queried",
-              scene.TryGetRenderObject(handle, actual));
-        CheckTransform("render transform after object update",
-                       actual.Transform,
-                       movedAgain);
+        CheckTransform(
+            "render transform after update",
+            scene.GetRenderObjects()[handle.Index].Transform,
+            moved);
 
         int visited = 0;
-        scene.ForEachRenderObject(
-            [&](const Limen::SceneRenderObject& renderObject)
-            {
-                ++visited;
-                Check("render visitor sees original mesh",
-                      renderObject.MeshResource == mesh);
-                Check("render visitor sees original material",
-                      renderObject.MaterialResource == material);
-                CheckTransform("render visitor sees current transform",
-                               renderObject.Transform,
-                               movedAgain);
-            }
-        );
+        for (const Limen::SceneRenderObject& renderObject :
+             scene.GetRenderObjects())
+        {
+            ++visited;
+            Check("render list sees original mesh",
+                  renderObject.MeshResource == mesh);
+            Check("render list sees original material",
+                  renderObject.MaterialResource == material);
+            CheckTransform("render list sees current transform",
+                           renderObject.Transform,
+                           moved);
+        }
         Check("one renderable object is visited", visited == 1);
 
+        // 普通场景对象与渲染对象当前是两条独立管理线：
+        // 普通对象不进入渲染数组，渲染对象也不占用对象槽位。
         const auto plainObject = scene.CreateObject();
         Check("plain scene object is valid", plainObject.IsValid());
+        Check("plain object does not enter render list",
+              scene.GetRenderObjects().getSize() == 1);
 
-        Limen::SceneRenderObject untouched = source;
-        untouched.Transform = Translation(40.0f, 50.0f, 60.0f);
-        Check("plain object is not renderable",
-              !scene.TryGetRenderObject(plainObject, untouched));
-        Check("failed render query preserves mesh",
-              untouched.MeshResource == mesh);
-        Check("failed render query preserves material",
-              untouched.MaterialResource == material);
-        CheckTransform("failed render query preserves transform",
-                       untouched.Transform,
-                       Translation(40.0f, 50.0f, 60.0f));
-
-        visited = 0;
-        scene.ForEachRenderObject(
-            [&](const Limen::SceneRenderObject&)
-            {
-                ++visited;
-            }
-        );
-        Check("plain object is skipped by render visitor", visited == 1);
-
-        Check("render object can be destroyed", scene.DestroyObject(handle));
-
-        visited = 0;
-        scene.ForEachRenderObject(
-            [&](const Limen::SceneRenderObject&)
-            {
-                ++visited;
-            }
-        );
-        Check("destroyed render object is not visited", visited == 0);
-
-        const auto emptyHandle = scene.AddRenderObject(Limen::SceneRenderObject{});
-        Check("empty render object is rejected", !emptyHandle.IsValid());
-
-        Limen::SceneRenderObject missingMaterial;
-        missingMaterial.MeshResource = mesh;
-        const auto missingMaterialHandle = scene.AddRenderObject(missingMaterial);
-        Check("render object without material is rejected",
-              !missingMaterialHandle.IsValid());
-
-        Limen::SceneRenderObject missingMesh;
-        missingMesh.MaterialResource = material;
-        const auto missingMeshHandle = scene.AddRenderObject(missingMesh);
-        Check("render object without mesh is rejected",
-              !missingMeshHandle.IsValid());
-
-        visited = 0;
-        scene.ForEachRenderObject(
-            [&](const Limen::SceneRenderObject&)
-            {
-                ++visited;
-            }
-        );
-        Check("rejected render objects do not enter render visitor",
-              visited == 0);
-
-        Check("plain object remains alive after render cleanup",
-              scene.IsObjectAlive(plainObject));
         Check("plain object can be destroyed",
               scene.DestroyObject(plainObject));
+        Check("render list survives plain object removal",
+              scene.GetRenderObjects().getSize() == 1);
+    }
+
+    void TestSlotRetirementBoundary()
+    {
+        using Generation = std::uint32_t;
+        constexpr Generation maxGeneration =
+                std::numeric_limits<Generation>::max();
+
+        Limen::Scene scene;
+        const auto first = scene.CreateObject();
+        Check("retirement setup object is valid", first.IsValid());
+
+        Limen::SceneObjectID retiredID{};
+        Check("retiring object exposes ID",
+              scene.TryGetObjectID(first, retiredID) && retiredID.isValid());
+
+        // 白盒：直接把槽位 Generation 推进到 uint32 上限。
+        Limen::SceneObjectSlotTestAccess::SetSlotGeneration(
+            scene, first.Index, maxGeneration);
+
+        const Limen::SceneObjectHandle maxed{first.Index, maxGeneration};
+        Check("max generation handle is valid", maxed.IsValid());
+        Check("max generation handle still matches slot",
+              scene.IsObjectAlive(maxed));
+
+        Check("destroying max generation slot retires it",
+              scene.DestroyObject(maxed));
+        Check("retired slot is no longer alive",
+              !scene.IsObjectAlive(maxed));
+        Check("previous generation handle also fails",
+              !scene.IsObjectAlive(first));
+
+        // 退休槽位不进入空闲链：新对象必须分配到新下标。
+        const auto replacement = scene.CreateObject();
+        Check("replacement uses a different slot",
+              replacement.Index != first.Index);
+        Check("replacement is alive", scene.IsObjectAlive(replacement));
+
+        // 退休后旧句柄与旧 ID 全部失效，且查询失败不修改 out 参数。
+        const Limen::SceneObjectID idSentinel{31, 41};
+        auto idOutput = idSentinel;
+        Check("retired handle cannot query ID",
+              !scene.TryGetObjectID(maxed, idOutput));
+        Check("failed ID query preserves output", idOutput == idSentinel);
+
+        const Limen::SceneObjectHandle handleSentinel{51, 61};
+        auto handleOutput = handleSentinel;
+        Check("retired ID cannot find object",
+              !scene.TryFindObject(retiredID, handleOutput));
+        Check("failed ID lookup preserves output",
+              handleOutput == handleSentinel);
+
+        auto untouched = Translation(70.0f, 80.0f, 90.0f);
+        Check("retired handle cannot set transform",
+              !scene.SetObjectTransform(
+                  maxed, Translation(1.0f, 2.0f, 3.0f)));
+        Check("retired handle cannot read transform",
+              !scene.TryGetObjectTransform(maxed, untouched));
+        CheckTransform("failed transform query preserves output",
+                       untouched,
+                       Translation(70.0f, 80.0f, 90.0f));
+
+        // 空闲链只回收普通释放槽位，退休槽位永远不会再次分配。
+        Check("replacement can be destroyed",
+              scene.DestroyObject(replacement));
+        const auto recycled = scene.CreateObject();
+        Check("freed replacement slot is recycled",
+              recycled.Index == replacement.Index);
+        Check("recycled object never reuses retired slot",
+              recycled.Index != first.Index);
+        Check("recycled object is alive", scene.IsObjectAlive(recycled));
+        Check("recycled object can be destroyed",
+              scene.DestroyObject(recycled));
     }
 }
 
@@ -372,9 +392,11 @@ int main()
     TestObjectLifecycle();
     TestIndependentObjectsAndInvalidInput();
     TestRenderObjectLifecycle();
+    TestSlotRetirementBoundary();
 
     if (g_Failures == 0)
-        std::cout << "Scene object identity, generation, and render views: PASS\n";
+        std::cout
+                << "Scene object identity, generation, retirement, and render views: PASS\n";
 
     return g_Failures == 0 ? 0 : 1;
 }

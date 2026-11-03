@@ -3,7 +3,7 @@
 //
 
 #pragma once
-
+#include <cstdint>
 namespace LimenEditor
 {
     // 左上角原点的逻辑窗口矩形；只保存数值，不拥有窗口或 GPU 资源。
@@ -22,6 +22,21 @@ namespace LimenEditor
                 && y >= Y && y < Y + Height;
         }
     };
+
+    // 逻辑矩形换算成帧缓冲像素尺寸；至少 1×1，输入无效时同样返回 1×1。
+    struct ViewportPixelSize
+    {
+        uint32_t Width = 1;
+        uint32_t Height = 1;
+    };
+
+    [[nodiscard]] ViewportPixelSize CalculateViewportPixelSize(
+        float logicalWindowWidth,
+        float logicalWindowHeight,
+        const UIRect& logicalRect,
+        uint32_t framebufferWidth,
+        uint32_t framebufferHeight
+    );
 
     // 一次布局计算的结果；尚未包含绘制命令或面板对象。
     struct EditorUILayoutResult

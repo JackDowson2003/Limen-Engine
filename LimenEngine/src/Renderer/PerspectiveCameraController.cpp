@@ -22,100 +22,98 @@ namespace Limen
     {
     }
 
-    void PerspectiveCameraController::OnUpdate(const DeltaTime &deltaTime)
+        void PerspectiveCameraController::OnUpdate(const DeltaTime &deltaTime)
     {
         const float dt = deltaTime.GetSeconds();
 
-        const bool isNavigating =
+        const bool isLooking =
             m_MouseLookEnabled &&
             Input::IsMouseButtonPressed(MouseButton::Right);
-
-        // 只有按住鼠标右键时才锁定光标，并响应飞行相机输入。
-        if (!isNavigating)
-        {
-            if (m_WasMouseLooking)
-                Input::SetCursorMode(CursorMode::Normal);
-
-            m_WasMouseLooking = false;
-            return;
-        }
+        // UE 标准：中键平移只在没有右键环视时生效。
+        const bool isPanning =
+            m_MouseLookEnabled && !isLooking &&
+            Input::IsMouseButtonPressed(MouseButton::Middle);
 
         const auto [mouseX, mouseY] = Input::GetMousePos();
         const glm::vec2 currentMousePos(mouseX, mouseY);
 
-        // 右键刚按下时只记录起点，避免第一次旋转发生跳变。
-        if (!m_WasMouseLooking)
+        if (isLooking)
         {
-            m_LastMousePos = currentMousePos;
-            m_WasMouseLooking = true;
-            Input::SetCursorMode(CursorMode::Locked);
+            if (!m_WasMouseLooking)
+            {
+                m_LastMousePos = currentMousePos;
+                m_WasMouseLooking = true;
+                Input::SetCursorMode(CursorMode::Locked);
+            }
+            else
+            {
+                const glm::vec2 mouseDelta = currentMousePos - m_LastMousePos;
+                m_LastMousePos = currentMousePos;
+
+                glm::vec3 rotation = m_Camera.GetRotation();
+                rotation.y -= mouseDelta.x * m_MouseSensitivity;
+                rotation.x -= mouseDelta.y * m_MouseSensitivity;
+                rotation.x = std::clamp(rotation.x, -89.0f, 89.0f);
+                rotation.y = std::remainder(rotation.y, 360.0f);
+                m_Camera.SetRotation(rotation);
+            }
         }
-        else
+        else if (m_WasMouseLooking)
         {
-            const glm::vec2 mouseDelta = currentMousePos - m_LastMousePos;
-            m_LastMousePos = currentMousePos;
-
-            glm::vec3 rotation = m_Camera.GetRotation();
-
-            /*
-             * 当前相机默认朝向-Z，使用右手坐标系：
-             * 绕+Y的正角度会转向世界-X。
-             * 因此鼠标向右时要减小Yaw，才能像UE一样向世界+X转动。
-             */
-            rotation.y -= mouseDelta.x * m_MouseSensitivity;
-
-            // 窗口坐标Y轴向下，所以鼠标向上时通过减法增加Pitch。
-            rotation.x -= mouseDelta.y * m_MouseSensitivity;
-
-            // 避免Forward与WorldUp平行，导致Right无法计算。
-            rotation.x = std::clamp(rotation.x, -89.0f, 89.0f);
-            rotation.y = std::remainder(rotation.y, 360.0f);
-
-            m_Camera.SetRotation(rotation);
+            // UE：松开右键恢复光标并停止环视。
+            Input::SetCursorMode(CursorMode::Normal);
+            m_WasMouseLooking = false;
         }
 
-        // 使用 Rodrigues 公式得到旋转后的相机前向。
         const glm::vec3 forward = CalculateForwardDirection();
         constexpr glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
+        const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+        const glm::vec3 up = glm::normalize(glm::cross(right, forward));
 
-        // 前向改变后重新计算相机局部右方向。
-        const glm::vec3 rightAxisVec = glm::normalize(glm::cross(forward, worldUp));
-
-        glm::vec3 movementDirection(0.0f);
-
-        // 编辑器飞行相机：WASD前后左右，E/Q上升下降。
-        if (Input::IsKeyPressed(KeyCode::W))
-            movementDirection += forward;
-        if (Input::IsKeyPressed(KeyCode::S))
-            movementDirection -= forward;
-        if (Input::IsKeyPressed(KeyCode::D))
-            movementDirection += rightAxisVec;
-        if (Input::IsKeyPressed(KeyCode::A))
-            movementDirection -= rightAxisVec;
-
-        if (Input::IsKeyPressed(KeyCode::E))
-            movementDirection += worldUp;
-        if (Input::IsKeyPressed(KeyCode::Q))
-            movementDirection -= worldUp;
-
-        if (glm::dot(movementDirection, movementDirection) > 0.0f)
+        if (isLooking)
         {
-            movementDirection = glm::normalize(movementDirection);
+            glm::vec3 movementDirection(0.0f);
+            if (Input::IsKeyPressed(KeyCode::W)) movementDirection += forward;
+            if (Input::IsKeyPressed(KeyCode::S)) movementDirection -= forward;
+            if (Input::IsKeyPressed(KeyCode::D)) movementDirection += right;
+            if (Input::IsKeyPressed(KeyCode::A)) movementDirection -= right;
+            if (Input::IsKeyPressed(KeyCode::E)) movementDirection += worldUp;
+            if (Input::IsKeyPressed(KeyCode::Q)) movementDirection -= worldUp;
 
-            // Shift 对应编辑器飞行相机的临时加速导航。
-            constexpr float fastMoveMultiplier = 4.0f;
-            const float speedMultiplier =
-                Input::IsKeyPressed(KeyCode::LeftShift)
-                    ? fastMoveMultiplier
-                    : 1.0f;
-
-            glm::vec3 position = m_Camera.GetPosition();
-            position += movementDirection
-                * m_TranslationSpeed
-                * dt
-                * speedMultiplier;
-
-            m_Camera.SetPosition(position);
+            if (glm::dot(movementDirection, movementDirection) > 0.0f)
+            {
+                movementDirection = glm::normalize(movementDirection);
+                constexpr float fastMoveMultiplier = 4.0f;
+                const float speedMultiplier =
+                    Input::IsKeyPressed(KeyCode::LeftShift)
+                        ? fastMoveMultiplier
+                        : 1.0f;
+                glm::vec3 position = m_Camera.GetPosition();
+                position += movementDirection * m_TranslationSpeed * dt * speedMultiplier;
+                m_Camera.SetPosition(position);
+            }
+        }
+        else if (isPanning)
+        {
+            // UE：中键拖拽平移，画面跟随鼠标（抓手感觉）。
+            if (!m_WasPanning)
+            {
+                m_LastMousePos = currentMousePos;
+                m_WasPanning = true;
+            }
+            else
+            {
+                const glm::vec2 mouseDelta = currentMousePos - m_LastMousePos;
+                m_LastMousePos = currentMousePos;
+                glm::vec3 position = m_Camera.GetPosition();
+                position -= right * (mouseDelta.x * m_PanSensitivity);
+                position += up * (mouseDelta.y * m_PanSensitivity);
+                m_Camera.SetPosition(position);
+            }
+        }
+        else if (m_WasPanning)
+        {
+            m_WasPanning = false;
         }
     }
 
@@ -175,6 +173,26 @@ namespace Limen
         return m_MouseSensitivity;
     }
 
+    void PerspectiveCameraController::SetPanSensitivity(const float sensitivity)
+    {
+        m_PanSensitivity = std::max(sensitivity, 0.0f);
+    }
+
+    float PerspectiveCameraController::GetPanSensitivity() const
+    {
+        return m_PanSensitivity;
+    }
+
+    void PerspectiveCameraController::SetDollySpeed(const float speed)
+    {
+        m_DollySpeed = std::max(speed, 0.0f);
+    }
+
+    float PerspectiveCameraController::GetDollySpeed() const
+    {
+        return m_DollySpeed;
+    }
+
     PerspectiveCamera &PerspectiveCameraController::GetCamera()
     {
         return m_Camera;
@@ -187,23 +205,31 @@ namespace Limen
 
     bool PerspectiveCameraController::OnMouseScrolled(const MouseScrolledEvent &event)
     {
-        // 按住右键滚轮调整飞行速度，而不是改变FOV。
-        if (!m_MouseLookEnabled || !Input::IsMouseButtonPressed(MouseButton::Right))
+        if (!m_MouseLookEnabled)
             return false;
 
-        const float speedFactor = std::pow(
-            1.0f + m_SpeedAdjustmentStep,
-            event.GetYOffset()
-        );
+        // UE：飞行中滚轮调整飞行速度。
+        if (Input::IsMouseButtonPressed(MouseButton::Right))
+        {
+            const float speedFactor = std::pow(
+                1.0f + m_SpeedAdjustmentStep,
+                event.GetYOffset()
+            );
+            constexpr float minSpeed = 0.05f;
+            constexpr float maxSpeed = 100.0f;
+            SetTranslationSpeed(std::clamp(
+                m_TranslationSpeed * speedFactor,
+                minSpeed,
+                maxSpeed
+            ));
+            return false;
+        }
 
-        constexpr float minSpeed = 0.05f;
-        constexpr float maxSpeed = 100.0f;
-        SetTranslationSpeed(std::clamp(
-            m_TranslationSpeed * speedFactor,
-            minSpeed,
-            maxSpeed
-        ));
-
+        // UE：非飞行状态滚轮沿视线推拉。
+        const glm::vec3 forward = CalculateForwardDirection();
+        glm::vec3 position = m_Camera.GetPosition();
+        position += forward * (event.GetYOffset() * m_DollySpeed);
+        m_Camera.SetPosition(position);
         return false;
     }
 

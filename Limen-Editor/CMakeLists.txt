@@ -36,7 +36,7 @@ endif ()
 
 add_executable(LimenEditor ${LIMEN_EDITOR_SOURCES})
 
-target_link_libraries(LimenEditor PRIVATE LimenEngine)
+target_link_libraries(LimenEditor PRIVATE LimenEngine glad)
 target_include_directories(LimenEditor PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

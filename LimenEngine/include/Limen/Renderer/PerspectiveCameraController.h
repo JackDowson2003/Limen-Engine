@@ -84,6 +84,14 @@ namespace Limen
          */
         void SetMouseLookEnabled(bool enabled);
 
+        // 中键平移灵敏度：鼠标每移动 1 像素，相机沿右/上方向移动的世界单位。
+        void SetPanSensitivity(float sensitivity);
+        [[nodiscard]] float GetPanSensitivity() const;
+
+        // 非飞行状态滚轮推拉速度：每个滚轮刻度沿视线移动的世界单位。
+        void SetDollySpeed(float speed);
+        [[nodiscard]] float GetDollySpeed() const;
+
         [[nodiscard]] float GetTranslationSpeed() const;
         [[nodiscard]] float GetMouseSensitivity() const;
 
@@ -130,6 +138,15 @@ namespace Limen
 
         // 每个滚轮刻度调整移动速度的比例。
         float m_SpeedAdjustmentStep = 0.5f;
+
+        // 中键平移灵敏度，单位：世界单位/像素。
+        float m_PanSensitivity = 0.02f;
+
+        // 非飞行状态滚轮推拉速度，单位：世界单位/滚轮刻度。
+        float m_DollySpeed = 0.5f;
+
+        // 记录上一帧是否处于中键平移状态，避免首次计算产生跳变。
+        bool m_WasPanning = false;
 
         // 是否允许鼠标控制相机朝向。
         bool m_MouseLookEnabled = true;

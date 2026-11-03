@@ -92,6 +92,12 @@ function(limen_configure_target target_name)
 endfunction ()
 
 # 子目录分别定义 LimenEngine 库与 LimenSandBox 可执行文件。
+# Scene 对象系统的白盒测试接缝：让 SceneObjectTests 能把槽位 Generation
+# 推进到 uint32 上限，覆盖“槽位退休”边界。只放宽访问控制，不改变对象布局。
+if (BUILD_TESTING)
+    add_compile_definitions(LIMEN_SCENE_TEST_HOOKS)
+endif ()
+
 add_subdirectory(LimenEngine)
 add_subdirectory(LimenSandBox)
 add_subdirectory(Limen-Editor)

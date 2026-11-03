@@ -236,6 +236,30 @@ int main()
             success = ExpectPixel("bottom-left UV", ReadPixel(11, 11), {0, 0, 255, 255}) && success;
             success = ExpectPixel("sRGB gray roundtrip", ReadPixel(20, 11), {128, 64, 32, 255}) && success;
             success = ExpectPixel("logical-to-framebuffer edge", ReadPixel(6, 16), {0, 0, 0, 0}) && success;
+
+            // 直通路径：把已知显示编码颜色写进离屏纹理，再直通绘制到默认帧缓冲。
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glClearColor(0.25f, 0.5f, 0.75f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glDrawBuffer(GL_BACK);
+            glReadBuffer(GL_BACK);
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            renderer.DrawNativeTextureRect(
+                window,
+                {4.0f, 4.0f},
+                {8.0f, 8.0f},
+                static_cast<std::uintptr_t>(outputTexture)
+            );
+            success = ExpectPixel("native texture pass-through",
+                                  ReadPixel(16, 16),
+                                  {64, 128, 191, 255}) && success;
+            success = ExpectPixel("native texture rect edge",
+                                  ReadPixel(28, 28),
+                                  {0, 0, 0, 0}) && success;
         }
 
         renderer.Shutdown();

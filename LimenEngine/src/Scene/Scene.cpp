@@ -4,6 +4,7 @@
 
 #include <glm/geometric.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <random>
 
 #include "Limen/Scene/Scene.h"
@@ -35,17 +36,6 @@ namespace Limen
             return id;
         }
 
-        /**
-         * @brief 取得槽位下一次使用的 Generation。
-         *
-         * Generation 0 被保留给无效句柄，因此回绕时从 1 重新开始。
-         */
-        [[nodiscard]]
-        std::uint32_t NextGeneration(const std::uint32_t generation) noexcept
-        {
-            const std::uint32_t next = generation + 1;
-            return next == 0 ? 1 : next;
-        }
     }
 
     SceneObjectHandle Scene::CreateObject()
@@ -122,10 +112,21 @@ namespace Limen
         slot.ID = {};
         slot.Transform = glm::mat4{1.0f};
         slot.Alive = false;
-        slot.NextFree = m_FreeHead;
-        slot.Generation = NextGeneration(slot.Generation);
-        m_FreeHead = handle.Index;
 
+        constexpr auto invalidIndex = SceneObjectHandle::InvalidIndex;
+        constexpr static auto maxGeneration = std::numeric_limits<std::uint32_t>::max();
+
+        // 不允许 Generation 回绕：否则一个极端旧的 Handle 可能重新有效。
+        // 该槽位退休，不再加入空闲链。
+        if (slot.Generation == maxGeneration)
+        {
+            slot.NextFree = invalidIndex;
+            return true;
+        }
+
+        ++slot.Generation;
+        slot.NextFree = m_FreeHead;
+        m_FreeHead = handle.Index;
         return true;
     }
 

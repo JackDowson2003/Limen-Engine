@@ -85,5 +85,31 @@ int main()
                                               normal.RightSplitter.Y + normal.RightSplitter.Height)))
         ++failures;
 
+    // 视口像素尺寸：逻辑矩形按帧缓冲/逻辑比例换算，且至少 1×1。
+    const auto scaled = LimenEditor::CalculateViewportPixelSize(
+        1600.0f, 900.0f, normal.Center, 3200, 1800);
+    if (!Check("viewport width maps with 2x framebuffer scale", scaled.Width == 2080))
+        ++failures;
+    if (!Check("viewport height maps with 2x framebuffer scale", scaled.Height == 1544))
+        ++failures;
+
+    const auto identity = LimenEditor::CalculateViewportPixelSize(
+        1600.0f, 900.0f, normal.Center, 1600, 900);
+    if (!Check("viewport identity scale keeps logical size",
+               identity.Width == 1040 && identity.Height == 772))
+        ++failures;
+
+    const auto tiny = LimenEditor::CalculateViewportPixelSize(
+        1600.0f, 900.0f, {0.0f, 128.0f, 0.2f, 0.2f}, 1600, 900);
+    if (!Check("tiny logical rect clamps to at least 1x1",
+               tiny.Width == 1 && tiny.Height == 1))
+        ++failures;
+
+    const auto invalid = LimenEditor::CalculateViewportPixelSize(
+        0.0f, 900.0f, normal.Center, 1600, 900);
+    if (!Check("zero logical window returns 1x1",
+               invalid.Width == 1 && invalid.Height == 1))
+        ++failures;
+
     return failures == 0 ? 0 : 1;
 }

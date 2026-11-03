@@ -13,6 +13,8 @@
 #include "Limen/Input/Input.h"
 #include "Limen/Application/Application.h"
 #include "Limen/Asset/AssetManager.h"
+#include "Limen/Scene/SceneRenderer.h"
+#include "Limen/Renderer/PerspectiveCameraController.h"
 #include "UI/EditorUILayout.h"
 #include "Project/EditorSession.h"
 
@@ -22,8 +24,9 @@ namespace LimenEditor
     class EditorUILayer final : public Limen::Layer
     {
     public:
-        EditorUILayer(Limen::Ref<EditorSession> session = {})
-            : Layer("Limen Editor"), m_Session(std::move(session))
+        explicit EditorUILayer(Limen::Ref<EditorSession> session = {})
+            : Layer("Limen Editor"), m_Session(std::move(session)),
+        m_ViewportCameraController(45.0f, 1.0f, 0.1f, 100.f)
         {
         }
 
@@ -31,10 +34,61 @@ namespace LimenEditor
         {
             if (!m_UIRenderer.Initialize())
                 LM_ERROR("Editor UI renderer initialization failed");
+
+            Limen::SceneRendererSpecification viewportSpec;
+            viewportSpec.Width = 1;
+            viewportSpec.Height = 1;
+            viewportSpec.DebugName = "Editor Scene Viewport";
+            m_ViewportRenderer = Limen::CreateScope<Limen::SceneRenderer>(viewportSpec);
+            m_ViewportCameraController.GetCamera().SetPosition({0.0f, 0.0f, 0.5f});
+        }
+
+
+        // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
+        void OnUpdate(Limen::DeltaTime& deltaTime) override
+        {
+            if (!m_Session || !m_ViewportRenderer)
+                return;
+
+            const Limen::Window &window = Limen::Application::GetApp().GetWindow();
+            const float logicalWidth = static_cast<float>(window.GetWindowWidth());
+            const float logicalHeight = static_cast<float>(window.GetWindowHeight());
+            if (logicalWidth <= 0.0f || logicalHeight <= 0.0f)
+                return;
+
+            const EditorUILayoutResult layout =
+                    CalculateEditorUILayout(logicalWidth, logicalHeight, m_RightTopRatio);
+            m_CenterRect = layout.Center;
+
+            // 光标在中央区域内，或从视口开始的右键拖拽进行中，才允许相机输入。
+            const auto [mouseX, mouseY] = Limen::Input::GetMousePos();
+            m_IsViewportHovered = m_CenterRect.Contains(mouseX, mouseY);
+            m_ViewportCameraController.SetMouseLookEnabled(
+                m_IsViewportHovered || m_IsNavigatingViewport);
+            m_ViewportCameraController.OnUpdate(deltaTime);
+
+            const auto [Width, Height] = CalculateViewportPixelSize(
+                logicalWidth, logicalHeight, layout.Center,
+                window.GetWidth(), window.GetHeight());
+
+            const auto &spec = m_ViewportRenderer->GetSpecification();
+            if (spec.Width != Width || spec.Height != Height)
+            {
+                m_ViewportRenderer->Resize(Width, Height);
+                m_ViewportCameraController.GetCamera().SetAspectRatio(
+                    static_cast<float>(Width) /
+                    static_cast<float>(Height));
+            }
+
+            m_ViewportRenderer->Render(
+                m_Session->GetScene(),
+                m_ViewportCameraController.GetCamera());
         }
 
         void OnDetach() override
         {
+            //保证视口 GPU 资源在 Context 销毁前释放，避免把销毁顺序交给成员析构
+            m_ViewportRenderer.reset();
             m_UIRenderer.Shutdown();
         }
 
@@ -69,16 +123,19 @@ namespace LimenEditor
                 {layout.Center.Width, layout.Center.Height},
                 {0.08f, 0.09f, 0.11f, 1.0f}
             );
-            if (layout.Center.Width >= 64.0f && layout.Center.Height >= 64.0f)
+
+            const std::uintptr_t finalHandle =
+                    m_ViewportRenderer
+                        ? m_ViewportRenderer->GetFinalColorAttachmentHandle()
+                        : 0;
+            if (finalHandle != 0)
             {
-                const auto& white = Limen::AssetManager::GetWhiteTexture();
-                if (white)
-                    m_UIRenderer.DrawTexturedRect(
-                        window,
-                        {layout.Center.X + 16.0f, layout.Center.Y + 16.0f},
-                        {48.0f, 48.0f},
-                        *white
-                    );
+                m_UIRenderer.DrawNativeTextureRect(
+                    window,
+                    {layout.Center.X, layout.Center.Y},
+                    {layout.Center.Width,layout.Center.Height},
+                    finalHandle
+                );
             }
 
             m_UIRenderer.DrawSolidRect(
@@ -101,27 +158,61 @@ namespace LimenEditor
             );
         }
 
-        // event 是 Application 转发给本 Layer 的非拥有事件引用。
+                // event 是 Application 转发给本 Layer 的非拥有事件引用。
         void OnEvent(Limen::Event &event) override
         {
+            // 视口内滚轮交给相机控制器：飞行时调速，非飞行时沿视线推拉缩放。
+            if (event.GetEventType() == Limen::EventType::MouseScrolled &&
+                m_IsViewportHovered)
+                m_ViewportCameraController.OnEvent(event);
+
             // dispatcher 只在本次事件调用期间存在，用于按事件类型调用对应回调。
             Limen::EventDispatcher dispatcher(event);
 
-            // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
-            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>([this](const Limen::MouseButtonPressedEvent &press)
-            {
-                if (press.GetButton() != Limen::MouseButton::Left)
-                    return false;
-                // x、y 分别是鼠标的逻辑横、纵坐标，用于命中最近一次绘制的分隔条。
-                if (
+            // 右键（环视/飞行）或中键（平移）从中央区域按下时，视口接管相机导航。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    const auto button = press.GetButton();
+                    if (button != Limen::MouseButton::Right &&
+                        button != Limen::MouseButton::Middle)
+                        return false;
+                    // x、y 是鼠标的逻辑横、纵坐标，用于命中最近一次布局的中央区域。
                     const auto [x, y] = Limen::Input::GetMousePos();
-                    !m_RightSplitterRect.Contains(x, y)
-                )
-                    return false;
-                m_IsDraggingRightSplitter = true;
-                LM_INFO("Editor right splitter grabbed");
-                return true;
-            });
+                    if (!m_CenterRect.Contains(x, y))
+                        return false;
+                    m_IsNavigatingViewport = true;
+                    return true;
+                });
+
+            dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
+                [this](const Limen::MouseButtonReleasedEvent &release)
+                {
+                    const auto button = release.GetButton();
+                    if ((button != Limen::MouseButton::Right &&
+                         button != Limen::MouseButton::Middle) ||
+                        !m_IsNavigatingViewport)
+                        return false;
+                    m_IsNavigatingViewport = false;
+                    return true;
+                });
+
+            // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left)
+                        return false;
+                    // x、y 分别是鼠标的逻辑横、纵坐标，用于命中最近一次绘制的分隔条。
+                    if (
+                        const auto [x, y] = Limen::Input::GetMousePos();
+                        !m_RightSplitterRect.Contains(x, y)
+                    )
+                        return false;
+                    m_IsDraggingRightSplitter = true;
+                    LM_INFO("Editor right splitter grabbed");
+                    return true;
+                });
 
             // release 仅提供鼠标按钮；这里只处理从分隔条开始的左键操作。
             dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
@@ -173,6 +264,11 @@ namespace LimenEditor
                         LM_INFO("Editor right splitter drag cancelled: framebuffer size is zero");
 
                     m_IsDraggingRightSplitter = false;
+
+                    // 零尺寸帧缓冲也会打断视口导航；恢复光标，避免右键环视锁定残留。
+                    m_IsNavigatingViewport = false;
+                    m_IsViewportHovered = false;
+                    m_ViewportCameraController.SetMouseLookEnabled(false);
                     return false;
                 }
             );
@@ -191,6 +287,14 @@ namespace LimenEditor
         bool m_IsDraggingRightSplitter = false;
 
         Limen::Ref<EditorSession> m_Session;
+
+        // 视口独占的离屏渲染器与相机；场景来自会话，只借用。
+        Limen::Scope<Limen::SceneRenderer> m_ViewportRenderer;
+        Limen::PerspectiveCameraController m_ViewportCameraController;
+        // 最近一帧中央区域；用于判定光标是否在视口内。
+        UIRect m_CenterRect{};
+        bool m_IsViewportHovered = false;
+        bool m_IsNavigatingViewport = false;
         //endregion
     };
 }

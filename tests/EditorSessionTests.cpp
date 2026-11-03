@@ -8,6 +8,8 @@
 #include <type_traits>
 #include <utility>
 
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "Project/EditorSession.h"
 
 namespace
@@ -21,6 +23,10 @@ namespace
     static_assert(std::is_same_v<
         decltype(std::declval<const LimenEditor::EditorSession &>().GetAssetRegistry()),
         const Limen::AssetRegistry &
+    >);
+    static_assert(std::is_same_v<
+        decltype(std::declval<const LimenEditor::EditorSession &>().GetScene()),
+        const Limen::Scene &
     >);
     // 项目会话必须同时拥有注册表，避免构造出 GetAssetRegistry 无法安全使用的会话。
     static_assert(!std::is_constructible_v<LimenEditor::EditorSession, Limen::ProjectConfiguration>);
@@ -113,6 +119,165 @@ namespace
             std::cerr << "FAIL: " << name << '\n';
         return passed;
     }
+
+    glm::mat4 Translation(const float x, const float y, const float z)
+    {
+        return glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
+    }
+
+    bool MatchesTransform(const glm::mat4 &actual, const glm::mat4 &expected)
+    {
+        for (int column = 0; column < 4; ++column)
+        {
+            for (int row = 0; row < 4; ++row)
+            {
+                if (actual[column][row] != expected[column][row])
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    bool TestActiveSceneContract(const Limen::ProjectConfiguration &configuration)
+    {
+        // 会话独占活动场景；CreateObject 只把稳定 ID 暴露给调用方。
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        const Limen::SceneObjectID first = session.CreateObject();
+        bool passed = Check("session creates a valid scene object ID", first.isValid());
+
+        Limen::SceneObjectHandle found{};
+        passed &= Check("session scene contains the created ID",
+                        session.GetScene().TryFindObject(first, found));
+        passed &= Check("created object is alive in the session scene",
+                        found.IsValid() && session.GetScene().IsObjectAlive(found));
+
+        const Limen::SceneObjectID second = session.CreateObject();
+        passed &= Check("second created object has a distinct valid ID",
+                        second.isValid() && !(second == first));
+
+        return passed;
+    }
+
+    bool TestSelectionContract(const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        const Limen::SceneObjectID first = session.CreateObject();
+        bool passed = Check("created object becomes selected", first.isValid());
+        passed &= Check("session reports created object as selected",
+                        session.GetSelectedObjectID() == first);
+        passed &= Check("IsObjectSelected agrees for created object",
+                        session.IsObjectSelected(first));
+
+        const Limen::SceneObjectID second = session.CreateObject();
+        passed &= Check("newest object takes over selection",
+                        session.GetSelectedObjectID() == second);
+        passed &= Check("previous object is no longer selected",
+                        !session.IsObjectSelected(first));
+        passed &= Check("IsObjectSelected agrees for newest object",
+                        session.IsObjectSelected(second));
+
+        passed &= Check("selecting a live object succeeds",
+                        session.SelectObject(first));
+        passed &= Check("selection switches back",
+                        session.GetSelectedObjectID() == first &&
+                        !session.IsObjectSelected(second));
+
+        // 选择失效 ID 必须失败，并且不能改变当前选择。
+        const Limen::SceneObjectID stale{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        };
+        passed &= Check("selecting a stale ID is rejected",
+                        !session.SelectObject(stale));
+        passed &= Check("failed select keeps previous selection",
+                        session.GetSelectedObjectID() == first);
+
+        session.ClearSelection();
+        passed &= Check("clear selection yields invalid ID",
+                        !session.GetSelectedObjectID().isValid());
+        passed &= Check("no object is selected after clear",
+                        !session.IsObjectSelected(first) &&
+                        !session.IsObjectSelected(second));
+
+        passed &= Check("selection works again after clear",
+                        session.SelectObject(second) &&
+                        session.GetSelectedObjectID() == second);
+
+        return passed;
+    }
+
+    bool TestDirtyAndDeleteContract(const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        bool passed = Check("fresh session is not dirty", !session.IsDirty());
+
+        const Limen::SceneObjectID first = session.CreateObject();
+        passed &= Check("creating an object marks the session dirty",
+                        first.isValid() && session.IsDirty());
+
+        session.ClearDirty();
+        passed &= Check("ClearDirty resets dirty state", !session.IsDirty());
+
+        // 无选择时编辑必须失败，且不能改脏位、不能改 out 参数。
+        session.ClearSelection();
+        const glm::mat4 sentinel = Translation(90.0f, 91.0f, 92.0f);
+        glm::mat4 out = sentinel;
+        passed &= Check("transform query fails without selection",
+                        !session.TryGetSelectedObjectTransform(out));
+        passed &= Check("failed transform query preserves out",
+                        MatchesTransform(out, sentinel));
+        passed &= Check("failed edit keeps session clean",
+                        !session.SetSelectedObjectTransform(
+                            Translation(1.0f, 2.0f, 3.0f)) &&
+                        !session.IsDirty());
+
+        // 选中后编辑：成功、可读回、置脏。
+        passed &= Check("reselect first object", session.SelectObject(first));
+        const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
+        passed &= Check("selected object accepts transform",
+                        session.SetSelectedObjectTransform(moved));
+        passed &= Check("editing marks the session dirty", session.IsDirty());
+        out = glm::mat4(0.0f);
+        passed &= Check("edited transform can be read back",
+                        session.TryGetSelectedObjectTransform(out));
+        passed &= Check("read-back transform matches edit",
+                        MatchesTransform(out, moved));
+
+        // 删除当前选中对象：成功、置脏、清选择、旧 ID 失效。
+        const Limen::SceneObjectID second = session.CreateObject();
+        session.ClearDirty();
+        passed &= Check("delete selected object succeeds",
+                        session.DeleteObject(second));
+        passed &= Check("deleting marks the session dirty", session.IsDirty());
+        passed &= Check("deleted object is no longer selected",
+                        !session.GetSelectedObjectID().isValid() &&
+                        !session.IsObjectSelected(second));
+        passed &= Check("deleted ID can no longer be selected",
+                        !session.SelectObject(second));
+
+        // 删除未选中对象：选择保持、仍置脏。
+        session.ClearDirty();
+        passed &= Check("select survivor", session.SelectObject(first));
+        const Limen::SceneObjectID victim = session.CreateObject();
+        passed &= Check("switch selection back to survivor",
+                        session.SelectObject(first));
+        session.ClearDirty();
+        passed &= Check("delete non-selected object succeeds",
+                        session.DeleteObject(victim));
+        passed &= Check("deleting non-selected object keeps selection",
+                        session.GetSelectedObjectID() == first);
+        passed &= Check("delete marks dirty again", session.IsDirty());
+
+        // 删除失效 ID：失败且不改脏位。
+        session.ClearDirty();
+        passed &= Check("deleting a stale ID fails", !session.DeleteObject(victim));
+        passed &= Check("failed delete keeps session clean", !session.IsDirty());
+
+        return passed;
+    }
 }
 
 int main()
@@ -150,6 +315,9 @@ int main()
         const auto session = LoadSession(projectFile, project.Root / "unrelated-cwd");
         const auto &configuration = session.GetConfiguration();
         bool passed = true;
+        passed &= TestActiveSceneContract(configuration);
+        passed &= TestSelectionContract(configuration);
+        passed &= TestDirtyAndDeleteContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");
