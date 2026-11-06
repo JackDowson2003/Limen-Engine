@@ -243,6 +243,23 @@ add_test(
         COMMAND $<TARGET_FILE:LimenEditorUILayoutTests>
 )
 
+add_executable(LimenFontAtlasTests
+        FontAtlasTests.cpp
+)
+
+limen_configure_target(LimenFontAtlasTests)
+
+target_compile_definitions(LimenFontAtlasTests PRIVATE
+        LIMEN_TEST_FONT_PATH="${CMAKE_SOURCE_DIR}/LimenEngine/assets/fonts/NotoSansCJKsc-Regular.otf"
+)
+
+target_link_libraries(LimenFontAtlasTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenFontAtlas
+        COMMAND $<TARGET_FILE:LimenFontAtlasTests>
+)
+
 if (APPLE)
     # 独立的可执行文件目录使路径测试能安全验证缺失/存在两种资源状态。
     add_executable(LimenPlatformPathsTests
@@ -354,6 +371,7 @@ if (APPLE)
 
     target_compile_definitions(LimenOpenGLEditorUITextureTests PRIVATE
             LIMEN_EDITOR_WITH_OPENGL
+            LIMEN_TEST_FONT_PATH="${CMAKE_SOURCE_DIR}/LimenEngine/assets/fonts/NotoSansCJKsc-Regular.otf"
     )
 
     target_link_libraries(LimenOpenGLEditorUITextureTests PRIVATE

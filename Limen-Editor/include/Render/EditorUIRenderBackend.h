@@ -44,5 +44,16 @@ namespace LimenEditor
             const glm::vec2 &size,
             std::uintptr_t textureHandle
         ) = 0;
+
+        // 用字形图集画一个字形；position 是左上角逻辑坐标，颜色用于调制。
+        virtual void DrawGlyph(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color,
+            const Limen::Texture2D &atlasTexture,
+            const glm::vec2 &uvMin,
+            const glm::vec2 &uvMax
+        ) = 0;
     };
 }

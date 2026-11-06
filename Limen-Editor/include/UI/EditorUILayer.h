@@ -6,6 +6,8 @@
 #include <utility>
 
 #include "Render/EditorUIRenderer.h"
+#include "Limen/Platform/PlatformPaths.h"
+#include "Limen/Renderer/FontAtlas.h"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/Log.h"
 #include "Limen/Application/Window.h"
@@ -41,8 +43,33 @@ namespace LimenEditor
             viewportSpec.DebugName = "Editor Scene Viewport";
             m_ViewportRenderer = Limen::CreateScope<Limen::SceneRenderer>(viewportSpec);
             m_ViewportCameraController.GetCamera().SetPosition({0.0f, 0.0f, 0.5f});
-        }
 
+            // 引擎默认字体：从内置资产根解析路径，失败只记日志、不阻断启动。
+            Limen::LString fontError;
+            std::filesystem::path fontPath;
+            if (Limen::TryGetBuiltInAssetRoot(fontPath, fontError))
+            {
+                fontPath /= "fonts/NotoSansCJKsc-Regular.otf";
+                m_FontAtlas = Limen::CreateScope<Limen::FontAtlas>(1024, 24.0f);
+                if (m_FontAtlas->LoadFontFile(fontPath))
+                {
+                    m_FontAtlas->AddText("Limen Editor 场景 视图 对象 选择");
+                    if (!m_FontAtlas->Build())
+                        LM_ERROR("Editor UI: font atlas build failed");
+                }
+                else
+                {
+                    LM_ERROR("Editor UI: default font load failed: {}",
+                             fontPath.string());
+                }
+            }
+            else
+            {
+                LM_ERROR("Editor UI: built-in asset root unavailable: {}",
+                         fontError);
+            }
+
+        }
 
         // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
         void OnUpdate(Limen::DeltaTime& deltaTime) override
@@ -89,6 +116,7 @@ namespace LimenEditor
         {
             //保证视口 GPU 资源在 Context 销毁前释放，避免把销毁顺序交给成员析构
             m_ViewportRenderer.reset();
+            m_FontAtlas.reset();
             m_UIRenderer.Shutdown();
         }
 
@@ -123,6 +151,16 @@ namespace LimenEditor
                 {layout.Center.Width, layout.Center.Height},
                 {0.08f, 0.09f, 0.11f, 1.0f}
             );
+            if (m_FontAtlas && m_FontAtlas->IsBuilt())
+            {
+                m_UIRenderer.DrawText(
+                    window,
+                    {layout.Top.X + 12.0f, layout.Top.Y + 8.0f},
+                    {1.0f, 1.0f, 1.0f, 1.0f},
+                    *m_FontAtlas,
+                    "Limen Editor 场景 视图"
+                );
+            }
 
             const std::uintptr_t finalHandle =
                     m_ViewportRenderer
@@ -295,6 +333,9 @@ namespace LimenEditor
         UIRect m_CenterRect{};
         bool m_IsViewportHovered = false;
         bool m_IsNavigatingViewport = false;
+
+        // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。
+        Limen::Scope<Limen::FontAtlas> m_FontAtlas;
         //endregion
     };
 }

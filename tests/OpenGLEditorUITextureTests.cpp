@@ -8,6 +8,7 @@
 #include "Render/EditorUIRenderer.h"
 #include "Limen/Application/Window.h"
 #include "Limen/Core/Log.h"
+#include "Limen/Renderer/FontAtlas.h"
 #include "Limen/Renderer/RendererCommand.h"
 #include "Limen/RHI/RendererAPI.h"
 #include "Limen/RHI/Texture.h"
@@ -92,6 +93,19 @@ namespace
                   << static_cast<int>(actual.Green) << ", "
                   << static_cast<int>(actual.Blue) << ", "
                   << static_cast<int>(actual.Alpha) << ")\n";
+        return false;
+    }
+
+    bool AnyVisiblePixel(const int x0, const int y0, const int x1, const int y1)
+    {
+        for (int y = y0; y < y1; ++y)
+        {
+            for (int x = x0; x < x1; ++x)
+            {
+                if (ReadPixel(x, y).Alpha > 0)
+                    return true;
+            }
+        }
         return false;
     }
 
@@ -260,6 +274,83 @@ int main()
             success = ExpectPixel("native texture rect edge",
                                   ReadPixel(28, 28),
                                   {0, 0, 0, 0}) && success;
+
+            // 文字：字形图集 Build 后绘制，画面里应出现非零 Alpha 的像素。
+            Limen::FontAtlas textAtlas(256, 32.0f);
+            const bool fontReady =
+                textAtlas.LoadFontFile(LIMEN_TEST_FONT_PATH);
+            if (fontReady)
+            {
+                textAtlas.AddText("Limen A 场");
+                textAtlas.Build();
+            }
+            if (fontReady && textAtlas.IsBuilt())
+            {
+                std::cerr << "font ascent=" << textAtlas.GetAscent()
+                          << " lineHeight=" << textAtlas.GetLineHeight() << '\n';
+                for (const char32_t codepoint :
+                     textAtlas.DecodeText("Limen A 场"))
+                {
+                    const Limen::FontAtlas::Glyph *glyph =
+                        textAtlas.FindGlyph(codepoint);
+                    std::cerr << std::hex
+                              << "glyph U+" << static_cast<uint32_t>(codepoint)
+                              << std::dec
+                              << " uv=(" << (glyph ? glyph->U0 : -1.0f) << ","
+                              << (glyph ? glyph->V0 : -1.0f)
+                              << ") size=(" << (glyph ? glyph->Width : -1.0f)
+                              << "," << (glyph ? glyph->Height : -1.0f)
+                              << ") advance=" << (glyph ? glyph->Advance : -1.0f)
+                              << '\n';
+                }
+
+                glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                renderer.DrawText(
+                    window,
+                    {4.0f, 4.0f},
+                    {1.0f, 1.0f, 1.0f, 1.0f},
+                    textAtlas,
+                    "Limen A 场");
+                std::cerr << "glGetError after DrawText: "
+                          << glGetError() << '\n';
+                const bool visible = AnyVisiblePixel(0, 0, 32, 32);
+                std::cerr << "text visible pixels: "
+                          << (visible ? "yes" : "no") << '\n';
+                for (int y = 8; y < 24; y += 3)
+                {
+                    const Pixel sample = ReadPixel(16, y);
+                    std::cerr << "pixel(16," << y << ") = ("
+                              << static_cast<int>(sample.Red) << ","
+                              << static_cast<int>(sample.Green) << ","
+                              << static_cast<int>(sample.Blue) << ","
+                              << static_cast<int>(sample.Alpha) << ")\n";
+                }
+                success = visible && success;
+
+                // 隔离检查：整屏画一个图集左上象限，排除 DrawText 排版干扰。
+                glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                renderer.DrawGlyph(
+                    window,
+                    {0.0f, 0.0f},
+                    {16.0f, 16.0f},
+                    {1.0f, 1.0f, 1.0f, 1.0f},
+                    textAtlas.GetTexture(),
+                    {0.0f, 0.0f},
+                    {0.25f, 0.25f});
+                std::cerr << "glGetError after glyph quad: "
+                          << glGetError() << '\n';
+                const bool glyphQuadVisible = AnyVisiblePixel(0, 0, 32, 32);
+                std::cerr << "full atlas quad visible: "
+                          << (glyphQuadVisible ? "yes" : "no") << '\n';
+                success = glyphQuadVisible && success;
+            }
+            else
+            {
+                std::cerr << "Editor UI text atlas build failed\n";
+                success = false;
+            }
         }
 
         renderer.Shutdown();

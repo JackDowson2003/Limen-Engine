@@ -62,6 +62,7 @@ add_library(LimenEngine
 # toml11 仅供项目配置实现使用，不向引擎公共接口传播。
 target_include_directories(LimenEngine SYSTEM PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/vendor/toml11"
+        "${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb_truetype"
 )
 
 # PCH 只加速引擎自身编译，不传播给 Sandbox，也不能替代公共头文件的自包含。

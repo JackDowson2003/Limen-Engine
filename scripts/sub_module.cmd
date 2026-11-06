@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-cd ..
-git submodule update --init --recursive
-=======
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
@@ -22,12 +18,19 @@ if errorlevel 1 goto :failed
 git submodule update --init --recursive
 if errorlevel 1 goto :failed
 
+rem 构建环境：下载 stb_truetype 单头文件，已存在则跳过。
+set "LIMEN_STB_DIR=%CD%\LimenEngine\vendor\stb_truetype"
+if not exist "%LIMEN_STB_DIR%" mkdir "%LIMEN_STB_DIR%"
+if not exist "%LIMEN_STB_DIR%\stb_truetype.h" (
+    curl -L --fail -o "%LIMEN_STB_DIR%\stb_truetype.h" https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h
+    if errorlevel 1 goto :failed
+)
+
 echo.
 echo Submodules are ready.
 exit /b 0
 
 :failed
 echo.
-echo Failed to initialize submodules. Check the Git installation and network access.
+echo Failed to initialize submodules or download stb_truetype. Check the Git installation and network access.
 exit /b 1
->>>>>>> Stashed changes

@@ -93,6 +93,22 @@ namespace LimenEditor
                 // SceneRenderer 最终图已经是显示编码，直接输出，不重复编码。
                 o_Color = texture(u_Texture, v_TexCoord);
             })";
+
+        constexpr char kGlyphFragmentSource[] = R"(#version 410 core
+            in vec2 v_TexCoord;
+            uniform sampler2D u_Texture;
+            uniform vec4 u_Color;
+            uniform vec2 u_UVMin;
+            uniform vec2 u_UVMax;
+            layout(location = 0) out vec4 o_Color;
+
+            void main()
+            {
+                // 把 0..1 的角点坐标映射到字形在图集中的子矩形。
+                vec2 glyphUV = u_UVMin + v_TexCoord * (u_UVMax - u_UVMin);
+                float glyphAlpha = texture(u_Texture, glyphUV).a;
+                o_Color = vec4(u_Color.rgb, glyphAlpha * u_Color.a);
+            })";
     }
 
     OpenGLEditorUIRenderBackend::~OpenGLEditorUIRenderBackend() = default;
@@ -191,6 +207,28 @@ namespace LimenEditor
         nativePipelineSpec.DebugName = "Editor UI Native Texture Rect";
         m_NativePipeline = Limen::GraphicsPipeline::Create(nativePipelineSpec);
 
+        if (!m_NativePipeline)
+        {
+            LM_ERROR("Editor UI: failed to create native pipeline");
+            Shutdown();
+            return false;
+        }
+
+        // 创建glyphShader
+        const Limen::Ref<Limen::Shader> &glyphShader =
+              Limen::Shader::CreateFromSource("EditorUI/Glyph", kVertexSource, kGlyphFragmentSource);
+
+        Limen::GraphicsPipelineSpecification glyphPipeline = pipelineSpec;
+        glyphPipeline.ShaderProgram = glyphShader;
+        glyphPipeline.DebugName = "Editor UI Glyph";
+        m_GlyphPipeline = Limen::GraphicsPipeline::Create(glyphPipeline);
+
+        if (!m_GlyphPipeline)
+        {
+            LM_ERROR("Editor UI: failed to create ");
+            Shutdown();
+            return false;
+        }
 
         return true;
     }
@@ -282,7 +320,7 @@ namespace LimenEditor
     }
 
     void OpenGLEditorUIRenderBackend::DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
-        const glm::vec2 &size, std::uintptr_t texture)
+        const glm::vec2 &size, const std::uintptr_t texture)
     {
         if (!m_NativePipeline || !m_VertexArray || size.x <= 0.0f || size.y <= 0)
             return;
@@ -313,5 +351,52 @@ namespace LimenEditor
             Limen::PrimitiveTopology::TriangleList,
             6
         );
+    }
+
+    void OpenGLEditorUIRenderBackend::DrawGlyph(const Limen::Window &window, const glm::vec2 &position,
+        const glm::vec2 &size, const glm::vec4 &color, const Limen::Texture2D &atlasTexture, const glm::vec2 &uvMin,
+        const glm::vec2 &uvMax)
+    {
+        if (!m_GlyphPipeline || !m_VertexArray)
+        {
+            LM_CORE_ERROR("DrawGlyph: Draw error, environment parameters have null value");
+            return;
+        }
+
+        // 空白字形尺寸为零是正常情况，静默跳过。
+        if (size.x <= 0.0f || size.y <= 0.0f)
+            return;
+
+        const uint32_t fboWidth = window.GetWidth();
+        const uint32_t fboHeight = window.GetHeight();
+        const uint32_t windowWidth = window.GetWindowWidth();
+        const uint32_t windowHeight = window.GetWindowHeight();
+
+        if (fboWidth == 0 || fboHeight == 0 ||
+            windowWidth == 0 || windowHeight == 0)
+            return;
+
+        Limen::RendererCommand::SetViewport(0,0,fboWidth,fboHeight);
+        m_GlyphPipeline->Bind();
+        const auto &shader = m_GlyphPipeline->GetSpecification().ShaderProgram;
+        shader->SetFloat2("u_WindowSize", {
+                              static_cast<float>(windowWidth),
+                              static_cast<float>(windowHeight)
+                          });
+        shader->SetFloat2("u_RectPosition", position);
+        shader->SetFloat2("u_RectSize", size);
+        shader->SetFloat4("u_Color", color);
+        shader->SetFloat2("u_UVMin", uvMin);
+        shader->SetFloat2("u_UVMax", uvMax);
+        shader->SetInt("u_Texture", 0);
+        atlasTexture.Bind(0);
+        m_VertexArray->Bind();
+
+        Limen::RendererCommand::DrawIndexed(
+                    *m_VertexArray,
+                    Limen::PrimitiveTopology::TriangleList,
+                    6
+                );
+
     }
 }

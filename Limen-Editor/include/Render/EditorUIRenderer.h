@@ -6,6 +6,7 @@
 
 namespace Limen
 {
+    class FontAtlas;
     class Window;
     class Texture2D;
 }
@@ -43,7 +44,24 @@ namespace LimenEditor
 
         void DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
                                    const glm::vec2 &size, std::uintptr_t textureHandle) const;
+        void DrawGlyph(
+            const Limen::Window& window,
+            const glm::vec2& position,
+            const glm::vec2& size,
+            const glm::vec4& color,
+            const Limen::Texture2D& atlasTexture,
+            const glm::vec2& uvMin,
+            const glm::vec2& uvMax
+        ) const;
 
+        // 从 position（行盒左上角）开始排版一行文字；未登记字形跳过。
+        void DrawText(
+            const Limen::Window& window,
+            const glm::vec2& position,
+            const glm::vec4& color,
+            const Limen::FontAtlas& atlas,
+            std::string_view text
+        ) const;
     private:
         Limen::Scope<EditorUIRenderBackend> m_Backend;
     };
