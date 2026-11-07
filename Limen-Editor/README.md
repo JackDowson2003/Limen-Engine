@@ -61,7 +61,7 @@ flowchart TB
 - 目前 [`Application`](../LimenEngine/include/Limen/Application/Application.h) 只持有一个 `Window`，主循环只轮询并呈现这一个窗口；多窗口宿主尚未实现。
 - Sandbox 的 [`ImGUILayer`](../LimenEngine/src/Editor/ImGui/ImGUILayer.cpp) 启用停靠，但关闭了多原生窗口。仅开启 ImGui 的多视口标志不能替代正式 Editor 的窗口、面板和状态所有权设计。
 - [`Example3DLayer`](../LimenSandBox/src/Example3DLayer.h) 将测试场景、`SceneRenderer` 与视口状态放在一个 Layer 中；正式 Editor 需要把跨面板共享的场景/选择状态与每个视口自己的状态分开。
-- 当前 [`SceneRenderObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 只有数组下标。安全删除、跨面板选择和撤销前，需要按根目录 [README 的 G1](../README.md)完善对象身份及序列化；不把现有句柄直接当成稳定的 Editor 对象 ID。
+- 当前 [`SceneObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 已带 Generation，稳定身份由 `SceneObjectID` 承担，渲染组件也已统一到对象槽；剩余差距是场景序列化、撤销/重做和跨面板编辑操作。
 
 ## 接下来执行的顺序
 

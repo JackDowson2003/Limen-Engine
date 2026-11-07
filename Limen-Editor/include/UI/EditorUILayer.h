@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "Render/EditorUIRenderer.h"
+#include "Render/EditorSceneContent.h"
 #include "Limen/Platform/PlatformPaths.h"
 #include "Limen/Renderer/FontAtlas.h"
 #include "Limen/Application/Layer.h"
@@ -41,7 +42,7 @@ namespace LimenEditor
             viewportSpec.Height = 1;
             viewportSpec.DebugName = "Editor Scene Viewport";
             m_ViewportRenderer = Limen::CreateScope<Limen::SceneRenderer>(viewportSpec);
-            m_ViewportCameraController.GetCamera().SetPosition({0.0f, 0.0f, 0.5f});
+            m_ViewportCameraController.GetCamera().SetPosition({0.0f, 0.0f, 4.0f});
 
             // 引擎默认字体：从内置资产根解析路径，失败只记日志、不阻断启动。
             Limen::LString fontError;
@@ -52,7 +53,11 @@ namespace LimenEditor
                 m_FontAtlas = Limen::CreateScope<Limen::FontAtlas>(1024, 24.0f);
                 if (m_FontAtlas->LoadFontFile(fontPath))
                 {
-                    m_FontAtlas->AddText("Limen Editor 场景 视图 对象 选择");
+                    std::string uiCharacters;
+                    for (char c = 32; c < 127; ++c)
+                        uiCharacters.push_back(c);
+                    uiCharacters += "场景视图对象选择内容浏览器创建详情无";
+                    m_FontAtlas->AddText(uiCharacters);
                     if (!m_FontAtlas->Build())
                         LM_ERROR("Editor UI: font atlas build failed");
                 } else
@@ -65,6 +70,8 @@ namespace LimenEditor
                 LM_ERROR("Editor UI: built-in asset root unavailable: {}",
                          fontError);
             }
+            if (!m_SceneContent.Initialize())
+                LM_ERROR("Editor scene content initialization failed");
         }
 
         // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
@@ -344,8 +351,7 @@ namespace LimenEditor
                         *m_FontAtlas,
                         "No selection"
                     );
-                }
-                else
+                } else
                 {
                     // 显示选中的位置
                     glm::mat4 transform{1.0f};
@@ -363,8 +369,7 @@ namespace LimenEditor
                             {0.75f, 0.75f, 0.75f, 1.0f},
                             *m_FontAtlas,
                             position);
-                    }
-                    else
+                    } else
                     {
                         // 不可用，但依然显示
                         m_UIRenderer.DrawText(
@@ -373,7 +378,7 @@ namespace LimenEditor
                             {0.8f, 0.4f, 0.4f, 1.0f},
                             *m_FontAtlas,
                             "Transform unavailable"
-                            );
+                        );
                     }
                 }
             }
@@ -429,7 +434,19 @@ namespace LimenEditor
                     const auto [x, y] = Limen::Input::GetMousePos();
                     if (!m_CreateButtonRect.Contains(x, y))
                         return false;
-                    return m_Session->CreateObject().isValid();
+                    LM_INFO("Editor create button clicked at ({}, {})", x, y);
+                    const auto &cubeMesh = m_SceneContent.GetCubeMesh();
+                    const auto &cubeMaterial = m_SceneContent.GetCubeMaterial();
+                    if (!cubeMesh || !cubeMaterial)
+                        return false;
+                    const auto created = m_Session->CreateRenderableObject(
+                        cubeMesh,
+                        cubeMaterial);
+                    LM_INFO("CreateRenderableObject valid={}, mesh={}, material={}",
+                            created.isValid(),
+                            static_cast<bool>(cubeMesh),
+                            static_cast<bool>(cubeMaterial));
+                    return created.isValid();
                 });
 
             // 左键点击 Outliner 行：把鼠标 Y 映射为行号并选中对应对象。
@@ -573,6 +590,9 @@ namespace LimenEditor
 
         // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。
         Limen::Scope<Limen::FontAtlas> m_FontAtlas;
+
+        // Editor 默认立方体等引导内容；GPU 资源由渲染层持有。
+        EditorSceneContent m_SceneContent;
         //endregion
     };
 }

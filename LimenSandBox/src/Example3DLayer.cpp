@@ -397,7 +397,7 @@ namespace SandBox
         cubeObject.MaterialResource = m_CubeMaterial;
         cubeObject.Transform = glm::mat4(1.0f);
 
-        m_CubeObjectHandle = m_Scene.AddRenderObject(cubeObject);
+        m_CubeObjectHandle = m_Scene.AddRenderableObject(cubeObject);
 
         LM_CORE_ASSERT(
             m_CubeObjectHandle.IsValid(),
@@ -421,8 +421,8 @@ namespace SandBox
          * 第二个立方体当前不需要每帧修改，
          * 所以句柄只用于检查添加是否成功，不必保存为成员。
          */
-        const Limen::SceneRenderObjectHandle secondCubeHandle =
-                m_Scene.AddRenderObject(secondCubeObject);
+        const Limen::SceneObjectHandle secondCubeHandle =
+                m_Scene.AddRenderableObject(secondCubeObject);
 
         LM_CORE_ASSERT(
             secondCubeHandle.IsValid(),
@@ -506,7 +506,7 @@ namespace SandBox
              */
             importedObj.Transform = importedModelTransform * LocalTransform;
 
-            const Limen::SceneRenderObjectHandle importedObjectHandle = m_Scene.AddRenderObject(importedObj);
+            const Limen::SceneObjectHandle importedObjectHandle = m_Scene.AddRenderableObject(importedObj);
             LM_CORE_ASSERT(
                 importedObjectHandle.IsValid(),
                 "Failed to add imported model part to Scene"
@@ -611,7 +611,7 @@ namespace SandBox
          * Layer 不直接访问 Scene 内部数组，
          * 而是通过创建立方体时取得的句柄修改 Transform。
          */
-        const bool transformUpdated = m_Scene.SetRenderObjectTransform(m_CubeObjectHandle, cubeTransform);
+        const bool transformUpdated = m_Scene.SetObjectTransform(m_CubeObjectHandle, cubeTransform);
 
         LM_CORE_ASSERT(transformUpdated, "Transform update failed");
 

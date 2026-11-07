@@ -251,68 +251,6 @@ namespace
               handleOutput == handleSentinel);
     }
 
-    void TestRenderObjectLifecycle()
-    {
-        Limen::Scene scene;
-
-        const auto mesh = MakeMeshToken();
-        const auto material = MakeMaterialToken();
-
-        Limen::SceneRenderObject source;
-        source.MeshResource = mesh;
-        source.MaterialResource = material;
-        source.Transform = Translation(1.0f, 2.0f, 3.0f);
-
-        const auto handle = scene.AddRenderObject(source);
-        Check("render object handle is valid", handle.IsValid());
-        Check("render object enters render list",
-              scene.GetRenderObjects().getSize() == 1);
-
-        const Limen::SceneRenderObject& stored =
-                scene.GetRenderObjects()[handle.Index];
-        Check("stored mesh is preserved", stored.MeshResource == mesh);
-        Check("stored material is preserved",
-              stored.MaterialResource == material);
-        CheckTransform("stored render transform",
-                       stored.Transform,
-                       source.Transform);
-
-        const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
-        Check("render transform entry updates render data",
-              scene.SetRenderObjectTransform(handle, moved));
-        CheckTransform(
-            "render transform after update",
-            scene.GetRenderObjects()[handle.Index].Transform,
-            moved);
-
-        int visited = 0;
-        for (const Limen::SceneRenderObject& renderObject :
-             scene.GetRenderObjects())
-        {
-            ++visited;
-            Check("render list sees original mesh",
-                  renderObject.MeshResource == mesh);
-            Check("render list sees original material",
-                  renderObject.MaterialResource == material);
-            CheckTransform("render list sees current transform",
-                           renderObject.Transform,
-                           moved);
-        }
-        Check("one renderable object is visited", visited == 1);
-
-        // 普通场景对象与渲染对象当前是两条独立管理线：
-        // 普通对象不进入渲染数组，渲染对象也不占用对象槽位。
-        const auto plainObject = scene.CreateObject();
-        Check("plain scene object is valid", plainObject.IsValid());
-        Check("plain object does not enter render list",
-              scene.GetRenderObjects().getSize() == 1);
-
-        Check("plain object can be destroyed",
-              scene.DestroyObject(plainObject));
-        Check("render list survives plain object removal",
-              scene.GetRenderObjects().getSize() == 1);
-    }
-
     void TestSlotRetirementBoundary()
     {
         using Generation = std::uint32_t;
@@ -450,15 +388,135 @@ namespace
         }
         Check("deleted object is not visited", !sawDeleted);
     }
+
+    void TestSceneRenderableComponent()
+    {
+        Limen::Scene scene;
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+
+        Limen::SceneRenderObject source;
+        source.MeshResource = mesh;
+        source.MaterialResource = material;
+        source.Transform = Translation(1.0f, 2.0f, 3.0f);
+
+        const auto handle = scene.AddRenderableObject(source);
+        Check("renderable object handle is valid", handle.IsValid());
+        Check("renderable object is alive", scene.IsObjectAlive(handle));
+
+        Limen::SceneObjectID objectID{};
+        Check("renderable object exposes stable ID",
+              scene.TryGetObjectID(handle, objectID) && objectID.isValid());
+
+        int objectVisits = 0;
+        scene.ForEachObject(
+            [&](const Limen::SceneObjectHandle &visitedHandle,
+                const Limen::SceneObjectID &visitedID)
+            {
+                if (!(visitedHandle == handle))
+                    return;
+                ++objectVisits;
+                Check("renderable object ID matches traversal",
+                      visitedID == objectID);
+            });
+        Check("renderable object appears in object traversal",
+              objectVisits == 1);
+
+        int renderVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &visitedHandle,
+                const Limen::SceneObjectID &visitedID,
+                const Limen::Ref<Limen::Mesh> &meshResource,
+                const Limen::Ref<Limen::Material> &materialResource,
+                const glm::mat4 &transform)
+            {
+                ++renderVisits;
+                Check("renderable traversal handle matches",
+                      visitedHandle == handle);
+                Check("renderable traversal ID matches", visitedID == objectID);
+                Check("renderable traversal mesh matches", meshResource == mesh);
+                Check("renderable traversal material matches",
+                      materialResource == material);
+                CheckTransform("renderable traversal transform",
+                               transform, source.Transform);
+            });
+        Check("one renderable object is visited", renderVisits == 1);
+
+        const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
+        Check("renderable transform follows object transform",
+              scene.SetObjectTransform(handle, moved));
+
+        renderVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &transform)
+            {
+                ++renderVisits;
+                CheckTransform("render traversal sees updated transform",
+                               transform, moved);
+            });
+        Check("updated renderable is visited once", renderVisits == 1);
+
+        source.MeshResource.reset();
+        source.MaterialResource.reset();
+        Check("mesh is shared while renderable is alive",
+              mesh.use_count() == 2);
+        Check("material is shared while renderable is alive",
+              material.use_count() == 2);
+
+        Check("renderable object can be destroyed",
+              scene.DestroyObject(handle));
+        Check("mesh reference released after destroy", mesh.use_count() == 1);
+        Check("material reference released after destroy",
+              material.use_count() == 1);
+
+        renderVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &)
+            {
+                ++renderVisits;
+            });
+        Check("destroyed renderable is not visited", renderVisits == 0);
+
+        // 复用槽位不得残留上一代渲染组件。
+        const auto again = scene.AddRenderableObject(
+            Limen::SceneRenderObject{mesh, material, glm::mat4{1.0f}});
+        Check("replacement renderable is valid", again.IsValid());
+        Check("replacement renderable reuses slot",
+              again.Index == handle.Index);
+        Check("destroy replacement renderable", scene.DestroyObject(again));
+
+        const auto plain = scene.CreateObject();
+        Check("plain object reuses renderable slot",
+              plain.Index == handle.Index);
+        renderVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &)
+            {
+                ++renderVisits;
+            });
+        Check("reused slot has no render component", renderVisits == 0);
+    }
 }
 
 int main()
 {
     TestObjectLifecycle();
     TestIndependentObjectsAndInvalidInput();
-    TestRenderObjectLifecycle();
     TestSlotRetirementBoundary();
     TestForEachObject();
+    TestSceneRenderableComponent();
 
     if (g_Failures == 0)
         std::cout

@@ -63,7 +63,9 @@ namespace Limen
         framebufferSpec.Width = m_Spec.Width;
         framebufferSpec.Height = m_Spec.Height;
         framebufferSpec.Samples = m_Spec.Samples;
-        framebufferSpec.Attachments = {FramebufferAttachmentFormat::RGBA16F,FramebufferAttachmentFormat::Depth24Stencil8};
+        framebufferSpec.Attachments = {
+            FramebufferAttachmentFormat::RGBA16F, FramebufferAttachmentFormat::Depth24Stencil8
+        };
 
         m_Framebuffer = Framebuffer::Create(framebufferSpec);
 
@@ -158,7 +160,7 @@ namespace Limen
             return;
 
         m_PostProcessShader->Bind();
-        m_PostProcessShader->SetInt("u_SceneColor",0);
+        m_PostProcessShader->SetInt("u_SceneColor", 0);
         m_PostProcessShader->UnBind();
 
         // Specification of Shadow Pipeline
@@ -458,26 +460,25 @@ namespace Limen
          * Shadow Pass只需要Mesh和Transform，
          * 不需要使用物体的Material。
          */
-        for (const SceneRenderObject &renderObject: scene.GetRenderObjects())
-        {
-            LM_CORE_ASSERT(
-                renderObject.MeshResource,
-                "Shadow Pass encountered an object without Mesh"
-            );
+        scene.ForEachRenderableObject(
+            [&](const SceneObjectHandle &,
+                const SceneObjectID &,
+                const Ref<Mesh> &meshResource,
+                const Ref<Material> &,
+                const glm::mat4 &transform)
+            {
+                LM_CORE_ASSERT(
+                    meshResource,
+                    "Shadow Pass encountered an object without Mesh"
+                );
 
-            if (!renderObject.MeshResource)
-                continue;
+                if (!meshResource)
+                    return;
 
-
-            // 在前面已经m_ShadowRenderPass->Begin();
-            // 这里会FBO.Bind()
-            Renderer::SubmitDepth(
-                *m_ShadowPipeline,
-                *renderObject.MeshResource,
-                m_DirectionalLightViewProjectionMatrix,
-                renderObject.Transform
-            );
-        }
+                Renderer::SubmitDepth(*m_ShadowPipeline, *meshResource, m_DirectionalLightViewProjectionMatrix,
+                                      transform);
+            }
+        );
 
         m_ShadowRenderPass->End();
 
@@ -513,42 +514,33 @@ namespace Limen
          * - 不增加 Mesh 和 Material 的 Ref 引用计数；
          * - 不复制 Transform 矩阵。
          */
-        for (const auto &[MeshResource,MaterialResource,Transform]
-             : scene.GetRenderObjects())
-        {
-            /*
-             * AddRenderObject() 已经禁止加入无效对象。
-             * 这里仍保留保护，避免未来反序列化或其他入口产生空资源。
-             */
-            LM_CORE_ASSERT(
-                MeshResource,
-                "SceneRenderer '{}' encountered an object without Mesh",
-                m_Spec.DebugName
-            );
-
-            LM_CORE_ASSERT(
-                MaterialResource,
-                "SceneRenderer '{}' encountered an object without Material",
-                m_Spec.DebugName
-            );
-
-            if (!MeshResource || !MaterialResource)
+        scene.ForEachRenderableObject(
+            [&](const SceneObjectHandle &,
+                const SceneObjectID &,
+                const Ref<Mesh> &meshResource,
+                const Ref<Material> &materialResource,
+                const glm::mat4 &transform)
             {
-                continue;
-            }
+                LM_CORE_ASSERT(
+                    meshResource,
+                    "SceneRenderer '{}' encountered an object without Mesh",
+                    m_Spec.DebugName
+                );
+                LM_CORE_ASSERT(
+                    materialResource,
+                    "SceneRenderer '{}' encountered an object without Material",
+                    m_Spec.DebugName
+                );
 
-            /*
-             * 在上面的SubmitDepth已经提交并生成了Depth32F 深度附件
-             *
-             * Material：提供 Shader、Pipeline、纹理和材质参数；
-             * Mesh：提供 VAO、VBO 和 IBO；
-             * Transform：描述该物体在世界中的位置、旋转和缩放。
-             */
-            Renderer::Submit(
-                *MaterialResource,
-                *MeshResource,
-                Transform);
-        }
+                if (!meshResource || !materialResource)
+                    return;
+
+                Renderer::Submit(
+                    *materialResource,
+                    *meshResource,
+                    transform
+                );
+            });
 
 
         /**
@@ -593,7 +585,7 @@ namespace Limen
         // 设置曝光
         m_PostProcessShader->SetFloat("u_Exposure", m_Exposure);
 
-        Renderer::SubmitFullscreen(*m_PostProcessPipeline,*m_PostProcessVertexArray);
+        Renderer::SubmitFullscreen(*m_PostProcessPipeline, *m_PostProcessVertexArray);
 
         m_PostProcessRenderPass->End();
     }

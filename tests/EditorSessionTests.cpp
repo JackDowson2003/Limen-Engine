@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -136,6 +137,21 @@ namespace
             }
         }
         return true;
+    }
+
+    // 仅作为 CPU 侧资源身份标记，测试不会解引用。
+    Limen::Ref<Limen::Mesh> MakeMeshToken()
+    {
+        return Limen::Ref<Limen::Mesh>(
+            reinterpret_cast<Limen::Mesh *>(std::uintptr_t{1}),
+            [](Limen::Mesh *) {});
+    }
+
+    Limen::Ref<Limen::Material> MakeMaterialToken()
+    {
+        return Limen::Ref<Limen::Material>(
+            reinterpret_cast<Limen::Material *>(std::uintptr_t{2}),
+            [](Limen::Material *) {});
     }
 
     bool TestActiveSceneContract(const Limen::ProjectConfiguration &configuration)
@@ -278,6 +294,67 @@ namespace
 
         return passed;
     }
+
+    bool TestRenderableObjectContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+
+        const Limen::SceneObjectID id =
+            session.CreateRenderableObject(mesh, material);
+        bool passed = Check("renderable object ID is valid", id.isValid());
+        passed &= Check("renderable object is selected",
+                        session.GetSelectedObjectID() == id);
+        passed &= Check("creating renderable object marks dirty",
+                        session.IsDirty());
+
+        int visits = 0;
+        session.GetScene().ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &visitedID,
+                const Limen::Ref<Limen::Mesh> &meshResource,
+                const Limen::Ref<Limen::Material> &materialResource,
+                const glm::mat4 &transform)
+            {
+                ++visits;
+                passed &= Check("renderable traversal ID matches",
+                                visitedID == id);
+                passed &= Check("renderable traversal mesh matches",
+                                meshResource == mesh);
+                passed &= Check("renderable traversal material matches",
+                                materialResource == material);
+                passed &= Check("renderable object starts at identity",
+                                MatchesTransform(transform, glm::mat4{1.0f}));
+            });
+        passed &= Check("one renderable object is visited", visits == 1);
+
+        passed &= Check("empty renderable mesh is rejected",
+                        !session.CreateRenderableObject({}, material).isValid());
+        passed &= Check("empty renderable material is rejected",
+                        !session.CreateRenderableObject(mesh, {}).isValid());
+
+        session.ClearDirty();
+        passed &= Check("delete renderable object succeeds",
+                        session.DeleteObject(id));
+        passed &= Check("deleting renderable clears selection",
+                        !session.GetSelectedObjectID().isValid());
+        passed &= Check("deleting renderable marks dirty", session.IsDirty());
+
+        visits = 0;
+        session.GetScene().ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &)
+            {
+                ++visits;
+            });
+        passed &= Check("deleted renderable is not visited", visits == 0);
+        return passed;
+    }
 }
 
 int main()
@@ -318,6 +395,7 @@ int main()
         passed &= TestActiveSceneContract(configuration);
         passed &= TestSelectionContract(configuration);
         passed &= TestDirtyAndDeleteContract(configuration);
+        passed &= TestRenderableObjectContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");

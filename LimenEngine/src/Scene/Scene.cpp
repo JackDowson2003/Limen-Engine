@@ -35,7 +35,6 @@ namespace Limen
 
             return id;
         }
-
     }
 
     SceneObjectHandle Scene::CreateObject()
@@ -80,23 +79,75 @@ namespace Limen
                 return {};
 
             m_FreeHead = m_ObjectSlots[index].NextFree;
-        }
-        else
+        } else
         {
             index = m_ObjectSlots.getSize();
             m_ObjectSlots.emplace_back();
         }
 
-        auto &[ID, Transform, Generation, NextFree, Alive] = m_ObjectSlots[index];
+        auto &[
+            ID,
+            Transform,
+            Generation,
+            NextFree,
+            Alive,
+            HasRenderComponent,
+            MeshResource,
+            MaterialResource
+        ] = m_ObjectSlots[index];
         ID = id;
         Transform = glm::mat4{1.0f};
         NextFree = invalidIndex;
         Alive = true;
+        HasRenderComponent = false;
+        MeshResource.reset();
+        MaterialResource.reset();
 
         return {
             .Index = index,
             .Generation = Generation
         };
+    }
+
+    SceneObjectHandle Scene::AddRenderableObject(const SceneRenderObject &renderObject)
+    {
+        LM_CORE_ASSERT(renderObject.MeshResource,
+                       "Renderable object requires Mesh");
+        LM_CORE_ASSERT(renderObject.MaterialResource,
+                       "Renderable object requires Material");
+        if (!renderObject.MeshResource || !renderObject.MaterialResource)
+            return {};
+
+        const SceneObjectHandle handle = CreateObject();
+        if (!handle.IsValid() || handle.Index >= m_ObjectSlots.getSize())
+            return {};
+
+        ObjectSlot &slot = m_ObjectSlots[handle.Index];
+        slot.Transform = renderObject.Transform;
+        slot.HasRenderComponent = true;
+        slot.MeshResource = renderObject.MeshResource;
+        slot.MaterialResource = renderObject.MaterialResource;
+        return handle;
+    }
+
+    void Scene::ForEachRenderableObject(
+        const std::function<void
+            (const SceneObjectHandle &, const SceneObjectID &, const Ref<Mesh> &, const Ref<Material> &,
+             const glm::mat4 &)> &callback) const
+    {
+        for (uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
+        {
+            const ObjectSlot slot = m_ObjectSlots[index];
+            if (!slot.Alive || !slot.HasRenderComponent)
+                continue;
+            callback(
+                SceneObjectHandle{.Index = index, .Generation = slot.Generation},
+                slot.ID,
+                slot.MeshResource,
+                slot.MaterialResource,
+                slot.Transform
+            );
+        }
     }
 
     bool Scene::DestroyObject(const SceneObjectHandle handle)
@@ -112,6 +163,9 @@ namespace Limen
         slot.ID = {};
         slot.Transform = glm::mat4{1.0f};
         slot.Alive = false;
+        slot.HasRenderComponent = false;
+        slot.MeshResource.reset();
+        slot.MaterialResource.reset();
 
         constexpr auto invalidIndex = SceneObjectHandle::InvalidIndex;
         constexpr static auto maxGeneration = std::numeric_limits<std::uint32_t>::max();
@@ -204,45 +258,12 @@ namespace Limen
     {
         for (std::uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
         {
-            const ObjectSlot& slot = m_ObjectSlots[index];
+            const ObjectSlot &slot = m_ObjectSlots[index];
             if (!slot.Alive)
                 continue;
 
-            callback(SceneObjectHandle{.Index = index, .Generation = slot.Generation},slot.ID);
+            callback(SceneObjectHandle{.Index = index, .Generation = slot.Generation}, slot.ID);
         }
-    }
-
-    SceneRenderObjectHandle Scene::AddRenderObject(const SceneRenderObject &renderObject)
-    {
-        /*
-         * SceneRenderObject 是明确的“可渲染对象”，所以 Mesh 和
-         * Material 都不能为空。未来普通 Entity 可以没有渲染组件，
-         * 但那不属于当前 SceneRenderObject 的职责。
-         */
-        LM_CORE_ASSERT(renderObject.MeshResource, "Scene cannot add a render object without Mesh");
-        LM_CORE_ASSERT(renderObject.MaterialResource, "Scene cannot add a render object without Material");
-
-        /*
-         * Release 构建可能关闭断言，因此仍然保留运行时保护，
-         * 避免无效对象进入场景并在 SceneRenderer 中被解引用。
-         */
-        if (!renderObject.MeshResource || !renderObject.MaterialResource)
-            return {};
-
-        LM_CORE_ASSERT(
-            m_RenderObjects.getSize() < SceneRenderObjectHandle::InvalidIndex,
-            "Scene contains too many render objects"
-        );
-
-        if (m_RenderObjects.getSize() >= SceneRenderObjectHandle::InvalidIndex)
-            return {};
-
-        const uint32_t objectIdx = static_cast<uint32_t>(m_RenderObjects.getSize());
-        m_RenderObjects.push_back(renderObject);
-
-        SceneRenderObjectHandle handle;
-        handle.Index = objectIdx;
-        return handle;
     }
 
     void Scene::SetDirectionalLight(const DirectionalLight &light)
@@ -389,29 +410,4 @@ namespace Limen
         return m_DirectionalLight;
     }
 
-    bool Scene::SetRenderObjectTransform(
-        const SceneRenderObjectHandle handle,
-        const glm::mat4 &transform
-    )
-    {
-        const bool handleIsValid =
-                handle.IsValid() && handle.Index < m_RenderObjects.getSize();
-
-        LM_CORE_ASSERT(
-            handleIsValid,
-            "Scene cannot update invalid render object handle '{}'",
-            handle.Index
-        );
-
-        if (!handleIsValid)
-            return false;
-
-        m_RenderObjects[handle.Index].Transform = transform;
-        return true;
-    }
-
-    const LArray<SceneRenderObject> &Scene::GetRenderObjects() const noexcept
-    {
-        return m_RenderObjects;
-    }
 }

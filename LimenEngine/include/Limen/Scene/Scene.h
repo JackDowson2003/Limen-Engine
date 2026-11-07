@@ -87,41 +87,6 @@ namespace Limen
     };
 
     /**
-     * @brief 标识 Scene 中的一个可渲染对象。
-     *
-     * 当前第一版使用 Scene 内部数组的下标作为句柄，不保存元素指针。
-     * 因为 Scene 暂时不支持删除和重新排序，所以对象加入后，
-     * 它的下标在 Scene 生命周期内保持不变。
-     *
-     * 后续加入对象删除功能时，需要扩展为：
-     * Index + Generation，避免旧句柄错误地访问新对象。
-     */
-    struct SceneRenderObjectHandle
-    {
-        /**
-         * @brief 表示句柄没有指向任何有效对象。
-         */
-        static constexpr uint32_t InvalidIndex = std::numeric_limits<uint32_t>::max();
-
-        /**
-         * @brief 对象在 Scene::m_RenderObjects 中的下标。
-         */
-        uint32_t Index = InvalidIndex;
-
-        /**
-         * @brief 判断句柄是否至少不是默认的无效值。
-         *
-         * 这里只检查是否拥有下标；
-         * Scene 访问时还要检查 Index 是否越过当前数组边界。
-         */
-        [[nodiscard]]
-        bool IsValid() const noexcept
-        {
-            return Index != InvalidIndex;
-        }
-    };
-
-    /**
      * @brief 标识Scene中的一个点光源
      *
      * 当前第一版使用 Scene 点光源数组的下标作为句柄，不保存元素指针。
@@ -156,7 +121,7 @@ namespace Limen
      * @brief 保存一个场景中的对象数据
      *
      * Scene 拥有并组织可渲染对象和光源数据，不发出渲染指令。
-     * SceneRenderer 通过 GetRenderObjects() 读取对象并提交渲染。
+     * SceneRenderer 通过 ForEachRenderableObject() 读取对象并提交渲染。
      */
     class LIMEN_API Scene final
     {
@@ -177,20 +142,20 @@ namespace Limen
         void ForEachObject(
             const std::function<void(const SceneObjectHandle&, const SceneObjectID&)>& callback
         ) const;
-
-        /**
-         * @brief 向 Scene 中加入一个可渲染对象。
-         *
-         * @param renderObject
-         * 需要复制进 Scene 的 Mesh、Material 和 Transform。
-         *
-         * @return 新对象在当前 Scene 中的句柄；
-         * 创建失败时返回无效句柄。
-         */
-        [[nodiscard]]
-        SceneRenderObjectHandle AddRenderObject(
+        // 创建一个带渲染组件的场景对象；Mesh/Material 不能为空。
+        [[nodiscard]] SceneObjectHandle AddRenderableObject(
             const SceneRenderObject& renderObject
         );
+
+        // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform。
+        void ForEachRenderableObject(
+            const std::function<void(
+                const SceneObjectHandle&,
+                const SceneObjectID&,
+                const Ref<Mesh>&,
+                const Ref<Material>&,
+                const glm::mat4&)>& callback
+        ) const;
 
         /**
          * @brief  设置当前场景的主平行光
@@ -278,36 +243,6 @@ namespace Limen
         GetPointLights() const noexcept;
 
         /**
-         * @brief 修改指定场景对象的模型变换矩阵。
-         *
-         * @param handle
-         * AddRenderObject() 返回的对象句柄。
-         * 句柄按值传递，因为它目前只有一个 uint32_t。
-         *
-         * @param transform
-         * 新的模型矩阵。使用 const 引用避免传参时复制整个 mat4；
-         * Scene 最终会把它复制到对应对象的 Transform 中。
-         *
-         * @return 修改成功返回 true；
-         * 句柄无效或越界时返回 false。
-         */
-        [[nodiscard]]
-        bool SetRenderObjectTransform(
-            SceneRenderObjectHandle handle,
-            const glm::mat4& transform
-        );
-
-        /**
-         * @brief 获取场景中所有可渲染对象。
-         *
-         * 返回 const 引用，不复制整个数组，同时避免 SceneRenderer
-         * 在渲染过程中意外增删场景对象。
-         */
-        [[nodiscard]]
-        const LArray<SceneRenderObject> &
-        GetRenderObjects() const noexcept;
-
-        /**
          * @brief 获取当前场景的主平行光。
          *
          * 返回 const 引用，不复制光源数据，
@@ -318,14 +253,6 @@ namespace Limen
        GetDirectionalLight() const noexcept;
 
     private:
-        /**
-         * @brief 当前场景拥有的全部可渲染对象。
-         *
-         * LArray 拥有 SceneRenderObject；其中的 Ref 共同持有对应的
-         * Mesh 和 Material 资源。
-         */
-        LArray<SceneRenderObject> m_RenderObjects;
-
         // 槽位下标可复用，Generation 用于让删除前的旧Handle失效
         struct ObjectSlot
         {
@@ -334,6 +261,11 @@ namespace Limen
             std::uint32_t Generation = 1;
             std::uint32_t NextFree = SceneObjectHandle::InvalidIndex;
             bool Alive = false;
+
+            // 可选渲染组件；Transform 始终以槽位 Transform 为唯一来源。
+            bool HasRenderComponent = false;
+            Ref<Mesh> MeshResource;
+            Ref<Material> MaterialResource;
         };
         LArray<ObjectSlot> m_ObjectSlots;
         std::uint32_t m_FreeHead = SceneObjectHandle::InvalidIndex;

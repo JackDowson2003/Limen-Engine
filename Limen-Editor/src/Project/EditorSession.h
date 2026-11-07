@@ -46,6 +46,31 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
             return id;
         }
 
+        // 创建一个带渲染组件的对象；失败返回无效 ID，成功则选中并置脏。
+        [[nodiscard]]
+        Limen::SceneObjectID CreateRenderableObject(
+            Limen::Ref<Limen::Mesh> mesh,
+            Limen::Ref<Limen::Material> material)
+        {
+            if (!mesh || !material)
+                return {};
+
+            const Limen::SceneObjectHandle handle =
+                m_Scene->AddRenderableObject(
+                    {
+                        .MeshResource = std::move(mesh),
+                        .MaterialResource = std::move(material),
+                        .Transform = glm::mat4{1.0f}
+                    });
+            Limen::SceneObjectID id{};
+            if (!m_Scene->TryGetObjectID(handle, id))
+                return {};
+
+            m_SelectedObjectID = id;
+            MarkDirty();
+            return id;
+        }
+
         // 面板与视口只借用活动场景；一切修改必须经过会话的编辑方法。
         [[nodiscard]]
         const Limen::Scene& GetScene() const noexcept

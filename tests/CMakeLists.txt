@@ -380,6 +380,39 @@ if (APPLE)
             glad
     )
 
+    # 端到端验证：SceneObject 的渲染组件能被 SceneRenderer 真正画出来。
+    add_executable(LimenEditorSceneRenderTests
+            EditorSceneRenderTests.cpp
+            "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneContent.cpp"
+    )
+
+    limen_configure_target(LimenEditorSceneRenderTests)
+
+    target_include_directories(LimenEditorSceneRenderTests PRIVATE
+            "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+    )
+
+    target_compile_definitions(LimenEditorSceneRenderTests PRIVATE
+            LIMEN_TEST_ASSET_ROOT="${CMAKE_SOURCE_DIR}/LimenEngine/assets"
+    )
+
+    target_link_libraries(LimenEditorSceneRenderTests PRIVATE
+            LimenEngine
+            glfw
+            glad
+    )
+
+    add_custom_target(LimenEditorSceneRenderTestAssets
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${CMAKE_SOURCE_DIR}/LimenEngine/assets"
+            "$<TARGET_FILE_DIR:LimenEditorSceneRenderTests>/assets"
+            COMMENT "Syncing assets for Editor scene render test"
+            VERBATIM
+    )
+    add_dependencies(LimenEditorSceneRenderTests
+            LimenEditorSceneRenderTestAssets
+    )
+
     if (LIMEN_ENABLE_OPENGL_GPU_TESTS)
         add_test(
                 NAME LimenOpenGLPostProcess
@@ -407,5 +440,11 @@ if (APPLE)
                 COMMAND $<TARGET_FILE:LimenOpenGLEditorUITextureTests>
         )
         set_tests_properties(LimenOpenGLEditorUITexture PROPERTIES LABELS "gpu")
+
+        add_test(
+                NAME LimenEditorSceneRender
+                COMMAND $<TARGET_FILE:LimenEditorSceneRenderTests>
+        )
+        set_tests_properties(LimenEditorSceneRender PROPERTIES LABELS "gpu")
     endif ()
 endif ()

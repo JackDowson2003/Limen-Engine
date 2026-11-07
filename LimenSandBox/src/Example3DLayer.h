@@ -112,7 +112,7 @@ namespace SandBox
          * Layer 不保存数组元素的指针或引用，
          * 而是通过该句柄请求 Scene 修改立方体。
          */
-        Limen::SceneRenderObjectHandle m_CubeObjectHandle;
+        Limen::SceneObjectHandle m_CubeObjectHandle;
 
         /**
          * @brief 测试点光源在m_Scene中的句柄。
