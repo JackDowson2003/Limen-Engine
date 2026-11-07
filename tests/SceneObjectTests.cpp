@@ -385,6 +385,71 @@ namespace
         Check("recycled object can be destroyed",
               scene.DestroyObject(recycled));
     }
+
+    void TestForEachObject()
+    {
+        Limen::Scene scene;
+
+        int emptyVisits = 0;
+        scene.ForEachObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &)
+            {
+                ++emptyVisits;
+            }
+        );
+        Check("empty scene yields no objects", emptyVisits == 0);
+
+        const auto first = scene.CreateObject();
+        const auto second = scene.CreateObject();
+        const auto third = scene.CreateObject();
+        Limen::SceneObjectID deletedID{};
+        Check("capture deleted object ID before destroy",
+              scene.TryGetObjectID(second, deletedID));
+        Check("destroy middle object", scene.DestroyObject(second));
+
+        Limen::LArray<Limen::SceneObjectID> visitedIDs;
+        int visited = 0;
+        scene.ForEachObject(
+            [&](const Limen::SceneObjectHandle &handle,
+                const Limen::SceneObjectID &id)
+            {
+                ++visited;
+                visitedIDs.push_back(id);
+                Check("visited handle is alive", scene.IsObjectAlive(handle));
+
+                Limen::SceneObjectID viaHandle{};
+                Check("visited ID matches handle",
+                      scene.TryGetObjectID(handle, viaHandle) &&
+                      viaHandle == id);
+            }
+        );
+        Check("two surviving objects are visited", visited == 2);
+
+        Limen::SceneObjectID firstID{};
+        Limen::SceneObjectID thirdID{};
+        const bool firstKnown = scene.TryGetObjectID(first, firstID);
+        const bool thirdKnown = scene.TryGetObjectID(third, thirdID);
+        bool sawFirst = false;
+        bool sawThird = false;
+        for (const Limen::SceneObjectID &id : visitedIDs)
+        {
+            if (firstKnown && id == firstID)
+                sawFirst = true;
+            if (thirdKnown && id == thirdID)
+                sawThird = true;
+        }
+        Check("first survivor is visited", sawFirst);
+        Check("third survivor is visited", sawThird);
+
+        bool sawDeleted = false;
+        for (const Limen::SceneObjectID &id : visitedIDs)
+        {
+            if (id == deletedID)
+                sawDeleted = true;
+        }
+        Check("deleted object is not visited", !sawDeleted);
+    }
 }
 
 int main()
@@ -393,6 +458,7 @@ int main()
     TestIndependentObjectsAndInvalidInput();
     TestRenderObjectLifecycle();
     TestSlotRetirementBoundary();
+    TestForEachObject();
 
     if (g_Failures == 0)
         std::cout

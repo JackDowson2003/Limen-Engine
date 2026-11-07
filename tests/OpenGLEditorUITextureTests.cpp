@@ -79,6 +79,15 @@ namespace
         return false;
     }
 
+    bool Check(const char *name, const bool condition)
+    {
+        if (condition)
+            return true;
+
+        std::cerr << "FAIL: " << name << '\n';
+        return false;
+    }
+
     bool ExpectPartialGreen(const Pixel actual)
     {
         // 当前 Editor 在 RGBA8 上编码后混合；这里只锁定 Alpha 和可见通道，
@@ -286,24 +295,6 @@ int main()
             }
             if (fontReady && textAtlas.IsBuilt())
             {
-                std::cerr << "font ascent=" << textAtlas.GetAscent()
-                          << " lineHeight=" << textAtlas.GetLineHeight() << '\n';
-                for (const char32_t codepoint :
-                     textAtlas.DecodeText("Limen A 场"))
-                {
-                    const Limen::FontAtlas::Glyph *glyph =
-                        textAtlas.FindGlyph(codepoint);
-                    std::cerr << std::hex
-                              << "glyph U+" << static_cast<uint32_t>(codepoint)
-                              << std::dec
-                              << " uv=(" << (glyph ? glyph->U0 : -1.0f) << ","
-                              << (glyph ? glyph->V0 : -1.0f)
-                              << ") size=(" << (glyph ? glyph->Width : -1.0f)
-                              << "," << (glyph ? glyph->Height : -1.0f)
-                              << ") advance=" << (glyph ? glyph->Advance : -1.0f)
-                              << '\n';
-                }
-
                 glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
                 renderer.DrawText(
@@ -312,21 +303,10 @@ int main()
                     {1.0f, 1.0f, 1.0f, 1.0f},
                     textAtlas,
                     "Limen A 场");
-                std::cerr << "glGetError after DrawText: "
-                          << glGetError() << '\n';
                 const bool visible = AnyVisiblePixel(0, 0, 32, 32);
-                std::cerr << "text visible pixels: "
-                          << (visible ? "yes" : "no") << '\n';
-                for (int y = 8; y < 24; y += 3)
-                {
-                    const Pixel sample = ReadPixel(16, y);
-                    std::cerr << "pixel(16," << y << ") = ("
-                              << static_cast<int>(sample.Red) << ","
-                              << static_cast<int>(sample.Green) << ","
-                              << static_cast<int>(sample.Blue) << ","
-                              << static_cast<int>(sample.Alpha) << ")\n";
-                }
-                success = visible && success;
+                success = Check("DrawText emits no GL error",
+                                glGetError() == GL_NO_ERROR) && success;
+                success = Check("DrawText produces visible pixels", visible) && success;
 
                 // 隔离检查：整屏画一个图集左上象限，排除 DrawText 排版干扰。
                 glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -339,12 +319,72 @@ int main()
                     textAtlas.GetTexture(),
                     {0.0f, 0.0f},
                     {0.25f, 0.25f});
-                std::cerr << "glGetError after glyph quad: "
-                          << glGetError() << '\n';
                 const bool glyphQuadVisible = AnyVisiblePixel(0, 0, 32, 32);
-                std::cerr << "full atlas quad visible: "
-                          << (glyphQuadVisible ? "yes" : "no") << '\n';
-                success = glyphQuadVisible && success;
+                success = Check("glyph quad emits no GL error",
+                                glGetError() == GL_NO_ERROR) && success;
+                success = Check("glyph quad produces visible pixels",
+                                glyphQuadVisible) && success;
+
+                // 方向检查：正立的 'L' 是竖笔在左、横杠在底部；
+                // 整屏 quad 上，底部右侧应被横杠覆盖、顶部右侧应为空。
+                const Limen::FontAtlas::Glyph *letterL =
+                    textAtlas.FindGlyph(U'L');
+                if (letterL)
+                {
+                    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                    glClear(GL_COLOR_BUFFER_BIT);
+                    renderer.DrawGlyph(
+                        window,
+                        {0.0f, 0.0f},
+                        {16.0f, 16.0f},
+                        {1.0f, 1.0f, 1.0f, 1.0f},
+                        textAtlas.GetTexture(),
+                        {letterL->U0, letterL->V0},
+                        {letterL->U1, letterL->V1});
+                    const Pixel bottomRight = ReadPixel(24, 2);
+                    const Pixel topRight = ReadPixel(24, 30);
+                    success = Check(
+                        "L bar is at glyph bottom (upright)",
+                        bottomRight.Alpha > 100 && topRight.Alpha <= 3
+                    ) && success;
+                }
+                else
+                {
+                    std::cerr << "glyph 'L' missing from atlas\n";
+                    success = false;
+                }
+
+                // 裁剪：左半裁剪区内画整屏红色，右侧必须保持清屏色。
+                glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+                glClear(GL_COLOR_BUFFER_BIT);
+                renderer.SetClipRect(window, {0.0f, 0.0f}, {8.0f, 16.0f});
+                renderer.DrawSolidRect(
+                    window,
+                    {0.0f, 0.0f},
+                    {16.0f, 16.0f},
+                    {1.0f, 0.0f, 0.0f, 1.0f});
+                renderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});
+                success = Check("scissor is disabled after clip cancel",
+                                !glIsEnabled(GL_SCISSOR_TEST)) && success;
+
+                success = ExpectPixel("clipped left half is red",
+                                      ReadPixel(4, 16),
+                                      {255, 0, 0, 255}) && success;
+                success = ExpectPixel("unclipped right half stays clear",
+                                      ReadPixel(24, 16),
+                                      {0, 0, 0, 0}) && success;
+
+                // 取消裁剪后，右侧区域必须可以继续正常绘制。
+                renderer.DrawSolidRect(
+                    window,
+                    {12.0f, 12.0f},
+                    {4.0f, 4.0f},
+                    {0.0f, 1.0f, 0.0f, 1.0f});
+                success = Check("green draw emits no GL error",
+                                glGetError() == GL_NO_ERROR) && success;
+                success = ExpectPixel("draw after clip cancel reaches right half",
+                                      ReadPixel(28, 4),
+                                      {0, 255, 0, 255}) && success;
             }
             else
             {

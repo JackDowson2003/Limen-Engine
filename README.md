@@ -395,6 +395,8 @@ macOS OpenGL 4.1 后端
 
 公共接口位于 `LimenEngine/include/Limen/`。OpenGL 原生类型和实现只允许出现在 `LimenEngine/src/RHI/macOS/OpenGL/` 等后端私有目录中。
 
+跨后端统一接口、坐标/行序契约与迁移顺序见 [RHI 跨后端接口设计](docs/RHIDesign.md)；该文档是目标契约，D3D12 后端与部分目标类尚未实现。
+
 ## Application 生命周期
 
 初始化顺序：

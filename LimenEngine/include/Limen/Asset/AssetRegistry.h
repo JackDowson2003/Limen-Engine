@@ -56,6 +56,8 @@ namespace Limen
                                        AssetID& output, AssetRegistryError& error);
         [[nodiscard]] bool TryFind(AssetID id, AssetRecord& output) const;
         [[nodiscard]] bool TryFindID(std::string_view logicalPath, AssetID& output) const;
+        // 只读遍历全部已注册资产，注册表未加载时一次也不调用
+        void ForEachRecord(const std::function<void(const AssetRecord&)>& callback) const;
 
     private:
         struct Data;

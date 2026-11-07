@@ -192,7 +192,8 @@ namespace LimenEditor
 
         // 创建NativePipeline
         const Limen::Ref<Limen::Shader> &nativeShader =
-              Limen::Shader::CreateFromSource("EditorUI/NativeTextureRect", kVertexSource, kNativeTextureFragmentSource);
+                Limen::Shader::CreateFromSource("EditorUI/NativeTextureRect", kVertexSource,
+                                                kNativeTextureFragmentSource);
 
         if (!nativeShader)
         {
@@ -216,7 +217,7 @@ namespace LimenEditor
 
         // 创建glyphShader
         const Limen::Ref<Limen::Shader> &glyphShader =
-              Limen::Shader::CreateFromSource("EditorUI/Glyph", kVertexSource, kGlyphFragmentSource);
+                Limen::Shader::CreateFromSource("EditorUI/Glyph", kVertexSource, kGlyphFragmentSource);
 
         Limen::GraphicsPipelineSpecification glyphPipeline = pipelineSpec;
         glyphPipeline.ShaderProgram = glyphShader;
@@ -320,7 +321,7 @@ namespace LimenEditor
     }
 
     void OpenGLEditorUIRenderBackend::DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
-        const glm::vec2 &size, const std::uintptr_t texture)
+                                                            const glm::vec2 &size, const std::uintptr_t texture)
     {
         if (!m_NativePipeline || !m_VertexArray || size.x <= 0.0f || size.y <= 0)
             return;
@@ -354,8 +355,9 @@ namespace LimenEditor
     }
 
     void OpenGLEditorUIRenderBackend::DrawGlyph(const Limen::Window &window, const glm::vec2 &position,
-        const glm::vec2 &size, const glm::vec4 &color, const Limen::Texture2D &atlasTexture, const glm::vec2 &uvMin,
-        const glm::vec2 &uvMax)
+                                                const glm::vec2 &size, const glm::vec4 &color,
+                                                const Limen::Texture2D &atlasTexture, const glm::vec2 &uvMin,
+                                                const glm::vec2 &uvMax)
     {
         if (!m_GlyphPipeline || !m_VertexArray)
         {
@@ -376,7 +378,7 @@ namespace LimenEditor
             windowWidth == 0 || windowHeight == 0)
             return;
 
-        Limen::RendererCommand::SetViewport(0,0,fboWidth,fboHeight);
+        Limen::RendererCommand::SetViewport(0, 0, fboWidth, fboHeight);
         m_GlyphPipeline->Bind();
         const auto &shader = m_GlyphPipeline->GetSpecification().ShaderProgram;
         shader->SetFloat2("u_WindowSize", {
@@ -393,10 +395,50 @@ namespace LimenEditor
         m_VertexArray->Bind();
 
         Limen::RendererCommand::DrawIndexed(
-                    *m_VertexArray,
-                    Limen::PrimitiveTopology::TriangleList,
-                    6
-                );
+            *m_VertexArray,
+            Limen::PrimitiveTopology::TriangleList,
+            6
+        );
+    }
 
+    void OpenGLEditorUIRenderBackend::SetClipRect(const Limen::Window &window, const glm::vec2 &position,
+                                                  const glm::vec2 &size)
+    {
+        const uint32_t fboWidth = window.GetWidth();
+        const uint32_t fboHeight = window.GetHeight();
+        const uint32_t windowWidth = window.GetWindowWidth();
+        const uint32_t windowHeight = window.GetWindowHeight();
+
+        if (fboWidth == 0 || fboHeight == 0 ||
+            windowWidth == 0 || windowHeight == 0)
+            return;
+
+        if (size.x <= 0.0f || size.y <= 0.0f)
+        {
+            // 空矩形表示取消裁剪
+            Limen::RendererCommand::SetScissor(false);
+            return;
+        }
+
+        // 逻辑左上角的原点 -> 帧缓冲左下角原点像素坐标，并钳制为非负数
+        // 主要是UI 是左上角(0, 0), 而OpenGL 是左下角
+        const float scaleX = static_cast<float>(fboWidth) / static_cast<float>(windowWidth);
+        const float scaleY = static_cast<float>(fboHeight) / static_cast<float>(windowHeight);
+        const int x = std::max(0, static_cast<int>(std::lround(position.x * scaleX)));
+        const int bottomY = std::max(
+            0,
+            static_cast<int>(
+                std::lround(static_cast<float>(fboHeight) - (position.y + size.y) * scaleY)
+            )
+        );
+
+        const int width = std::max(0,static_cast<int>(std::lround(size.x * scaleX)));
+        const int height = std::max(0,static_cast<int>(std::lround(size.y * scaleY)));
+        Limen::RendererCommand::SetScissor(
+            true,
+            static_cast<uint32_t>(x),
+            static_cast<uint32_t>(bottomY),
+            static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height));
     }
 }

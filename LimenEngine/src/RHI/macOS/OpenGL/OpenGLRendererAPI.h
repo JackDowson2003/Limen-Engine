@@ -50,5 +50,7 @@ namespace Limen
        ) override;
 
         void SetViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
+
+        virtual void SetScissor(bool enable, uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
     };
 }

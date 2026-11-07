@@ -81,6 +81,14 @@ namespace Limen
          */
         virtual void SetDepthTest(bool enabled) = 0;
 
+        /**
+         * @brief 开启或关闭像素矩形剪裁
+         *
+         * 坐标是帧缓冲像素，原点在左下角，与 SetViewport 一致；
+         * 启用后 Clear 与 Draw 都只作用于该矩形。
+         */
+        virtual void SetScissor(bool enable, uint32_t x, uint32_t y, uint32_t width, uint32_t height) = 0;
+
         /** @return 当前进程选择的图形 API。 */
         static API GetAPI() noexcept
         {

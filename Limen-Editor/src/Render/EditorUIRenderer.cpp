@@ -101,6 +101,13 @@ namespace LimenEditor
             m_Backend->DrawGlyph(window, position, size, color, atlasTexture, uvMin, uvMax);
     }
 
+    void EditorUIRenderer::SetClipRect(const Limen::Window &window, const glm::vec2 &position,
+        const glm::vec2 &size) const
+    {
+        if (m_Backend)
+            m_Backend->SetClipRect(window,position,size);
+    }
+
     void EditorUIRenderer::DrawText(
         const Limen::Window &window,
         const glm::vec2 &position,
@@ -133,7 +140,7 @@ namespace LimenEditor
 
             const glm::vec2 glyphTopLeft(
                 penX + glyph->OffsetX,
-                baselineY - glyph->OffsetY);
+                baselineY + glyph->OffsetY);
             m_Backend->DrawGlyph(
                 window,
                 glyphTopLeft,

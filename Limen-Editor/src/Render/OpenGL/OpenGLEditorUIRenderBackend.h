@@ -50,6 +50,13 @@ namespace LimenEditor
             const glm::vec2& uvMin,
             const glm::vec2& uvMax
         )  override;
+
+        void SetClipRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size
+        ) override;
+
     private:
         Limen::Scope<Limen::VertexArray> m_VertexArray;
 

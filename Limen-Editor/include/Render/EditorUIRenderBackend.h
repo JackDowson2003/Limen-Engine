@@ -55,5 +55,12 @@ namespace LimenEditor
             const glm::vec2 &uvMin,
             const glm::vec2 &uvMax
         ) = 0;
+
+        // 后续绘制只落在该逻辑矩形内；宽或高不大于 0 表示取消裁剪。
+        virtual void SetClipRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size
+        ) = 0;
     };
 }

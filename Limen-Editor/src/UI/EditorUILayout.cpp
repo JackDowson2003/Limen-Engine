@@ -112,4 +112,13 @@ namespace LimenEditor
         res.Height = static_cast<uint32_t>(std::max(1L,height));
         return res;
     }
+
+    int FindListRowAt(const float firstRowY, const float rowHeight, const float mouseY, const uint32_t rowCount) noexcept
+    {
+        if (rowHeight <= 0.0f || rowCount == 0 || mouseY < firstRowY)
+            return -1;
+
+        const int row = static_cast<int>((mouseY - firstRowY) / rowHeight);
+        return row >= 0 && row < static_cast<int>(rowCount) ? row : -1;
+    }
 }

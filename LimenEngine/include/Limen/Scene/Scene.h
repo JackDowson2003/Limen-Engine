@@ -5,6 +5,7 @@
 #pragma once
 
 #include <limits>
+#include <functional>
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 
@@ -171,6 +172,11 @@ namespace Limen
         [[nodiscard]] bool TryFindObject(SceneObjectID id, SceneObjectHandle& outHandle) const noexcept;
         [[nodiscard]] bool SetObjectTransform(SceneObjectHandle handle, const glm::mat4& transform);
         [[nodiscard]] bool TryGetObjectTransform(SceneObjectHandle handle, glm::mat4& outTransform) const noexcept;
+        // 只读遍历全部存活对象；回调依次收到运行期句柄与稳定 ID。
+        // 回调只借用数据，不得在遍历中创建或销毁对象。
+        void ForEachObject(
+            const std::function<void(const SceneObjectHandle&, const SceneObjectID&)>& callback
+        ) const;
 
         /**
          * @brief 向 Scene 中加入一个可渲染对象。

@@ -14,7 +14,6 @@
 #include "Limen/Events/MouseEvent.h"
 #include "Limen/Input/Input.h"
 #include "Limen/Application/Application.h"
-#include "Limen/Asset/AssetManager.h"
 #include "Limen/Scene/SceneRenderer.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "UI/EditorUILayout.h"
@@ -28,7 +27,7 @@ namespace LimenEditor
     public:
         explicit EditorUILayer(Limen::Ref<EditorSession> session = {})
             : Layer("Limen Editor"), m_Session(std::move(session)),
-        m_ViewportCameraController(45.0f, 1.0f, 0.1f, 100.f)
+              m_ViewportCameraController(45.0f, 1.0f, 0.1f, 100.f)
         {
         }
 
@@ -56,23 +55,20 @@ namespace LimenEditor
                     m_FontAtlas->AddText("Limen Editor 场景 视图 对象 选择");
                     if (!m_FontAtlas->Build())
                         LM_ERROR("Editor UI: font atlas build failed");
-                }
-                else
+                } else
                 {
                     LM_ERROR("Editor UI: default font load failed: {}",
                              fontPath.string());
                 }
-            }
-            else
+            } else
             {
                 LM_ERROR("Editor UI: built-in asset root unavailable: {}",
                          fontError);
             }
-
         }
 
         // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
-        void OnUpdate(Limen::DeltaTime& deltaTime) override
+        void OnUpdate(Limen::DeltaTime &deltaTime) override
         {
             if (!m_Session || !m_ViewportRenderer)
                 return;
@@ -129,6 +125,7 @@ namespace LimenEditor
             const EditorUILayoutResult &layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
             // 输入命中区域必须与本次实际绘制的分隔条一致。
             m_RightSplitterRect = layout.RightSplitter;
+            m_CreateButtonRect = {};
 
             if (layout.Top.Width <= 0.0f || layout.Top.Height <= 0.0f)
                 return;
@@ -139,12 +136,57 @@ namespace LimenEditor
                 {layout.Top.Width, layout.Top.Height},
                 {0.17f, 0.18f, 0.20f, 1.0f}
             );
+
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.Left.X, layout.Left.Y},
                 {layout.Left.Width, layout.Left.Height},
                 {0.13f, 0.14f, 0.16f, 1.0f}
             );
+            // Content Browser 骨架：列出项目资产的逻辑路径，裁剪在左栏内。
+            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
+            {
+                m_LeftRect = layout.Left;
+                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
+                const float textX = layout.Left.X + 12.0f;
+                const float headerY = layout.Left.Y + 8.0f;
+
+                m_UIRenderer.SetClipRect(
+                    window,
+                    {layout.Left.X, layout.Left.Y},
+                    {layout.Left.Width, layout.Left.Height});
+
+                m_UIRenderer.DrawText(
+                    window,
+                    {textX, headerY},
+                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    *m_FontAtlas,
+                    "Content Browser");
+
+                Limen::LArray<Limen::LString> assetRows;
+                m_Session->GetAssetRegistry().ForEachRecord(
+                    [&](const Limen::AssetRecord &record)
+                    {
+                        assetRows.push_back(record.LogicalPath);
+                    });
+                m_AssetRows = assetRows;
+                m_AssetFirstRowY = headerY + rowHeight;
+                m_AssetRowHeight = rowHeight;
+
+                for (uint32_t row = 0; row < assetRows.getSize(); ++row)
+                {
+                    m_UIRenderer.DrawText(
+                        window,
+                        {textX, m_AssetFirstRowY + rowHeight * static_cast<float>(row)},
+                        {0.7f, 0.7f, 0.7f, 1.0f},
+                        *m_FontAtlas,
+                        std::string_view(
+                            assetRows[row].data(),
+                            assetRows[row].size()));
+                }
+
+                m_UIRenderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});
+            }
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.Center.X, layout.Center.Y},
@@ -171,7 +213,7 @@ namespace LimenEditor
                 m_UIRenderer.DrawNativeTextureRect(
                     window,
                     {layout.Center.X, layout.Center.Y},
-                    {layout.Center.Width,layout.Center.Height},
+                    {layout.Center.Width, layout.Center.Height},
                     finalHandle
                 );
             }
@@ -182,6 +224,83 @@ namespace LimenEditor
                 {layout.RightTop.Width, layout.RightTop.Height},
                 {0.15f, 0.16f, 0.18f, 1.0f}
             );
+
+            // Outliner 骨架：列出场景对象，选中行高亮，裁剪在右上区域。
+            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
+            {
+                m_RightTopRect = layout.RightTop;
+                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
+                const float textX = layout.RightTop.X + 12.0f;
+                const float headerY = layout.RightTop.Y + 8.0f;
+
+                m_UIRenderer.SetClipRect(
+                    window,
+                    {layout.RightTop.X, layout.RightTop.Y},
+                    {layout.RightTop.Width, layout.RightTop.Height});
+
+                m_UIRenderer.DrawText(
+                    window,
+                    {textX, headerY},
+                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    *m_FontAtlas,
+                    "Outliner");
+
+                // Outliner 工具栏: Create按钮
+                const float buttonWidth = std::min(96.0f, layout.RightTop.Width - 16.0f);
+
+                if (buttonWidth > 0.0f)
+                {
+                    m_CreateButtonRect = {
+                        .X = layout.RightTop.X + layout.RightTop.Width - buttonWidth - 8.0f,
+                        .Y = headerY - 2.0f,
+                        .Width = buttonWidth,
+                        .Height = rowHeight
+                    };
+                    m_UIRenderer.DrawSolidRect(
+                        window,
+                        {m_CreateButtonRect.X, m_CreateButtonRect.Y},
+                        {m_CreateButtonRect.Width, m_CreateButtonRect.Height},
+                        {0.24f, 0.28f, 0.34f, 1.0f}
+                    );
+                    m_UIRenderer.DrawText(
+                        window,
+                        {m_CreateButtonRect.X + 8.0f, m_CreateButtonRect.Y + 2.0f},
+                        {1.0f, 1.0f, 1.0f, 1.0f},
+                        *m_FontAtlas,
+                        "Create");
+                }
+
+                Limen::LArray<Limen::SceneObjectID> rows;
+                m_Session->GetScene().ForEachObject(
+                    [&](const Limen::SceneObjectHandle &,
+                        const Limen::SceneObjectID &id)
+                    {
+                        rows.push_back(id);
+                    });
+                m_OutlinerRows = rows;
+                m_OutlinerFirstRowY = headerY + rowHeight;
+                m_OutlinerRowHeight = rowHeight;
+
+                for (uint32_t row = 0; row < rows.getSize(); ++row)
+                {
+                    const Limen::SceneObjectID &id = rows[row];
+                    const bool selected = m_Session->IsObjectSelected(id);
+                    const glm::vec4 rowColor =
+                            selected
+                                ? glm::vec4{1.0f, 0.8f, 0.2f, 1.0f}
+                                : glm::vec4{0.7f, 0.7f, 0.7f, 1.0f};
+                    m_UIRenderer.DrawText(
+                        window,
+                        {textX, m_OutlinerFirstRowY + rowHeight * static_cast<float>(row)},
+                        rowColor,
+                        *m_FontAtlas,
+                        "对象 " + std::to_string(row + 1));
+                }
+
+                m_UIRenderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});
+            }
+
+
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.RightSplitter.X, layout.RightSplitter.Y},
@@ -194,9 +313,73 @@ namespace LimenEditor
                 {layout.RightBottom.Width, layout.RightBottom.Height},
                 {0.21f, 0.22f, 0.24f, 1.0f}
             );
+
+            // Details 骨架, 显示当前选中对象的平移分量
+            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
+            {
+                const float textX = layout.RightBottom.X + 12.0f;
+                const float headerY = layout.RightBottom.Y + 8.0f;
+                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
+
+                m_UIRenderer.SetClipRect(
+                    window,
+                    {layout.RightBottom.X, layout.RightBottom.Y},
+                    {layout.RightBottom.Width, layout.RightBottom.Height}
+                );
+
+                m_UIRenderer.DrawText(
+                    window,
+                    {textX, headerY},
+                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    *m_FontAtlas,
+                    "Details"
+                );
+                const Limen::SceneObjectID selectedID = m_Session->GetSelectedObjectID();
+                if (!selectedID.isValid())
+                {
+                    m_UIRenderer.DrawText(
+                        window,
+                        {textX, headerY + rowHeight},
+                        {0.55f, 0.55f, 0.55f, 1.0f},
+                        *m_FontAtlas,
+                        "No selection"
+                    );
+                }
+                else
+                {
+                    // 显示选中的位置
+                    glm::mat4 transform{1.0f};
+                    if (m_Session->TryGetSelectedObjectTransform(transform))
+                    {
+                        std::string position = "Pos ";
+                        position += std::to_string(transform[3][0]);
+                        position += ", ";
+                        position += std::to_string(transform[3][1]);
+                        position += ", ";
+                        position += std::to_string(transform[3][2]);
+                        m_UIRenderer.DrawText(
+                            window,
+                            {textX, headerY + rowHeight},
+                            {0.75f, 0.75f, 0.75f, 1.0f},
+                            *m_FontAtlas,
+                            position);
+                    }
+                    else
+                    {
+                        // 不可用，但依然显示
+                        m_UIRenderer.DrawText(
+                            window,
+                            {textX, headerY + rowHeight},
+                            {0.8f, 0.4f, 0.4f, 1.0f},
+                            *m_FontAtlas,
+                            "Transform unavailable"
+                            );
+                    }
+                }
+            }
         }
 
-                // event 是 Application 转发给本 Layer 的非拥有事件引用。
+        // event 是 Application 转发给本 Layer 的非拥有事件引用。
         void OnEvent(Limen::Event &event) override
         {
             // 视口内滚轮交给相机控制器：飞行时调速，非飞行时沿视线推拉缩放。
@@ -233,6 +416,44 @@ namespace LimenEditor
                         return false;
                     m_IsNavigatingViewport = false;
                     return true;
+                });
+
+
+            // Outliner 工具栏：Create Object 按钮。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
+                        return false;
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    if (!m_CreateButtonRect.Contains(x, y))
+                        return false;
+                    return m_Session->CreateObject().isValid();
+                });
+
+            // 左键点击 Outliner 行：把鼠标 Y 映射为行号并选中对应对象。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
+                        return false;
+
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    if (!m_RightTopRect.Contains(x, y))
+                        return false;
+
+                    const int row = FindListRowAt(
+                        m_OutlinerFirstRowY,
+                        m_OutlinerRowHeight,
+                        y,
+                        m_OutlinerRows.getSize());
+                    if (row < 0)
+                        return false;
+
+                    return m_Session->SelectObject(
+                        m_OutlinerRows[static_cast<uint32_t>(row)]);
                 });
 
             // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
@@ -321,6 +542,7 @@ namespace LimenEditor
         float m_RightTopRatio = 0.5f;
         // 最近一次 OnUIRender 实际绘制的分隔条命中区域；每次绘制前清空并重建，用于鼠标事件的判断
         UIRect m_RightSplitterRect{};
+
         // 左键是否从分隔条开始按下，等待松开时更新比例；当前并非实时拖动。
         bool m_IsDraggingRightSplitter = false;
 
@@ -329,10 +551,25 @@ namespace LimenEditor
         // 视口独占的离屏渲染器与相机；场景来自会话，只借用。
         Limen::Scope<Limen::SceneRenderer> m_ViewportRenderer;
         Limen::PerspectiveCameraController m_ViewportCameraController;
+
+        // 左栏 Content Browser 的命中与行布局，每次绘制重建
+        UIRect m_LeftRect{};
+        Limen::LArray<Limen::LString> m_AssetRows;
+        float m_AssetFirstRowY = 0.0f;
+        float m_AssetRowHeight = 0.0f;
+
+        // 右上 Outliner 的命中与行布局，每次绘制重建
+        UIRect m_RightTopRect{};
+        Limen::LArray<Limen::SceneObjectID> m_OutlinerRows;
+        float m_OutlinerFirstRowY = 0.0f;
+        float m_OutlinerRowHeight = 0.0f;
+
         // 最近一帧中央区域；用于判定光标是否在视口内。
         UIRect m_CenterRect{};
         bool m_IsViewportHovered = false;
         bool m_IsNavigatingViewport = false;
+
+        UIRect m_CreateButtonRect{};
 
         // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。
         Limen::Scope<Limen::FontAtlas> m_FontAtlas;

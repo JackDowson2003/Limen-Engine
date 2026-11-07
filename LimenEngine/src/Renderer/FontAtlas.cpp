@@ -214,8 +214,8 @@ namespace Limen
             Height] = entry.second;
         U0 = static_cast<float>(data.x0) / atlasSize;
         U1 = static_cast<float>(data.x1) / atlasSize;
-        V0 = static_cast<float>(data.y0) / atlasSize;
-        V1 = static_cast<float>(data.y1) / atlasSize;
+        V0 = static_cast<float>(data.y1) / atlasSize;
+        V1 = static_cast<float>(data.y0) / atlasSize;
         OffsetX = data.xoff;
         OffsetY = data.yoff;
         Advance = data.xadvance;

@@ -199,6 +199,19 @@ namespace Limen
         return true;
     }
 
+    void Scene::ForEachObject(
+        const std::function<void(const SceneObjectHandle &, const SceneObjectID &)> &callback) const
+    {
+        for (std::uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
+        {
+            const ObjectSlot& slot = m_ObjectSlots[index];
+            if (!slot.Alive)
+                continue;
+
+            callback(SceneObjectHandle{.Index = index, .Generation = slot.Generation},slot.ID);
+        }
+    }
+
     SceneRenderObjectHandle Scene::AddRenderObject(const SceneRenderObject &renderObject)
     {
         /*

@@ -111,5 +111,31 @@ int main()
                invalid.Width == 1 && invalid.Height == 1))
         ++failures;
 
+    // 列表行命中：首行、行边界、末行外与非法行高。
+    if (!Check("row above list returns -1",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 99.0f, 3) == -1))
+        ++failures;
+    if (!Check("first row starts at firstRowY",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 100.0f, 3) == 0))
+        ++failures;
+    if (!Check("row inside first slot",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 110.0f, 3) == 0))
+        ++failures;
+    if (!Check("boundary starts next row",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 120.0f, 3) == 1))
+        ++failures;
+    if (!Check("last row is reachable",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 150.0f, 3) == 2))
+        ++failures;
+    if (!Check("row below list returns -1",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 160.0f, 3) == -1))
+        ++failures;
+    if (!Check("zero row height returns -1",
+               LimenEditor::FindListRowAt(100.0f, 0.0f, 110.0f, 3) == -1))
+        ++failures;
+    if (!Check("zero row count returns -1",
+               LimenEditor::FindListRowAt(100.0f, 20.0f, 110.0f, 0) == -1))
+        ++failures;
+
     return failures == 0 ? 0 : 1;
 }

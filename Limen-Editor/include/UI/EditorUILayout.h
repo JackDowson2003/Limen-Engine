@@ -56,4 +56,12 @@ namespace LimenEditor
         float logicalHeight,
         float rightTopRatio
     );
+
+    // 根据首行 Y、行高和鼠标 Y 求列表行号；不在任何行内返回 -1。
+    [[nodiscard]] int FindListRowAt(
+        float firstRowY,
+        float rowHeight,
+        float mouseY,
+        uint32_t rowCount
+    ) noexcept;
 }

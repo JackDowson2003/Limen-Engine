@@ -145,4 +145,15 @@ namespace Limen
     {
         glViewport(static_cast<int>(x), static_cast<int>(y), static_cast<int>(width), static_cast<int>(height));
     }
+
+    void OpenGLRendererAPI::SetScissor(const bool enable,const uint32_t x,const uint32_t y,const uint32_t width,const uint32_t height)
+    {
+        if (!enable)
+        {
+            glDisable(GL_SCISSOR_TEST);
+            return;
+        }
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(static_cast<int>(x),static_cast<int>(y),static_cast<int>(width),static_cast<int>(height));
+    }
 }

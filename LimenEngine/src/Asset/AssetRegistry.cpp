@@ -684,4 +684,14 @@ namespace Limen
         output = it->second;
         return true;
     }
+
+    void AssetRegistry::ForEachRecord(const std::function<void(const AssetRecord &)> &callback) const
+    {
+        if (!m_Data->Loaded)
+            return;
+
+        // ByID 的值就是完整的AssetRecord，直接借给回调
+        for (const auto& entry : m_Data->ByID)
+            callback(entry.second);
+    }
 }

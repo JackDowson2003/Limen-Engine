@@ -184,6 +184,8 @@ namespace Limen
 
     void Renderer::BeginFrame()
     {
+        // 每帧开始关闭裁剪：任何面板忘记取消，都不能污染后续绘制。
+        RendererCommand::SetScissor(false);
         if (g_GPUProfiler)
             g_GPUProfiler->BeginFrame();
     }

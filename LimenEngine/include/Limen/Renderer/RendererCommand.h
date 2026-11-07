@@ -17,7 +17,7 @@ namespace Limen
          */
         static void Clear(
             const ClearFlags flags =
-                ClearFlags::Color | ClearFlags::Depth
+                    ClearFlags::Color | ClearFlags::Depth
         )
         {
             if (RendererAPI *api = GetRendererAPI())
@@ -71,7 +71,7 @@ namespace Limen
         )
         {
             if (RendererAPI *api = GetRendererAPI())
-                api->DrawIndexed(vertexArray, topology,indexCount);
+                api->DrawIndexed(vertexArray, topology, indexCount);
         }
 
         static void SetViewport(
@@ -90,6 +90,18 @@ namespace Limen
                     height
                 );
             }
+        }
+
+        static void SetScissor(
+            const bool enabled,
+            const uint32_t x = 0,
+            const uint32_t y = 0,
+            const uint32_t width = 0,
+            const uint32_t height = 0
+        )
+        {
+            if (RendererAPI *api = GetRendererAPI())
+                api->SetScissor(enabled, x, y, width, height);
         }
 
     private:
