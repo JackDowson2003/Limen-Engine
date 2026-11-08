@@ -355,6 +355,153 @@ namespace
         passed &= Check("deleted renderable is not visited", visits == 0);
         return passed;
     }
+
+    bool TestMultiSelectionContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        const Limen::SceneObjectID first = session.CreateObject();
+        const Limen::SceneObjectID second = session.CreateObject();
+        const Limen::SceneObjectID third = session.CreateObject();
+
+        bool passed = Check("create selects newest object only",
+                            session.GetSelectedObjectCount() == 1 &&
+                            session.GetSelectedObjectID() == third);
+
+        passed &= Check("select replaces multi selection",
+                        session.SelectObject(first) &&
+                        session.GetSelectedObjectCount() == 1 &&
+                        session.GetSelectedObjectID() == first);
+
+        passed &= Check("toggle adds second object",
+                        session.ToggleObjectSelection(second) &&
+                        session.GetSelectedObjectCount() == 2 &&
+                        session.IsObjectSelected(first) &&
+                        session.IsObjectSelected(second));
+        passed &= Check("multi selection has no single ID",
+                        !session.GetSelectedObjectID().isValid());
+
+        passed &= Check("toggle removes first object",
+                        session.ToggleObjectSelection(first) &&
+                        session.GetSelectedObjectCount() == 1 &&
+                        session.GetSelectedObjectID() == second);
+
+        Limen::LArray<Limen::SceneObjectID> range;
+        range.push_back(first);
+        range.push_back(second);
+        range.push_back(Limen::SceneObjectID{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        });
+        passed &= Check("range selection keeps valid IDs",
+                        session.SelectObjects(range) &&
+                        session.GetSelectedObjectCount() == 2 &&
+                        session.IsObjectSelected(first) &&
+                        session.IsObjectSelected(second));
+
+        passed &= Check("multi selection rejects transform edit",
+                        !session.SetSelectedObjectTransform(
+                            Translation(1.0f, 2.0f, 3.0f)));
+
+        glm::mat4 out = Translation(9.0f, 9.0f, 9.0f);
+        passed &= Check("multi selection rejects transform query",
+                        !session.TryGetSelectedObjectTransform(out) &&
+                        MatchesTransform(out, Translation(9.0f, 9.0f, 9.0f)));
+
+        session.ClearSelection();
+        passed &= Check("clear removes all selection",
+                        session.GetSelectedObjectCount() == 0);
+
+        passed &= Check("restore range selection",
+                        session.SelectObjects(range));
+        passed &= Check("delete removes object from selection",
+                        session.DeleteObject(first) &&
+                        session.GetSelectedObjectCount() == 1 &&
+                        session.IsObjectSelected(second));
+
+        passed &= Check("select single after deletion",
+                        session.SelectObject(third) &&
+                        session.GetSelectedObjectID() == third);
+        return passed;
+    }
+
+    bool TestAssetSelectionContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        bool passed = Check("fresh session has no asset selection",
+                            !session.GetSelectedAssetID().isValid());
+        passed &= Check("select existing asset",
+                        session.SelectAsset(kAssetID));
+        passed &= Check("asset selection is retained",
+                        session.GetSelectedAssetID() == kAssetID &&
+                        session.IsAssetSelected(kAssetID));
+
+        const Limen::SceneObjectID object = session.CreateObject();
+        passed &= Check("scene selection does not affect asset selection",
+                        session.GetSelectedAssetID() == kAssetID);
+
+        const Limen::AssetID stale{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        };
+        passed &= Check("stale asset is rejected",
+                        !session.SelectAsset(stale) &&
+                        session.GetSelectedAssetID() == kAssetID);
+
+        session.ClearAssetSelection();
+        passed &= Check("asset selection can be cleared",
+                        !session.GetSelectedAssetID().isValid());
+        passed &= Check("asset selection does not affect scene selection",
+                        session.GetSelectedObjectID() == object);
+        return passed;
+    }
+
+    bool TestBatchDeletionContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+
+        const Limen::SceneObjectID first = session.CreateObject();
+        const Limen::SceneObjectID second = session.CreateObject();
+        const Limen::SceneObjectID third = session.CreateObject();
+
+        Limen::LArray<Limen::SceneObjectID> selection;
+        selection.push_back(first);
+        selection.push_back(second);
+
+        bool passed = Check("selection contains two objects",
+                            session.SelectObjects(selection) &&
+                            session.GetSelectedObjectCount() == 2);
+
+        session.ClearDirty();
+        passed &= Check("batch delete succeeds",
+                        session.DeleteSelectedObjects());
+        passed &= Check("batch delete clears selection",
+                        session.GetSelectedObjectCount() == 0);
+        passed &= Check("batch delete marks session dirty",
+                        session.IsDirty());
+        passed &= Check("deleted objects cannot be reselected",
+                        !session.SelectObject(first) &&
+                        !session.SelectObject(second));
+        passed &= Check("unselected object survives batch delete",
+                        session.SelectObject(third));
+
+        session.ClearSelection();
+        session.ClearDirty();
+        passed &= Check("empty selection cannot delete",
+                        !session.DeleteSelectedObjects() &&
+                        !session.IsDirty());
+
+        passed &= Check("single selected object deletes",
+                        session.SelectObject(third) &&
+                        session.DeleteSelectedObjects());
+        passed &= Check("single delete clears selection",
+                        session.GetSelectedObjectCount() == 0);
+        return passed;
+    }
 }
 
 int main()
@@ -396,6 +543,9 @@ int main()
         passed &= TestSelectionContract(configuration);
         passed &= TestDirtyAndDeleteContract(configuration);
         passed &= TestRenderableObjectContract(configuration);
+        passed &= TestMultiSelectionContract(configuration);
+        passed &= TestAssetSelectionContract(configuration);
+        passed &= TestBatchDeletionContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");

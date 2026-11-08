@@ -137,5 +137,53 @@ int main()
                LimenEditor::FindListRowAt(100.0f, 20.0f, 110.0f, 0) == -1))
         ++failures;
 
+    // Shift 范围选择：使用 Outliner 的行顺序，不依赖选择集合内部顺序。
+    const Limen::SceneObjectID idA{1, 1};
+    const Limen::SceneObjectID idB{2, 2};
+    const Limen::SceneObjectID idC{3, 3};
+    const Limen::SceneObjectID idMissing{99, 99};
+
+    Limen::LArray<Limen::SceneObjectID> rows;
+    rows.push_back(idA);
+    rows.push_back(idB);
+    rows.push_back(idC);
+
+    const auto forwardRange =
+        LimenEditor::BuildSelectionRange(rows, idA, idC);
+    if (!Check("range selects anchor through target",
+               forwardRange.getSize() == 3 &&
+               forwardRange[0] == idA &&
+               forwardRange[1] == idB &&
+               forwardRange[2] == idC))
+        ++failures;
+
+    const auto reverseRange =
+        LimenEditor::BuildSelectionRange(rows, idC, idA);
+    if (!Check("reverse range has same normalized order",
+               reverseRange.getSize() == 3 &&
+               reverseRange[0] == idA &&
+               reverseRange[1] == idB &&
+               reverseRange[2] == idC))
+        ++failures;
+
+    const auto singleRange =
+        LimenEditor::BuildSelectionRange(rows, idB, idB);
+    if (!Check("same anchor and target selects one row",
+               singleRange.getSize() == 1 && singleRange[0] == idB))
+        ++failures;
+
+    const auto missingAnchorRange =
+        LimenEditor::BuildSelectionRange(rows, idMissing, idB);
+    if (!Check("missing anchor falls back to target only",
+               missingAnchorRange.getSize() == 1 &&
+               missingAnchorRange[0] == idB))
+        ++failures;
+
+    const auto missingTargetRange =
+        LimenEditor::BuildSelectionRange(rows, idB, idMissing);
+    if (!Check("missing target yields empty range",
+               missingTargetRange.getSize() == 0))
+        ++failures;
+
     return failures == 0 ? 0 : 1;
 }

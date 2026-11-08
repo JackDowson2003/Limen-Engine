@@ -121,4 +121,44 @@ namespace LimenEditor
         const int row = static_cast<int>((mouseY - firstRowY) / rowHeight);
         return row >= 0 && row < static_cast<int>(rowCount) ? row : -1;
     }
+
+    Limen::LArray<Limen::SceneObjectID> BuildSelectionRange(
+    const Limen::LArray<Limen::SceneObjectID> &orderedRows,
+    const Limen::SceneObjectID anchor,
+    const Limen::SceneObjectID target)
+    {
+        Limen::LArray<Limen::SceneObjectID> result;
+
+        // anchor 是上一次普通点击/增选的行；target 是本次 Shift+点击的行。
+        // 两者都必须在当前 Outliner 行顺序中存在，范围才有效。
+        int anchorIndex = -1;
+        int targetIndex = -1;
+
+        for (uint32_t i = 0; i < orderedRows.getSize(); ++i)
+        {
+            if (orderedRows[i] == anchor)
+                anchorIndex = static_cast<int>(i);
+            if (orderedRows[i] == target)
+                targetIndex = static_cast<int>(i);
+        }
+
+        // 目标行都不存在时没有可选范围。
+        if (targetIndex < 0)
+            return result;
+
+        // 锚点失效（例如对象刚被删除）时退化为只选当前行。
+        if (anchorIndex < 0)
+        {
+            result.push_back(target);
+            return result;
+        }
+
+        // 无论向上还是向下拖选，结果都按 Outliner 行顺序从前往后返回。
+        const int first = std::min(anchorIndex, targetIndex);
+        const int last = std::max(anchorIndex, targetIndex);
+        for (int i = first; i <= last; ++i)
+            result.push_back(orderedRows[static_cast<uint32_t>(i)]);
+
+        return result;
+    }
 }

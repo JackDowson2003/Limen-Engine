@@ -15,6 +15,7 @@
 #include "Limen/Events/MouseEvent.h"
 #include "Limen/Input/Input.h"
 #include "Limen/Application/Application.h"
+#include "Limen/Events/KeyEvent.h"
 #include "Limen/Scene/SceneRenderer.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "UI/EditorUILayout.h"
@@ -341,9 +342,10 @@ namespace LimenEditor
                     *m_FontAtlas,
                     "Details"
                 );
-                const Limen::SceneObjectID selectedID = m_Session->GetSelectedObjectID();
-                if (!selectedID.isValid())
+                const uint32_t selectedCount = m_Session->GetSelectedObjectCount();
+                if (selectedCount == 0)
                 {
+                    // 空选择 告诉以后没有对象被选择
                     m_UIRenderer.DrawText(
                         window,
                         {textX, headerY + rowHeight},
@@ -351,9 +353,18 @@ namespace LimenEditor
                         *m_FontAtlas,
                         "No selection"
                     );
+                } else if (selectedCount > 1)
+                {
+                    // 多选暂时只显示数量；公共属性编辑后续再做。
+                    m_UIRenderer.DrawText(
+                        window,
+                        {textX, headerY + rowHeight},
+                        {0.75f, 0.75f, 0.75f, 1.0f},
+                        *m_FontAtlas,
+                        std::to_string(selectedCount) + " Objects selected");
                 } else
                 {
-                    // 显示选中的位置
+                    // 单选：沿用现有 Transform 显示。
                     glm::mat4 transform{1.0f};
                     if (m_Session->TryGetSelectedObjectTransform(transform))
                     {
@@ -371,14 +382,12 @@ namespace LimenEditor
                             position);
                     } else
                     {
-                        // 不可用，但依然显示
                         m_UIRenderer.DrawText(
                             window,
                             {textX, headerY + rowHeight},
                             {0.8f, 0.4f, 0.4f, 1.0f},
                             *m_FontAtlas,
-                            "Transform unavailable"
-                        );
+                            "Transform unavailable");
                     }
                 }
             }
@@ -446,6 +455,9 @@ namespace LimenEditor
                             created.isValid(),
                             static_cast<bool>(cubeMesh),
                             static_cast<bool>(cubeMaterial));
+                    // 新建对象会成为单选目标，同时作为后续 Shift 范围的起点。
+                    if (created.isValid())
+                        m_SelectionAnchor = created;
                     return created.isValid();
                 });
 
@@ -469,8 +481,39 @@ namespace LimenEditor
                     if (row < 0)
                         return false;
 
-                    return m_Session->SelectObject(
-                        m_OutlinerRows[static_cast<uint32_t>(row)]);
+                    const Limen::SceneObjectID clicked = m_OutlinerRows[static_cast<uint32_t>(row)];
+
+                    // Shift：从锚点到当前行连续选择；锚点失效时退化为单选。
+                    const bool shiftDown =
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftShift) ||
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightShift);
+
+                    // macOS 使用 Command，Windows/Linux 使用 Ctrl；统一接受两者。
+                    const bool toggleDown =
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftControl) ||
+                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightControl);
+
+                    if (shiftDown && m_SelectionAnchor.isValid())
+                    {
+                        // 范围始终按 Outliner 行顺序生成，与选择集合内部顺序无关。
+                        const auto range = BuildSelectionRange(
+                            m_OutlinerRows, m_SelectionAnchor, clicked);
+                        m_Session->SelectObjects(range);
+                    } else if (toggleDown)
+                    {
+                        // Cmd/Ctrl：增选或取消；只有增选成功才移动锚点。
+                        m_Session->ToggleObjectSelection(clicked);
+                        if (m_Session->IsObjectSelected(clicked))
+                            m_SelectionAnchor = clicked;
+                    } else
+                    {
+                        // 普通点击：替换为单选，并重置锚点。
+                        m_Session->SelectObject(clicked);
+                        m_SelectionAnchor = clicked;
+                    }
+                    return true;
                 });
 
             // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
@@ -548,6 +591,20 @@ namespace LimenEditor
                     return false;
                 }
             );
+
+            // Delete/Backspace：删除当前全部选中对象
+            dispatcher.Dispatch<Limen::KeyPressedEvent>(
+                [this](const Limen::KeyPressedEvent &keyEvent)
+                {
+                    if (!m_Session)
+                        return false;
+
+                    const Limen::KeyCode key = keyEvent.GetKeyCode();
+                    if (key != Limen::KeyCode::Delete && key != Limen::KeyCode::Backspace)
+                        return false;
+                    return m_Session->DeleteSelectedObjects();
+                }
+            );
         }
 
     private:
@@ -586,6 +643,10 @@ namespace LimenEditor
         bool m_IsViewportHovered = false;
         bool m_IsNavigatingViewport = false;
 
+        // Shift 范围选择的锚点；普通点击或增选成功后更新。
+        Limen::SceneObjectID m_SelectionAnchor{};
+
+        // "create" button to use
         UIRect m_CreateButtonRect{};
 
         // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。

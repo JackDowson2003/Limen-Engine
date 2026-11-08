@@ -236,7 +236,11 @@ limen_configure_target(LimenEditorUILayoutTests)
 
 target_include_directories(LimenEditorUILayoutTests PRIVATE
         "${CMAKE_SOURCE_DIR}/Limen-Editor/include"
+        "${CMAKE_SOURCE_DIR}/LimenEngine/include"
+        "${CMAKE_SOURCE_DIR}/LimenEngine/vendor/glm"
 )
+
+target_link_libraries(LimenEditorUILayoutTests PRIVATE LimenEngine)
 
 add_test(
         NAME LimenEditorUILayout

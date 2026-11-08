@@ -1,6 +1,6 @@
 # Limen Editor
 
-> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI 原型：占位布局、纯色与纹理矩形绘制、右侧分隔条交互。非对称 RGBA GPU 测试已覆盖 UV、sRGB、Alpha 和 2 倍尺寸映射；真实 Retina 窗口与交互仍待验证。真正的面板内容、Scene 视口、停靠和多原生窗口尚未实现。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序已定：A（会话数据契约）→ B（真实场景视口）→ C（面板骨架与文字），见下文。
+> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；真实 Retina 交互、资产驱动对象生成、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产驱动生成），见下文。
 
 ## 当前已实现
 
@@ -75,31 +75,44 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 
 上述是依赖与验收顺序，不表示目标能力已实现。OpenGL 实现留在 Editor 后端，不把图形 API 类型带入通用 UI 接口；新增字体等第三方依赖前仍需评估方案。C# 只用于 G3 起的游戏脚本。
 
-## 当前迭代顺序：A → B → C
+## 当前迭代顺序：A → B → C → D
 
-在 G0 收尾与 G1 会话接入之间按三个工作包推进，每包都有独立验收句；除另行约定外，生产代码由用户编写，Codex 负责设计与审查。
+在 G0 收尾与 G1 会话接入之间按四个工作包推进，每包都有独立验收句；除另行约定外，生产代码由用户编写，Codex 负责设计与审查。
 
-### A：会话数据契约（进行中）
+### A：会话数据契约（已完成）
 
-- 范围：`src/Project/EditorSession.h` 扩展活动 Scene、统一选择与脏状态；`tests/EditorSessionTests.cpp` 补选择、失效与脏标记用例；不新增 UI 与 GPU 路径。
-- 关键接口：`CreateObject`（创建即选中）、`SelectObject`、`ClearSelection`、`GetSelectedObjectID`、`IsObjectSelected`、`DeleteObject`、`SetSelectedObjectTransform`、`TryGetSelectedObjectTransform`、`GetScene`（const 借用）、`IsDirty/MarkDirty/ClearDirty`。
-- 验收：`LimenEditor` 编译通过；`LimenEditorSession` 测试全绿；视觉行为零变化。
+- 范围：`src/Project/EditorSession.h` 扩展活动 Scene、统一选择与脏状态；`tests/EditorSessionTests.cpp` 覆盖选择、失效、多选、批量删除与脏标记。
+- 关键接口：`CreateObject`（创建即选中）、`CreateRenderableObject`、`SelectObject`、`ToggleObjectSelection`、`SelectObjects`、`DeleteSelectedObjects`、`GetSelectedObjectIDs/Count`、`DeleteObject`、`SetSelectedObjectTransform`、`TryGetSelectedObjectTransform`、`GetScene`（const 借用）、`IsDirty/ClearDirty`。
+- 验收：`LimenEditor` 编译通过；`LimenEditorSession` 测试全绿。
 
-### B：真实场景视口（A 落地后）
+### B：真实场景视口（已完成）
 
 - 中央区域升级为真视口：视口组件拥有自己的相机与 `SceneRenderer`，共享会话的活动 Scene；`OnUpdate` 渲染离屏、`OnUIRender` 把最终颜色画进中央矩形。
-- 新增：UI 后端“原生纹理句柄”绘制入口；中央区域 hover 焦点路由；最终图已是显示编码、不重复做 sRGB 编码。
+- 新增：UI 后端“原生纹理句柄”绘制入口、直通采样、hover 焦点路由，以及 UE 式右键环视/飞行、中键平移、滚轮推拉缩放。
 - 验收：启动 `LimenEditor --project <项目>`，中央视口显示场景，视口内可旋转/缩放相机，窗口放大两倍时清晰不变形。
 
-### C：面板骨架与文字（B 落地后）
+### C：面板骨架与文字（已完成基础）
 
-- 补齐文字渲染、矩形裁剪、输入焦点路由，先画 Outliner/Details 静态骨架。
-- 前置决策：字体方案按仓库 AGENTS.md 第 8 条评估；Outliner 的列表依赖引擎侧 Scene 只读遍历接口（待 engine 补齐，不进 A/B 包）。
-- 验收：面板显示会话真实数据；选择在面板间同步。
+- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径，Outliner 列出场景对象并支持 Create、单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Transform 或多选数量。
+- 引擎侧新增 `Scene::ForEachObject/ForEachRenderableObject` 与 `AssetRegistry::ForEachRecord`，面板只读借用数据。
+- 验收：面板显示会话真实数据；选择、删除在面板间同步；字体方向、裁剪和纹理直通 GPU 测试通过。
+
+### D：资产驱动对象生成（下一步）
+
+当前 Create 生成临时立方体，只用于打通渲染链路。D 将其替换为真实项目资产工作流，参考 UE 的 Content Browser 选中资产 → Spawn/Place 流程：
+
+1. Content Browser 行点击调用 `EditorSession::SelectAsset(AssetID)`，选中行高亮；资产选择与场景对象选择互相独立。
+2. Instantiate/Create 要求存在选中资产且 `AssetRecordStatus::Present`；资产缺失或加载失败时不修改 Scene，并给出可见错误。
+3. 通过 `AssetRegistry` 的 `LogicalPath` 调用 `AssetManager::LoadModel` 加载模型；用 `ModelMaterialBuilder::BuildBlinnPhong` 和 `EditorSceneContent` 的 Blinn-Phong Pipeline 构建运行时材质。
+4. 第一版只支持模型资产（OBJ + sidecar）；纹理只作为材质输入，不作为可生成对象。一个多 part 模型暂时生成多个 SceneObject（part 级选择），真正“一个资产实例 = 一个层级对象”需要 Scene 层级/组件模型后再做。
+5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
+6. GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用；临时立方体保留为开发调试路径，正式生成流程不依赖它。
+
+文件范围：`EditorSession`（资产选择已就绪）、`EditorSceneContent`（暴露 Blinn-Phong Pipeline）、新增 Editor 侧的 Model Spawner、`EditorUILayer`（资产行 ID、高亮、Create 行为）、测试与资产样例。验收：选中一个已注册模型资产 → Create → 视口出现模型，Outliner 出现对应 part，Details 显示 Transform；重复实例共享 Mesh/Material；缺失资产不留下半成品对象。
 
 ### UE5 参照边界
 
-借鉴 GEditor 全局选择集、Package Dirty 的脏标记、ViewportClient 每视口独立视图状态、Spawn 即选中；不照搬 Slate 停靠框架、反射式 Details 面板与多窗口宿主（G2 之后再议）。
+借鉴 GEditor 全局选择集、Package Dirty 的脏标记、ViewportClient 每视口独立视图状态、Content Browser 资产选择 → Spawn、Spawn 即选中；不照搬 Slate 停靠框架、反射式 Details 面板与多窗口宿主（G2 之后再议）。
 
 ## 尚待决定
 

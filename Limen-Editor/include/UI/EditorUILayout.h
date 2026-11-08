@@ -4,6 +4,9 @@
 
 #pragma once
 #include <cstdint>
+
+#include "Limen/Scene/Scene.h"
+
 namespace LimenEditor
 {
     // 左上角原点的逻辑窗口矩形；只保存数值，不拥有窗口或 GPU 资源。
@@ -64,4 +67,14 @@ namespace LimenEditor
         float mouseY,
         uint32_t rowCount
     ) noexcept;
+
+    // 在 Outliner 行顺序中，从 anchor 到 target 生成连续选择范围。
+    // anchor 不存在时只返回 target；target 不存在时返回空。
+    [[nodiscard]]
+    Limen::LArray<Limen::SceneObjectID> BuildSelectionRange(
+        const Limen::LArray<Limen::SceneObjectID>& orderedRows,
+        Limen::SceneObjectID anchor,
+        Limen::SceneObjectID target
+    );
+
 }

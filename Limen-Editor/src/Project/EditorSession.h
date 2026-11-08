@@ -6,6 +6,7 @@
 #include <utility>
 
 #include "Limen/Asset/AssetRegistry.h"
+#include "Limen/Core/Log.h"
 #include "Limen/Project/ProjectConfiguration.h"
 #include "Limen/Scene/Scene.h"
 
@@ -14,21 +15,50 @@ namespace LimenEditor
     class EditorSession final
     {
     public:
-        explicit EditorSession(Limen::ProjectConfiguration configuration,Limen::Scope<Limen::AssetRegistry> registry)
-            : m_Configuration(std::move(configuration)),m_AssetRegistry(std::move(registry)),
-m_Scene(Limen::CreateScope<Limen::Scene>())
-        {}
+        explicit EditorSession(Limen::ProjectConfiguration configuration, Limen::Scope<Limen::AssetRegistry> registry)
+            : m_Configuration(std::move(configuration)), m_AssetRegistry(std::move(registry)),
+              m_Scene(Limen::CreateScope<Limen::Scene>())
+        {
+        }
 
         [[nodiscard]]
-        const Limen::ProjectConfiguration& GetConfiguration() const noexcept
+        const Limen::ProjectConfiguration &GetConfiguration() const noexcept
         {
             return m_Configuration;
         }
 
         [[nodiscard]]
-        const Limen::AssetRegistry& GetAssetRegistry() const noexcept
+        const Limen::AssetRegistry &GetAssetRegistry() const noexcept
         {
             return *m_AssetRegistry;
+        }
+
+        // 资产选择独立于场景对象选择；只接受 Registry 中存在的资产。
+        [[nodiscard]]
+        bool SelectAsset(const Limen::AssetID id)
+        {
+            Limen::AssetRecord record;
+            if (!m_AssetRegistry->TryFind(id, record))
+                return false;
+            m_SelectedAssetID = id;
+            return true;
+        }
+
+        void ClearAssetSelection() noexcept
+        {
+            m_SelectedAssetID = {};
+        }
+
+        [[nodiscard]]
+        Limen::AssetID GetSelectedAssetID() const noexcept
+        {
+            return m_SelectedAssetID;
+        }
+
+        [[nodiscard]]
+        bool IsAssetSelected(const Limen::AssetID id) const noexcept
+        {
+            return m_SelectedAssetID.isValid() && m_SelectedAssetID == id;
         }
 
         // 创建场景普通对象并返回其稳定的ID，失败的时候返回 High/Low 均为0的无效ID
@@ -38,10 +68,9 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
             const Limen::SceneObjectHandle handle = m_Scene->CreateObject();
 
             Limen::SceneObjectID id{};
-            if (!m_Scene->TryGetObjectID(handle,id))
+            if (!m_Scene->TryGetObjectID(handle, id))
                 return {};
-            // 创建即选中：新对象自动成为当前选择。
-            m_SelectedObjectID = id;
+            SelectSingleObject(id);
             MarkDirty();
             return id;
         }
@@ -56,77 +85,175 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
                 return {};
 
             const Limen::SceneObjectHandle handle =
-                m_Scene->AddRenderableObject(
-                    {
-                        .MeshResource = std::move(mesh),
-                        .MaterialResource = std::move(material),
-                        .Transform = glm::mat4{1.0f}
-                    });
+                    m_Scene->AddRenderableObject(
+                        {
+                            .MeshResource = std::move(mesh),
+                            .MaterialResource = std::move(material),
+                            .Transform = glm::mat4{1.0f}
+                        });
             Limen::SceneObjectID id{};
             if (!m_Scene->TryGetObjectID(handle, id))
                 return {};
-
-            m_SelectedObjectID = id;
+            SelectSingleObject(id);
             MarkDirty();
             return id;
         }
 
         // 面板与视口只借用活动场景；一切修改必须经过会话的编辑方法。
         [[nodiscard]]
-        const Limen::Scene& GetScene() const noexcept
+        const Limen::Scene &GetScene() const noexcept
         {
             return *m_Scene;
         }
 
-        // 选择只存稳定ID，失效或删除时由会话负责清除
+        // 普通点击：以单个对象替换当前选择。
         bool SelectObject(const Limen::SceneObjectID id)
         {
             Limen::SceneObjectHandle handle{};
-            if (!m_Scene->TryFindObject(id,handle))
+            if (!m_Scene->TryFindObject(id, handle))
                 return false;
-            m_SelectedObjectID = id;
+            SelectSingleObject(id);
             return true;
+        }
+
+        // Cmd/Ctrl+点击：命中则移出选择，未命中则追加。
+        bool ToggleObjectSelection(const Limen::SceneObjectID id)
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return false;
+
+            for (uint32_t i = 0; i < m_SelectedObjectIDs.getSize(); ++i)
+            {
+                if (m_SelectedObjectIDs[i] == id)
+                {
+                    m_SelectedObjectIDs[i] =
+                            m_SelectedObjectIDs[m_SelectedObjectIDs.getSize() - 1];
+                    m_SelectedObjectIDs.pop_back();
+                    return true;
+                }
+            }
+            m_SelectedObjectIDs.push_back(id);
+            return true;
+        }
+
+        // Shift 范围选择：用经过校验的去重集合替换当前选择。
+        bool SelectObjects(const Limen::LArray<Limen::SceneObjectID> &ids)
+        {
+            Limen::LArray<Limen::SceneObjectID> validated;
+            for (const Limen::SceneObjectID id: ids)
+            {
+                Limen::SceneObjectHandle handle{};
+                if (!m_Scene->TryFindObject(id, handle))
+                    continue;
+
+                bool duplicate = false;
+                for (uint32_t i = 0; i < validated.getSize(); ++i)
+                {
+                    if (validated[i] == id)
+                    {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!duplicate)
+                    validated.push_back(id);
+            }
+
+            const bool hasAny = validated.getSize() > 0;
+            m_SelectedObjectIDs = validated;
+            return hasAny;
         }
 
         void ClearSelection() noexcept
         {
-            m_SelectedObjectID = {};
+            m_SelectedObjectIDs.clear();
         }
 
+        // 恰好选中一个时返回该 ID；零个或多个时返回无效 ID。
         [[nodiscard]]
         Limen::SceneObjectID GetSelectedObjectID() const noexcept
         {
-            return m_SelectedObjectID;
+            return m_SelectedObjectIDs.getSize() == 1
+                       ? m_SelectedObjectIDs[0]
+                       : Limen::SceneObjectID{};
+        }
+
+        [[nodiscard]]
+        const Limen::LArray<Limen::SceneObjectID> &
+        GetSelectedObjectIDs() const noexcept
+        {
+            return m_SelectedObjectIDs;
+        }
+
+        [[nodiscard]]
+        uint32_t GetSelectedObjectCount() const noexcept
+        {
+            return m_SelectedObjectIDs.getSize();
         }
 
         [[nodiscard]]
         bool IsObjectSelected(const Limen::SceneObjectID id) const noexcept
         {
-            return m_SelectedObjectID.isValid() && m_SelectedObjectID == id;
+            if (!id.isValid())
+                return false;
+
+            for (uint32_t i = 0; i < m_SelectedObjectIDs.getSize(); ++i)
+            {
+                if (m_SelectedObjectIDs[i] == id)
+                    return true;
+            }
+            return false;
         }
 
-        // 删除指定对象：成功则置脏；若删除的是当前选择，同时清除选择
+        // 删除指定对象：成功则置脏，并从选择集合移除。
         bool DeleteObject(const Limen::SceneObjectID id)
         {
             Limen::SceneObjectHandle handle{};
-            if (!m_Scene->TryFindObject(id,handle))
+            if (!m_Scene->TryFindObject(id, handle))
                 return false;
             if (!m_Scene->DestroyObject(handle))
                 return false;
 
-            if (m_SelectedObjectID == id)
-                m_SelectedObjectID = {};
+            RemoveFromSelection(id);
             MarkDirty();
             return true;
         }
 
-        // 修改当前选择对象的变换；无选择或修改失败时返回 false。
-        bool SetSelectedObjectTransform(const glm::mat4& transform)
+        // 删除全部选中对象；只要成功删除一个，就清空选择并置脏
+        bool DeleteSelectedObjects()
         {
-            if (!m_SelectedObjectID.isValid())
+            if (m_SelectedObjectIDs.empty())
                 return false;
+
+            // 先复制一份ID 删除过程中会修改选择集合
+            const Limen::LArray<Limen::SceneObjectID> selected = m_SelectedObjectIDs;
+
+            bool deleteAny = false;
+            for (const Limen::SceneObjectID id : selected)
+            {
+                Limen::SceneObjectHandle handle{};
+                if (!m_Scene->TryFindObject(id,handle))
+                    continue;
+                if (!m_Scene->DestroyObject(handle))
+                    continue;
+                deleteAny = true;
+            }
+            m_SelectedObjectIDs.clear();
+            if (deleteAny)
+                MarkDirty();
+            return deleteAny;
+        }
+
+        // 多选暂不做批量变换：只有恰好一个对象时生效。
+        bool SetSelectedObjectTransform(const glm::mat4 &transform)
+        {
+            if (m_SelectedObjectIDs.getSize() != 1)
+                return false;
+
+            const Limen::SceneObjectID selected = m_SelectedObjectIDs[0];
             Limen::SceneObjectHandle handle{};
-            if (!m_Scene->TryFindObject(m_SelectedObjectID, handle))
+            if (!m_Scene->TryFindObject(selected, handle))
                 return false;
             if (!m_Scene->SetObjectTransform(handle, transform))
                 return false;
@@ -135,17 +262,19 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
             return true;
         }
 
-        // 读取当前对象的transform 失败时返回false 且不修改out transform
         [[nodiscard]]
-        bool TryGetSelectedObjectTransform(glm::mat4& outTransform) const noexcept
+        bool TryGetSelectedObjectTransform(glm::mat4 &outTransform) const noexcept
         {
-            if (!m_SelectedObjectID.isValid())
+            if (m_SelectedObjectIDs.getSize() != 1)
                 return false;
+
+            const Limen::SceneObjectID selected = m_SelectedObjectIDs[0];
             Limen::SceneObjectHandle handle{};
-            if (!m_Scene->TryFindObject(m_SelectedObjectID, handle))
+            if (!m_Scene->TryFindObject(selected, handle))
                 return false;
-            return m_Scene->TryGetObjectTransform(handle,outTransform);
+            return m_Scene->TryGetObjectTransform(handle, outTransform);
         }
+
 
         [[nodiscard]]
         bool IsDirty() const noexcept
@@ -166,8 +295,10 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
 
         // 会话独占的活动场景，面板只通过GetScene() 借用，不拥有，不释放
         Limen::Scope<Limen::Scene> m_Scene;
-        // 当前选中对象的稳定 ID；无效 ID 表示没有选择。
-        Limen::SceneObjectID m_SelectedObjectID{};
+        // 当前选中的场景对象集合，顺序不参与语义。
+        Limen::LArray<Limen::SceneObjectID> m_SelectedObjectIDs;
+        // Content Browser 当前选中的资产；无效 ID 表示未选择。
+        Limen::AssetID m_SelectedAssetID{};
 
         // session是否有未保存的编辑，只有会话自己的编辑方法才能置为脏
         bool m_IsDirty = false;
@@ -176,6 +307,26 @@ m_Scene(Limen::CreateScope<Limen::Scene>())
         void MarkDirty() noexcept
         {
             m_IsDirty = true;
+        }
+
+        void SelectSingleObject(const Limen::SceneObjectID id)
+        {
+            m_SelectedObjectIDs.clear();
+            m_SelectedObjectIDs.push_back(id);
+        }
+
+        void RemoveFromSelection(const Limen::SceneObjectID id) noexcept
+        {
+            for (uint32_t i = 0; i < m_SelectedObjectIDs.getSize();)
+            {
+                if (m_SelectedObjectIDs[i] != id)
+                {
+                    ++i;
+                    continue;
+                }
+                m_SelectedObjectIDs[i] = m_SelectedObjectIDs[m_SelectedObjectIDs.getSize() - 1];
+                m_SelectedObjectIDs.pop_back();
+            }
         }
     };
 }
