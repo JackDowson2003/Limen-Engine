@@ -54,7 +54,7 @@ asset_root = "assets"
 schema_version = 1
 
 [game]
-startup_scene = "Scenes/Main.lscene" # 仅示意逻辑路径；场景格式尚未定案
+startup_scene_asset_id = "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539"
 
 [render]
 backend = "Auto"
@@ -62,7 +62,7 @@ vsync = true
 ```
 
 - `.lmproject` 的必填字段是 `schema_version`、`project_id` 和 `asset_root`；`display_name` 可默认取文件名。`asset_root` 解析为项目文件所在目录下的路径，而不是进程工作目录下的路径。
-- `[game].startup_scene` 在可运行游戏项目中必须解析为项目资产；项目刚创建、尚无场景时可以省略。TOML 没有用来表示“未设置”的 `null` 字段，此处不用空字符串伪装有效场景。将来 Asset Registry 成立后，长期引用应改由稳定 AssetID 表示，不能把可重命名路径当永久身份。
+- `[game].startup_scene_asset_id` 在可运行游戏项目中必须解析为已注册的 `.lscene` 项目资产；项目刚创建、尚无场景时可以省略。TOML 没有用来表示“未设置”的 `null` 字段，此处不用空字符串伪装有效场景。稳定引用使用 AssetID，不使用可重命名逻辑路径；场景 schema 与保存/加载契约见[Scene 对象模型与序列化](SceneSerialization.md)。
 - `[render].backend = "Auto"` 表示从**已编译且当前平台实际可用**的后端中选择，不是从 `RendererAPI::API` 的所有枚举值中任选。明确指定不可用后端时，应在创建 Window/Graphics Context 前报错并停止启动，不静默降级。
 - 第一版仅承诺 macOS + OpenGL 4.1 可运行。Windows + Direct3D 12、macOS + Metal 等是未来目标；配置格式可表达目标，不代表后端已经实现。OS 覆盖文件也不能为不存在的后端“开通支持”。
 - 身份、资源根和起始场景不接受 `Platforms`、`UserGame` 覆盖；命令行如要临时指定测试场景，必须是显式的启动参数且不回写项目文件。
