@@ -39,6 +39,34 @@ int main()
 {
     int failures = 0;
 
+    Limen::AxisAlignedBoundingBox pickBounds;
+    pickBounds.Expand({-1.0f, -1.0f, -1.0f});
+    pickBounds.Expand({1.0f, 1.0f, 1.0f});
+
+    float hitDistance = -1.0f;
+    if (!Check("ray hits bounds",
+               Limen::IntersectRayAABB(
+                   pickBounds,
+                   {0.0f, 0.0f, 5.0f},
+                   {0.0f, 0.0f, -1.0f},
+                   hitDistance)))
+        ++failures;
+    if (!Check("ray hit distance is nearest face",
+               std::abs(hitDistance - 4.0f) <= 0.0001f))
+        ++failures;
+
+    float missDistance = 123.0f;
+    if (!Check("ray misses bounds",
+               !Limen::IntersectRayAABB(
+                   pickBounds,
+                   {5.0f, 5.0f, 5.0f},
+                   {0.0f, 0.0f, -1.0f},
+                   missDistance)))
+        ++failures;
+    if (!Check("failed ray preserves distance",
+               std::abs(missDistance - 123.0f) <= 0.0001f))
+        ++failures;
+
     Limen::AxisAlignedBoundingBox empty;
     if (!Check("default bounds are invalid", !empty.IsValid()))
         ++failures;

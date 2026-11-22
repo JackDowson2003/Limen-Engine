@@ -35,6 +35,7 @@ namespace LimenEditor
             const Limen::Texture2D &texture
         ) override;
 
+        // 它用直通 Shader 直接采样并输出，不做额外颜色编码
         void DrawNativeTextureRect(
             const Limen::Window &window,
             const glm::vec2 &position,

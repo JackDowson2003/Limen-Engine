@@ -89,14 +89,19 @@ namespace LimenEditor
         return result;
     }
 
-    ViewportPixelSize CalculateViewportPixelSize(float logicalWindowWidth, float logicalWindowHeight, const UIRect &logicalRect, uint32_t framebufferWidth, uint32_t framebufferHeight)
+    ViewportPixelSize CalculateViewportPixelSize(
+        const float logicalWindowWidth,
+        const float logicalWindowHeight,
+        const UIRect &logicalRect,
+        const uint32_t framebufferWidth,
+        const uint32_t framebufferHeight)
     {
         ViewportPixelSize res{};
 
         // 任一输入无效时返回最小 1x1, 避免视口尺寸为0
-        if (logicalWindowWidth <= 0.0f || logicalWindowHeight <= 0.0f  ||
-        framebufferWidth == 0 || framebufferHeight == 0 ||
-        logicalRect.Width <=0.0f || logicalRect.Height <= 0.0f
+        if (logicalWindowWidth <= 0.0f || logicalWindowHeight <= 0.0f ||
+            framebufferWidth == 0 || framebufferHeight == 0 ||
+            logicalRect.Width <= 0.0f || logicalRect.Height <= 0.0f
         )
         {
             return res;
@@ -108,12 +113,13 @@ namespace LimenEditor
         const long width = std::lround(logicalRect.Width * scaleX);
         const long height = std::lround(logicalRect.Height * scaleY);
 
-        res.Width = static_cast<uint32_t>(std::max(1L,width));
-        res.Height = static_cast<uint32_t>(std::max(1L,height));
+        res.Width = static_cast<uint32_t>(std::max(1L, width));
+        res.Height = static_cast<uint32_t>(std::max(1L, height));
         return res;
     }
 
-    int FindListRowAt(const float firstRowY, const float rowHeight, const float mouseY, const uint32_t rowCount) noexcept
+    int FindListRowAt(const float firstRowY, const float rowHeight, const float mouseY,
+                      const uint32_t rowCount) noexcept
     {
         if (rowHeight <= 0.0f || rowCount == 0 || mouseY < firstRowY)
             return -1;
@@ -123,9 +129,9 @@ namespace LimenEditor
     }
 
     Limen::LArray<Limen::SceneObjectID> BuildSelectionRange(
-    const Limen::LArray<Limen::SceneObjectID> &orderedRows,
-    const Limen::SceneObjectID anchor,
-    const Limen::SceneObjectID target)
+        const Limen::LArray<Limen::SceneObjectID> &orderedRows,
+        const Limen::SceneObjectID anchor,
+        const Limen::SceneObjectID target)
     {
         Limen::LArray<Limen::SceneObjectID> result;
 

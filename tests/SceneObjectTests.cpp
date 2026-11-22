@@ -508,6 +508,93 @@ namespace
             });
         Check("reused slot has no render component", renderVisits == 0);
     }
+
+    void TestGroupedRenderableComponents()
+    {
+        Limen::Scene scene;
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+
+        Limen::LArray<Limen::SceneRenderObject> parts;
+        parts.push_back(Limen::SceneRenderObject{
+            mesh, material, Translation(1.0f, 0.0f, 0.0f)});
+        parts.push_back(Limen::SceneRenderObject{
+            mesh, material, Translation(0.0f, 2.0f, 0.0f)});
+
+        const auto handle = scene.AddRenderableObjectGroup(parts);
+        Check("grouped renderable object is valid", handle.IsValid());
+
+        int objectVisits = 0;
+        scene.ForEachObject(
+            [&](const Limen::SceneObjectHandle &visitedHandle,
+                const Limen::SceneObjectID &)
+            {
+                if (visitedHandle == handle)
+                    ++objectVisits;
+            });
+        Check("group is one scene object", objectVisits == 1);
+
+        int componentVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &visitedHandle,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &transform)
+            {
+                if (!(visitedHandle == handle))
+                    return;
+                if (componentVisits == 0)
+                    CheckTransform("first component local transform",
+                                   transform,
+                                   Translation(1.0f, 0.0f, 0.0f));
+                else if (componentVisits == 1)
+                    CheckTransform("second component local transform",
+                                   transform,
+                                   Translation(0.0f, 2.0f, 0.0f));
+                ++componentVisits;
+            });
+        Check("group exposes two render components", componentVisits == 2);
+
+        Check("group object transform moves all components",
+              scene.SetObjectTransform(handle, Translation(10.0f, 0.0f, 0.0f)));
+
+        componentVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &visitedHandle,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &transform)
+            {
+                if (!(visitedHandle == handle))
+                    return;
+                if (componentVisits == 0)
+                    CheckTransform("first component world transform",
+                                   transform,
+                                   Translation(11.0f, 0.0f, 0.0f));
+                else if (componentVisits == 1)
+                    CheckTransform("second component world transform",
+                                   transform,
+                                   Translation(10.0f, 2.0f, 0.0f));
+                ++componentVisits;
+            });
+        Check("group still exposes two components after move",
+              componentVisits == 2);
+
+        Check("destroy grouped renderable", scene.DestroyObject(handle));
+        componentVisits = 0;
+        scene.ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &)
+            {
+                ++componentVisits;
+            });
+        Check("destroy clears grouped components", componentVisits == 0);
+    }
 }
 
 int main()
@@ -517,6 +604,7 @@ int main()
     TestSlotRetirementBoundary();
     TestForEachObject();
     TestSceneRenderableComponent();
+    TestGroupedRenderableComponents();
 
     if (g_Failures == 0)
         std::cout

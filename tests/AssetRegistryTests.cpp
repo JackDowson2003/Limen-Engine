@@ -346,6 +346,66 @@ namespace
         runner.Check("uppercase sidecar failure publishes no records",
                      !registry.TryFind(kKnownID, output));
     }
+
+    void TestForEachRecord(TestRunner& runner)
+    {
+        TemporaryProject project;
+        fs::create_directory(project.Assets / "Textures");
+        WriteFile(project.Assets / "Textures" / "present.bin", "present");
+        WriteFile(project.Assets / "Textures" / "missing.bin", "missing");
+        WriteFile(
+            project.Assets / "Textures" / "present.bin.lmmeta",
+            SidecarText(kKnownID));
+        WriteFile(
+            project.Assets / "Textures" / "missing.bin.lmmeta",
+            SidecarText(kOtherID));
+
+        // 删除源文件后再加载，验证遍历同时包含 Present 与 Missing 记录。
+        std::error_code removeError;
+        fs::remove(project.Assets / "Textures" / "missing.bin", removeError);
+
+        Limen::AssetRegistry unloaded(project.Assets);
+        int unloadedVisits = 0;
+        unloaded.ForEachRecord(
+            [&](const Limen::AssetRecord &)
+            {
+                ++unloadedVisits;
+            });
+        runner.Check("unloaded registry visits no records",
+                     unloadedVisits == 0);
+
+        Limen::AssetRegistry registry(project.Assets);
+        Limen::AssetRegistryError error;
+        runner.Check("registry loads for traversal",
+                     registry.TryLoad(error));
+
+        int visits = 0;
+        bool sawPresent = false;
+        bool sawMissing = false;
+        registry.ForEachRecord(
+            [&](const Limen::AssetRecord &record)
+            {
+                ++visits;
+                if (record.ID == kKnownID &&
+                    record.Status == Limen::AssetRecordStatus::Present &&
+                    static_cast<std::string_view>(record.LogicalPath) ==
+                        "Textures/present.bin")
+                {
+                    sawPresent = true;
+                }
+                if (record.ID == kOtherID &&
+                    record.Status == Limen::AssetRecordStatus::Missing &&
+                    static_cast<std::string_view>(record.LogicalPath) ==
+                        "Textures/missing.bin")
+                {
+                    sawMissing = true;
+                }
+            });
+
+        runner.Check("traversal visits every registered record", visits == 2);
+        runner.Check("traversal exposes present record", sawPresent);
+        runner.Check("traversal exposes missing record", sawMissing);
+    }
 }
 
 int main()
@@ -358,6 +418,7 @@ int main()
         TestRegistrationPathSafety(runner);
         TestSidecarCannotDescribeAnotherSidecar(runner);
         TestSidecarSuffixCase(runner);
+        TestForEachRecord(runner);
     }
     catch (const std::exception& error)
     {

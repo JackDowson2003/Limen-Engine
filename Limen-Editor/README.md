@@ -1,6 +1,6 @@
 # Limen Editor
 
-> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；真实 Retina 交互、资产驱动对象生成、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产驱动生成），见下文。
+> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产驱动生成），见下文。
 
 ## 当前已实现
 
@@ -77,7 +77,7 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 
 ## 当前迭代顺序：A → B → C → D
 
-在 G0 收尾与 G1 会话接入之间按四个工作包推进，每包都有独立验收句；除另行约定外，生产代码由用户编写，Codex 负责设计与审查。
+在 G0 收尾与 G1 会话接入之间按四个工作包推进，每包都有独立验收句；当前约定是 Editor 生产代码由 Codex 实现，涉及 Engine 公共接口或场景数据结构的改动先提交方案由用户实现。
 
 ### A：会话数据契约（已完成）
 
@@ -93,22 +93,26 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 
 ### C：面板骨架与文字（已完成基础）
 
-- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径，Outliner 列出场景对象并支持 Create、单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Transform 或多选数量。
+- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Transform 或多选数量。
+- 引入 `EditorTheme` 统一 UE 风格暗色主题；选中行使用蓝色行背景；视口、Details、Content Browser、Outliner 均已拆为独立面板。
+- 视口支持世界空间射线-AABB 拾取：左键点击选择对象，Command/Ctrl 增选，点击空白清空对象选择。
+- 鼠标输入采用 `Scene Viewport → Content Browser → Outliner → Splitter → 快捷键` 的固定优先级；前一个区域消费事件后，后续区域不再重复处理。
 - 引擎侧新增 `Scene::ForEachObject/ForEachRenderableObject` 与 `AssetRegistry::ForEachRecord`，面板只读借用数据。
 - 验收：面板显示会话真实数据；选择、删除在面板间同步；字体方向、裁剪和纹理直通 GPU 测试通过。
 
-### D：资产驱动对象生成（下一步）
+### D：资产驱动对象生成（进行中）
 
-当前 Create 生成临时立方体，只用于打通渲染链路。D 将其替换为真实项目资产工作流，参考 UE 的 Content Browser 选中资产 → Spawn/Place 流程：
+当前生成入口已经统一到 Content Browser 的显式 `Place`，Outliner 不再拥有创建按钮。流程参考 UE 的 Content Browser 选中资产 → Place：
 
-1. Content Browser 行点击调用 `EditorSession::SelectAsset(AssetID)`，选中行高亮；资产选择与场景对象选择互相独立。
-2. Instantiate/Create 要求存在选中资产且 `AssetRecordStatus::Present`；资产缺失或加载失败时不修改 Scene，并给出可见错误。
+1. Content Browser 行点击调用 `EditorSession::SelectAsset(AssetID)`，选中行高亮；单击只改变资产选择，双击保留为后续资产编辑器入口，不实例化对象。资产选择与场景对象选择互相独立。按住资产行拖动超过 5 个逻辑像素后可拖入 Scene 视口，在释放位置生成对象。
+2. `Place` 要求存在选中资产且 `AssetRecordStatus::Present`；资产缺失或加载失败时不修改 Scene，并留下明确诊断。
 3. 通过 `AssetRegistry` 的 `LogicalPath` 调用 `AssetManager::LoadModel` 加载模型；用 `ModelMaterialBuilder::BuildBlinnPhong` 和 `EditorSceneContent` 的 Blinn-Phong Pipeline 构建运行时材质。
-4. 第一版只支持模型资产（OBJ + sidecar）；纹理只作为材质输入，不作为可生成对象。一个多 part 模型暂时生成多个 SceneObject（part 级选择），真正“一个资产实例 = 一个层级对象”需要 Scene 层级/组件模型后再做。
-5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
-6. GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用；临时立方体保留为开发调试路径，正式生成流程不依赖它。
+4. 第一版只支持模型资产（OBJ + sidecar）；纹理只作为材质输入，不作为可生成对象。多 Part 模型现在是**一个 SceneObject + 多个渲染组件**，Outliner 只出现一行，Details 显示该实例的 Transform。
+5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`，渲染时与世界 Transform 组合；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
+6. `Place` 按钮把对象放在视口中心；拖拽释放则按鼠标位置生成世界空间射线，默认距离也是相机前方 4 个世界单位。拖拽开始时读取模型局部 AABB，按当前落点投影为半透明屏幕包围框，同时显示资产路径和距离；滚轮按每次 0.5 个单位在 1.0～20.0 范围调整距离。连续放置不依赖硬编码世界原点。GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用。
+7. Place 成功或失败会在顶栏显示 10 秒状态：缺失资产、OBJ 加载失败、无渲染组件、视口未就绪和拖拽落到视口外都有可见反馈；控制台同时记录一次点击级诊断。
 
-文件范围：`EditorSession`（资产选择已就绪）、`EditorSceneContent`（暴露 Blinn-Phong Pipeline）、新增 Editor 侧的 Model Spawner、`EditorUILayer`（资产行 ID、高亮、Create 行为）、测试与资产样例。验收：选中一个已注册模型资产 → Create → 视口出现模型，Outliner 出现对应 part，Details 显示 Transform；重复实例共享 Mesh/Material；缺失资产不留下半成品对象。
+文件范围：`EditorSession`、`EditorSceneContent`、`EditorAssetSpawner`、`SceneViewportPanel`、`EditorUILayer`、Content Browser/Outliner 面板、测试与资产样例。已验证：完整构建通过，完整 CTest 25/25 通过，临时项目 OBJ 的 OpenGL GPU 端到端测试通过，并已在真实窗口验证按钮放置、拖拽放置和滚轮距离调整。验收：选中一个已注册模型资产 → 点击 Place 或拖入视口 → 模型出现在对应位置，Outliner 只增加一行，Details 显示 Pos；重复实例共享 Mesh/Material；缺失资产不留下半成品对象。
 
 ### UE5 参照边界
 

@@ -23,7 +23,10 @@ namespace LimenEditor
             const uint32_t base = data.Vertices.getSize();
             const glm::vec3 positions[4]{p0, p1, p2, p3};
             const glm::vec2 texCoords[4]{
-                {0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f}
+                {0.0f, 0.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f}
             };
 
             for (uint32_t i = 0; i < 4; ++i)
@@ -66,7 +69,7 @@ namespace LimenEditor
         }
 
         const Limen::Ref<Limen::Shader> shader =
-            m_ShaderLibrary->Load("Example3D/BlinnPhong");
+                m_ShaderLibrary->Load("Example3D/BlinnPhong");
         if (!shader)
         {
             LM_ERROR("Editor scene content: failed to load BlinnPhong shader");
@@ -84,16 +87,15 @@ namespace LimenEditor
         pipelineSpec.FrontFaceWinding = Limen::FrontFace::CounterClockwise;
         pipelineSpec.DebugName = "Editor Default Cube Pipeline";
 
-        const Limen::Ref<Limen::GraphicsPipeline> pipeline =
-            Limen::GraphicsPipeline::Create(pipelineSpec);
-        if (!pipeline)
+        m_LitPipeline = Limen::GraphicsPipeline::Create(pipelineSpec);
+        if (!m_LitPipeline)
         {
             LM_ERROR("Editor scene content: failed to create cube pipeline");
             return false;
         }
 
         m_CubeMaterial = Limen::CreateRef<Limen::Material>(
-            pipeline, "Editor Default Cube Material");
+            m_LitPipeline, "Editor Default Cube Material");
         if (!m_CubeMaterial)
         {
             LM_ERROR("Editor scene content: failed to create cube material");
@@ -101,9 +103,9 @@ namespace LimenEditor
         }
 
         const Limen::Ref<Limen::Texture2D> &white =
-            Limen::AssetManager::GetWhiteTexture();
+                Limen::AssetManager::GetWhiteTexture();
         const Limen::Ref<Limen::Texture2D> &flatNormal =
-            Limen::AssetManager::GetFlatNormalTexture();
+                Limen::AssetManager::GetFlatNormalTexture();
         if (!white || !flatNormal)
         {
             LM_ERROR("Editor scene content: default textures unavailable");
@@ -115,7 +117,7 @@ namespace LimenEditor
         m_CubeMaterial->SetFloat3("u_AmbientReflectance", glm::vec3{0.15f});
         m_CubeMaterial->SetFloat("u_Shininess", 128.0f);
         m_CubeMaterial->SetFloat3(
-            "u_DiffuseReflectance", glm::vec3{0.72f, 0.76f, 0.85f});
+                        "u_DiffuseReflectance", glm::vec3{0.72f, 0.76f, 0.85f});
         m_CubeMaterial->SetFloat3("u_SpecularColor", glm::vec3{0.35f});
         return true;
     }

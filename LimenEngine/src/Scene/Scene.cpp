@@ -3,12 +3,14 @@
 //
 
 #include <glm/geometric.hpp>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <random>
 
 #include "Limen/Scene/Scene.h"
 #include "Limen/Core/Log.h"
+#include "Limen/Renderer/Mesh.h"
 
 namespace Limen
 {
@@ -91,17 +93,13 @@ namespace Limen
             Generation,
             NextFree,
             Alive,
-            HasRenderComponent,
-            MeshResource,
-            MaterialResource
+            RenderComponents
         ] = m_ObjectSlots[index];
         ID = id;
         Transform = glm::mat4{1.0f};
         NextFree = invalidIndex;
         Alive = true;
-        HasRenderComponent = false;
-        MeshResource.reset();
-        MaterialResource.reset();
+        RenderComponents.clear();
 
         return {
             .Index = index,
@@ -124,9 +122,36 @@ namespace Limen
 
         ObjectSlot &slot = m_ObjectSlots[handle.Index];
         slot.Transform = renderObject.Transform;
-        slot.HasRenderComponent = true;
-        slot.MeshResource = renderObject.MeshResource;
-        slot.MaterialResource = renderObject.MaterialResource;
+        // 单组件入口把传入 Transform 当作对象变换，组件局部变换保持单位矩阵。
+        slot.RenderComponents.push_back(SceneRenderObject{
+            .MeshResource = renderObject.MeshResource,
+            .MaterialResource = renderObject.MaterialResource,
+            .Transform = glm::mat4{1.0f}
+        });
+        return handle;
+    }
+
+    SceneObjectHandle Scene::AddRenderableObjectGroup(
+        const LArray<SceneRenderObject> &parts)
+    {
+        if (parts.getSize() == 0)
+            return {};
+
+        for (const SceneRenderObject &part: parts)
+        {
+            if (!part.MeshResource || !part.MaterialResource)
+                return {};
+        }
+
+        const SceneObjectHandle handle = CreateObject();
+        if (!handle.IsValid() || handle.Index >= m_ObjectSlots.getSize())
+            return {};
+
+        ObjectSlot &slot = m_ObjectSlots[handle.Index];
+        slot.Transform = glm::mat4{1.0f};
+        for (const SceneRenderObject &part: parts)
+            slot.RenderComponents.push_back(part);
+
         return handle;
     }
 
@@ -137,17 +162,78 @@ namespace Limen
     {
         for (uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
         {
-            const ObjectSlot slot = m_ObjectSlots[index];
-            if (!slot.Alive || !slot.HasRenderComponent)
+            const ObjectSlot &slot = m_ObjectSlots[index];
+            if (!slot.Alive || slot.RenderComponents.getSize() == 0)
                 continue;
-            callback(
-                SceneObjectHandle{.Index = index, .Generation = slot.Generation},
-                slot.ID,
-                slot.MeshResource,
-                slot.MaterialResource,
-                slot.Transform
-            );
+
+            for (const auto &[MeshResource, MaterialResource, Transform]: slot.RenderComponents)
+            {
+                callback(
+                    SceneObjectHandle{
+                        .Index = index,
+                        .Generation = slot.Generation
+                    },
+                    slot.ID,
+                    MeshResource,
+                    MaterialResource,
+                    slot.Transform * Transform
+                );
+            }
         }
+    }
+
+    bool Scene::PickObject(
+        const glm::vec3 &rayOrigin,
+        const glm::vec3 &rayDirection,
+        SceneObjectID &outID) const noexcept
+    {
+        const float directionLengthSquared =
+            glm::dot(rayDirection, rayDirection);
+        if (directionLengthSquared <= 0.0f)
+            return false;
+
+        const glm::vec3 direction =
+            rayDirection / std::sqrt(directionLengthSquared);
+
+        float closestDistance = std::numeric_limits<float>::max();
+        SceneObjectID closestID{};
+        bool found = false;
+
+        for (uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
+        {
+            const ObjectSlot &slot = m_ObjectSlots[index];
+            if (!slot.Alive || slot.RenderComponents.getSize() == 0)
+                continue;
+
+            for (const SceneRenderObject &component: slot.RenderComponents)
+            {
+                if (!component.MeshResource)
+                    continue;
+
+                const AxisAlignedBoundingBox worldBounds =
+                    component.MeshResource->GetLocalBounds().Transformed(
+                        slot.Transform * component.Transform);
+
+                float distance = 0.0f;
+                if (!IntersectRayAABB(
+                        worldBounds,
+                        rayOrigin,
+                        direction,
+                        distance))
+                    continue;
+
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    closestID = slot.ID;
+                    found = true;
+                }
+            }
+        }
+
+        if (found)
+            outID = closestID;
+        return found;
     }
 
     bool Scene::DestroyObject(const SceneObjectHandle handle)
@@ -163,9 +249,7 @@ namespace Limen
         slot.ID = {};
         slot.Transform = glm::mat4{1.0f};
         slot.Alive = false;
-        slot.HasRenderComponent = false;
-        slot.MeshResource.reset();
-        slot.MaterialResource.reset();
+        slot.RenderComponents.clear();
 
         constexpr auto invalidIndex = SceneObjectHandle::InvalidIndex;
         constexpr static auto maxGeneration = std::numeric_limits<std::uint32_t>::max();

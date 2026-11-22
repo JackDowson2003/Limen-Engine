@@ -8,6 +8,7 @@
 #include <functional>
 #include <cstdint>
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 
 #include "Limen/Core/Core.h"
 #include "Limen/Scene/Light.h"
@@ -147,7 +148,14 @@ namespace Limen
             const SceneRenderObject& renderObject
         );
 
-        // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform。
+        // 一个对象挂多个渲染组件（例如多 Part 模型）。
+        // 每个 part.Transform 是相对对象 Transform 的局部变换。
+        [[nodiscard]] SceneObjectHandle AddRenderableObjectGroup(
+            const LArray<SceneRenderObject>& parts
+        );
+
+        // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform
+        // 由“每个对象回调一次”改为“每个渲染组件回调一次”
         void ForEachRenderableObject(
             const std::function<void(
                 const SceneObjectHandle&,
@@ -156,6 +164,13 @@ namespace Limen
                 const Ref<Material>&,
                 const glm::mat4&)>& callback
         ) const;
+
+        // 用世界空间射线拾取最近的可渲染对象；失败时不修改 outID。
+        [[nodiscard]] bool PickObject(
+            const glm::vec3& rayOrigin,
+            const glm::vec3& rayDirection,
+            SceneObjectID& outID
+        ) const noexcept;
 
         /**
          * @brief  设置当前场景的主平行光
@@ -262,12 +277,13 @@ namespace Limen
             std::uint32_t NextFree = SceneObjectHandle::InvalidIndex;
             bool Alive = false;
 
-            // 可选渲染组件；Transform 始终以槽位 Transform 为唯一来源。
-            bool HasRenderComponent = false;
-            Ref<Mesh> MeshResource;
-            Ref<Material> MaterialResource;
+            // 一个对象可拥有多个渲染组件；空数组表示对象不可渲染。
+            // 组件 Transform 是相对对象 Transform 的局部变换。
+            LArray<SceneRenderObject> RenderComponents;
         };
         LArray<ObjectSlot> m_ObjectSlots;
+
+        // Scene 对象槽位空闲链表的头指针
         std::uint32_t m_FreeHead = SceneObjectHandle::InvalidIndex;
 
         #if defined(LIMEN_SCENE_TEST_HOOKS)

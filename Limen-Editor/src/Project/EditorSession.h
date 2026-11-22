@@ -79,7 +79,8 @@ namespace LimenEditor
         [[nodiscard]]
         Limen::SceneObjectID CreateRenderableObject(
             Limen::Ref<Limen::Mesh> mesh,
-            Limen::Ref<Limen::Material> material)
+            Limen::Ref<Limen::Material> material,
+            const glm::mat4 &transform = glm::mat4{1.0f})
         {
             if (!mesh || !material)
                 return {};
@@ -89,11 +90,37 @@ namespace LimenEditor
                         {
                             .MeshResource = std::move(mesh),
                             .MaterialResource = std::move(material),
-                            .Transform = glm::mat4{1.0f}
+                        .Transform = transform
                         });
             Limen::SceneObjectID id{};
             if (!m_Scene->TryGetObjectID(handle, id))
                 return {};
+            SelectSingleObject(id);
+            MarkDirty();
+            return id;
+        }
+
+        // 一个多 Part 模型对应一个 SceneObject，内部挂多个渲染组件。
+        [[nodiscard]]
+        Limen::SceneObjectID CreateRenderableObjectGroup(
+            const Limen::LArray<Limen::SceneRenderObject> &parts,
+            const glm::mat4 &transform = glm::mat4{1.0f})
+        {
+            if (parts.getSize() == 0)
+                return {};
+
+            const Limen::SceneObjectHandle handle =
+                m_Scene->AddRenderableObjectGroup(parts);
+            if (!m_Scene->SetObjectTransform(handle, transform))
+            {
+                static_cast<void>(m_Scene->DestroyObject(handle));
+                return {};
+            }
+
+            Limen::SceneObjectID id{};
+            if (!m_Scene->TryGetObjectID(handle, id))
+                return {};
+
             SelectSingleObject(id);
             MarkDirty();
             return id;
@@ -271,6 +298,18 @@ namespace LimenEditor
             const Limen::SceneObjectID selected = m_SelectedObjectIDs[0];
             Limen::SceneObjectHandle handle{};
             if (!m_Scene->TryFindObject(selected, handle))
+                return false;
+            return m_Scene->TryGetObjectTransform(handle, outTransform);
+        }
+
+        // 按稳定 ID 读取任意对象 Transform；失败时不修改 outTransform。
+        [[nodiscard]]
+        bool TryGetObjectTransform(
+            const Limen::SceneObjectID id,
+            glm::mat4 &outTransform) const noexcept
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
                 return false;
             return m_Scene->TryGetObjectTransform(handle, outTransform);
         }

@@ -9,6 +9,7 @@
 
 namespace Limen
 {
+    class GraphicsPipeline;
     class Mesh;
     class Material;
 }
@@ -33,8 +34,16 @@ namespace LimenEditor
             return m_CubeMaterial;
         }
 
+        // 立方体与导入模型共享同一条 Blinn-Phong 图形管线。
+        [[nodiscard]] const Limen::Ref<Limen::GraphicsPipeline> &
+        GetLitPipeline() const noexcept
+        {
+            return m_LitPipeline;
+        }
+
     private:
         Limen::Ref<Limen::ShaderLibrary> m_ShaderLibrary = Limen::CreateRef<Limen::ShaderLibrary>();
+        Limen::Ref<Limen::GraphicsPipeline> m_LitPipeline;
         Limen::Ref<Limen::Mesh> m_CubeMesh;
         Limen::Ref<Limen::Material> m_CubeMaterial;
     };

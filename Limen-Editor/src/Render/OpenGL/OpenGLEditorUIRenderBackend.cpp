@@ -321,7 +321,7 @@ namespace LimenEditor
     }
 
     void OpenGLEditorUIRenderBackend::DrawNativeTextureRect(const Limen::Window &window, const glm::vec2 &position,
-                                                            const glm::vec2 &size, const std::uintptr_t texture)
+                                                            const glm::vec2 &size, const std::uintptr_t textureHandle)
     {
         if (!m_NativePipeline || !m_VertexArray || size.x <= 0.0f || size.y <= 0)
             return;
@@ -345,7 +345,7 @@ namespace LimenEditor
         shader->SetFloat2("u_RectSize", size);
         shader->SetInt("u_Texture", 0);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(texture));
+        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(textureHandle));
         m_VertexArray->Bind();
         Limen::RendererCommand::DrawIndexed(
             *m_VertexArray,

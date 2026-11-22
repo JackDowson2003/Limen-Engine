@@ -3,6 +3,7 @@
 #include "Limen/Core/Core.h"
 #include "glm/vec2.hpp"
 #include "glm/vec4.hpp"
+#include <string_view>
 
 namespace Limen
 {

@@ -264,6 +264,57 @@ add_test(
         COMMAND $<TARGET_FILE:LimenFontAtlasTests>
 )
 
+add_executable(LimenContentBrowserClickStateTests
+        ContentBrowserClickStateTests.cpp
+)
+
+limen_configure_target(LimenContentBrowserClickStateTests)
+
+target_include_directories(LimenContentBrowserClickStateTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/include"
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+target_link_libraries(LimenContentBrowserClickStateTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenContentBrowserClickState
+        COMMAND $<TARGET_FILE:LimenContentBrowserClickStateTests>
+)
+
+add_executable(LimenEditorStatusMessageTests
+        EditorStatusMessageTests.cpp
+)
+
+limen_configure_target(LimenEditorStatusMessageTests)
+
+target_include_directories(LimenEditorStatusMessageTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+add_test(
+        NAME LimenEditorStatusMessage
+        COMMAND $<TARGET_FILE:LimenEditorStatusMessageTests>
+)
+
+add_executable(LimenEditorViewportProjectionTests
+        EditorViewportProjectionTests.cpp
+)
+
+limen_configure_target(LimenEditorViewportProjectionTests)
+
+target_include_directories(LimenEditorViewportProjectionTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/include"
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+target_link_libraries(LimenEditorViewportProjectionTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenEditorViewportProjection
+        COMMAND $<TARGET_FILE:LimenEditorViewportProjectionTests>
+)
+
 if (APPLE)
     # 独立的可执行文件目录使路径测试能安全验证缺失/存在两种资源状态。
     add_executable(LimenPlatformPathsTests
@@ -387,6 +438,7 @@ if (APPLE)
     # 端到端验证：SceneObject 的渲染组件能被 SceneRenderer 真正画出来。
     add_executable(LimenEditorSceneRenderTests
             EditorSceneRenderTests.cpp
+            "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorAssetSpawner.cpp"
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneContent.cpp"
     )
 
@@ -398,6 +450,7 @@ if (APPLE)
 
     target_compile_definitions(LimenEditorSceneRenderTests PRIVATE
             LIMEN_TEST_ASSET_ROOT="${CMAKE_SOURCE_DIR}/LimenEngine/assets"
+            LIMEN_TEST_MODEL_PATH="${CMAKE_SOURCE_DIR}/LimenSandBox/assets/models/TestCube.obj"
     )
 
     target_link_libraries(LimenEditorSceneRenderTests PRIVATE

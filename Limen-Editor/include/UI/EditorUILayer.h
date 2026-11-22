@@ -3,9 +3,12 @@
 //
 #pragma once
 #include <algorithm>
+#include <cstdio>
+#include <string>
 #include <utility>
 
 #include "Render/EditorUIRenderer.h"
+#include "Render/EditorAssetSpawner.h"
 #include "Render/EditorSceneContent.h"
 #include "Limen/Platform/PlatformPaths.h"
 #include "Limen/Renderer/FontAtlas.h"
@@ -16,10 +19,17 @@
 #include "Limen/Input/Input.h"
 #include "Limen/Application/Application.h"
 #include "Limen/Events/KeyEvent.h"
+#include "Limen/Math/AxisAlignedBoundingBox.h"
 #include "Limen/Scene/SceneRenderer.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "UI/EditorUILayout.h"
+#include "UI/EditorStatusMessage.h"
+#include "UI/EditorTheme.h"
 #include "Project/EditorSession.h"
+#include "UI/Panels/ContentBrowserPanel.h"
+#include "UI/Panels/DetailsPanel.h"
+#include "UI/Panels/OutlinerPanel.h"
+#include "UI/Panels/SceneViewportPanel.h"
 
 namespace LimenEditor
 {
@@ -28,8 +38,7 @@ namespace LimenEditor
     {
     public:
         explicit EditorUILayer(Limen::Ref<EditorSession> session = {})
-            : Layer("Limen Editor"), m_Session(std::move(session)),
-              m_ViewportCameraController(45.0f, 1.0f, 0.1f, 100.f)
+            : Layer("Limen Editor"), m_Session(std::move(session))
         {
         }
 
@@ -38,12 +47,8 @@ namespace LimenEditor
             if (!m_UIRenderer.Initialize())
                 LM_ERROR("Editor UI renderer initialization failed");
 
-            Limen::SceneRendererSpecification viewportSpec;
-            viewportSpec.Width = 1;
-            viewportSpec.Height = 1;
-            viewportSpec.DebugName = "Editor Scene Viewport";
-            m_ViewportRenderer = Limen::CreateScope<Limen::SceneRenderer>(viewportSpec);
-            m_ViewportCameraController.GetCamera().SetPosition({0.0f, 0.0f, 4.0f});
+            if (!m_ViewportPanel.Init())
+                LM_ERROR("Editor viewport initialization failed");
 
             // 引擎默认字体：从内置资产根解析路径，失败只记日志、不阻断启动。
             Limen::LString fontError;
@@ -78,48 +83,22 @@ namespace LimenEditor
         // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
         void OnUpdate(Limen::DeltaTime &deltaTime) override
         {
-            if (!m_Session || !m_ViewportRenderer)
+            if (!m_Session || !m_ViewportPanel.IsReady())
                 return;
 
             const Limen::Window &window = Limen::Application::GetApp().GetWindow();
-            const float logicalWidth = static_cast<float>(window.GetWindowWidth());
-            const float logicalHeight = static_cast<float>(window.GetWindowHeight());
-            if (logicalWidth <= 0.0f || logicalHeight <= 0.0f)
-                return;
+            const EditorUILayoutResult layout = CalculateEditorUILayout(
+                static_cast<float>(window.GetWindowWidth()),
+                static_cast<float>(window.GetWindowHeight()),
+                m_RightTopRatio);
 
-            const EditorUILayoutResult layout =
-                    CalculateEditorUILayout(logicalWidth, logicalHeight, m_RightTopRatio);
-            m_CenterRect = layout.Center;
-
-            // 光标在中央区域内，或从视口开始的右键拖拽进行中，才允许相机输入。
-            const auto [mouseX, mouseY] = Limen::Input::GetMousePos();
-            m_IsViewportHovered = m_CenterRect.Contains(mouseX, mouseY);
-            m_ViewportCameraController.SetMouseLookEnabled(
-                m_IsViewportHovered || m_IsNavigatingViewport);
-            m_ViewportCameraController.OnUpdate(deltaTime);
-
-            const auto [Width, Height] = CalculateViewportPixelSize(
-                logicalWidth, logicalHeight, layout.Center,
-                window.GetWidth(), window.GetHeight());
-
-            const auto &spec = m_ViewportRenderer->GetSpecification();
-            if (spec.Width != Width || spec.Height != Height)
-            {
-                m_ViewportRenderer->Resize(Width, Height);
-                m_ViewportCameraController.GetCamera().SetAspectRatio(
-                    static_cast<float>(Width) /
-                    static_cast<float>(Height));
-            }
-
-            m_ViewportRenderer->Render(
-                m_Session->GetScene(),
-                m_ViewportCameraController.GetCamera());
+            m_ViewportPanel.Update(*m_Session, window, deltaTime, layout.Center);
         }
 
         void OnDetach() override
         {
             //保证视口 GPU 资源在 Context 销毁前释放，避免把销毁顺序交给成员析构
-            m_ViewportRenderer.reset();
+            m_ViewportPanel.Shutdown();
             m_FontAtlas.reset();
             m_UIRenderer.Shutdown();
         }
@@ -133,7 +112,6 @@ namespace LimenEditor
             const EditorUILayoutResult &layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
             // 输入命中区域必须与本次实际绘制的分隔条一致。
             m_RightSplitterRect = layout.RightSplitter;
-            m_CreateButtonRect = {};
 
             if (layout.Top.Width <= 0.0f || layout.Top.Height <= 0.0f)
                 return;
@@ -142,170 +120,79 @@ namespace LimenEditor
                 window,
                 {layout.Top.X, layout.Top.Y},
                 {layout.Top.Width, layout.Top.Height},
-                {0.17f, 0.18f, 0.20f, 1.0f}
+                m_Theme.TopBarBackground
             );
+
+            if (m_FontAtlas && m_FontAtlas->IsBuilt())
+            {
+                const auto now = std::chrono::steady_clock::now();
+                const std::string_view status = m_StatusMessage.GetText(now);
+                std::string header = "Limen Editor 场景 视图";
+                glm::vec4 headerColor = m_Theme.TextPrimary;
+                if (!status.empty())
+                {
+                    header += "    ";
+                    header += status;
+                    headerColor =
+                        m_StatusMessage.GetKind(now) == EditorStatusKind::Error
+                            ? m_Theme.MissingText
+                            : m_Theme.ButtonText;
+                }
+
+                m_UIRenderer.DrawText(
+                    window,
+                    {layout.Top.X + 12.0f, layout.Top.Y + 8.0f},
+                    headerColor,
+                    *m_FontAtlas,
+                    header
+                );
+            }
 
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.Left.X, layout.Left.Y},
                 {layout.Left.Width, layout.Left.Height},
-                {0.13f, 0.14f, 0.16f, 1.0f}
+                m_Theme.PanelBackground
             );
-            // Content Browser 骨架：列出项目资产的逻辑路径，裁剪在左栏内。
+            // Content Browser 的行数据、绘制和点击由面板自己管理。
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
             {
-                m_LeftRect = layout.Left;
-                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
-                const float textX = layout.Left.X + 12.0f;
-                const float headerY = layout.Left.Y + 8.0f;
-
-                m_UIRenderer.SetClipRect(
+                m_ContentBrowser.Update(*m_Session);
+                m_ContentBrowser.Draw(
+                    *m_Session,
                     window,
-                    {layout.Left.X, layout.Left.Y},
-                    {layout.Left.Width, layout.Left.Height});
-
-                m_UIRenderer.DrawText(
-                    window,
-                    {textX, headerY},
-                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    m_UIRenderer,
                     *m_FontAtlas,
-                    "Content Browser");
-
-                Limen::LArray<Limen::LString> assetRows;
-                m_Session->GetAssetRegistry().ForEachRecord(
-                    [&](const Limen::AssetRecord &record)
-                    {
-                        assetRows.push_back(record.LogicalPath);
-                    });
-                m_AssetRows = assetRows;
-                m_AssetFirstRowY = headerY + rowHeight;
-                m_AssetRowHeight = rowHeight;
-
-                for (uint32_t row = 0; row < assetRows.getSize(); ++row)
-                {
-                    m_UIRenderer.DrawText(
-                        window,
-                        {textX, m_AssetFirstRowY + rowHeight * static_cast<float>(row)},
-                        {0.7f, 0.7f, 0.7f, 1.0f},
-                        *m_FontAtlas,
-                        std::string_view(
-                            assetRows[row].data(),
-                            assetRows[row].size()));
-                }
-
-                m_UIRenderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});
+                    m_Theme,
+                    layout.Left);
             }
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.Center.X, layout.Center.Y},
                 {layout.Center.Width, layout.Center.Height},
-                {0.08f, 0.09f, 0.11f, 1.0f}
+                m_Theme.ViewportBackground
             );
-            if (m_FontAtlas && m_FontAtlas->IsBuilt())
-            {
-                m_UIRenderer.DrawText(
-                    window,
-                    {layout.Top.X + 12.0f, layout.Top.Y + 8.0f},
-                    {1.0f, 1.0f, 1.0f, 1.0f},
-                    *m_FontAtlas,
-                    "Limen Editor 场景 视图"
-                );
-            }
 
-            const std::uintptr_t finalHandle =
-                    m_ViewportRenderer
-                        ? m_ViewportRenderer->GetFinalColorAttachmentHandle()
-                        : 0;
-            if (finalHandle != 0)
-            {
-                m_UIRenderer.DrawNativeTextureRect(
-                    window,
-                    {layout.Center.X, layout.Center.Y},
-                    {layout.Center.Width, layout.Center.Height},
-                    finalHandle
-                );
-            }
+            m_ViewportPanel.Draw(window,m_UIRenderer,layout.Center);
 
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.RightTop.X, layout.RightTop.Y},
                 {layout.RightTop.Width, layout.RightTop.Height},
-                {0.15f, 0.16f, 0.18f, 1.0f}
+                m_Theme.PanelBackground
             );
 
-            // Outliner 骨架：列出场景对象，选中行高亮，裁剪在右上区域。
+            // Outliner 的行数据、多选和绘制由面板自己管理。
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
             {
-                m_RightTopRect = layout.RightTop;
-                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
-                const float textX = layout.RightTop.X + 12.0f;
-                const float headerY = layout.RightTop.Y + 8.0f;
-
-                m_UIRenderer.SetClipRect(
+                m_Outliner.Update(*m_Session);
+                m_Outliner.Draw(
+                    *m_Session,
                     window,
-                    {layout.RightTop.X, layout.RightTop.Y},
-                    {layout.RightTop.Width, layout.RightTop.Height});
-
-                m_UIRenderer.DrawText(
-                    window,
-                    {textX, headerY},
-                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    m_UIRenderer,
                     *m_FontAtlas,
-                    "Outliner");
-
-                // Outliner 工具栏: Create按钮
-                const float buttonWidth = std::min(96.0f, layout.RightTop.Width - 16.0f);
-
-                if (buttonWidth > 0.0f)
-                {
-                    m_CreateButtonRect = {
-                        .X = layout.RightTop.X + layout.RightTop.Width - buttonWidth - 8.0f,
-                        .Y = headerY - 2.0f,
-                        .Width = buttonWidth,
-                        .Height = rowHeight
-                    };
-                    m_UIRenderer.DrawSolidRect(
-                        window,
-                        {m_CreateButtonRect.X, m_CreateButtonRect.Y},
-                        {m_CreateButtonRect.Width, m_CreateButtonRect.Height},
-                        {0.24f, 0.28f, 0.34f, 1.0f}
-                    );
-                    m_UIRenderer.DrawText(
-                        window,
-                        {m_CreateButtonRect.X + 8.0f, m_CreateButtonRect.Y + 2.0f},
-                        {1.0f, 1.0f, 1.0f, 1.0f},
-                        *m_FontAtlas,
-                        "Create");
-                }
-
-                Limen::LArray<Limen::SceneObjectID> rows;
-                m_Session->GetScene().ForEachObject(
-                    [&](const Limen::SceneObjectHandle &,
-                        const Limen::SceneObjectID &id)
-                    {
-                        rows.push_back(id);
-                    });
-                m_OutlinerRows = rows;
-                m_OutlinerFirstRowY = headerY + rowHeight;
-                m_OutlinerRowHeight = rowHeight;
-
-                for (uint32_t row = 0; row < rows.getSize(); ++row)
-                {
-                    const Limen::SceneObjectID &id = rows[row];
-                    const bool selected = m_Session->IsObjectSelected(id);
-                    const glm::vec4 rowColor =
-                            selected
-                                ? glm::vec4{1.0f, 0.8f, 0.2f, 1.0f}
-                                : glm::vec4{0.7f, 0.7f, 0.7f, 1.0f};
-                    m_UIRenderer.DrawText(
-                        window,
-                        {textX, m_OutlinerFirstRowY + rowHeight * static_cast<float>(row)},
-                        rowColor,
-                        *m_FontAtlas,
-                        "对象 " + std::to_string(row + 1));
-                }
-
-                m_UIRenderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});
+                    m_Theme,
+                    layout.RightTop);
             }
 
 
@@ -313,155 +200,122 @@ namespace LimenEditor
                 window,
                 {layout.RightSplitter.X, layout.RightSplitter.Y},
                 {layout.RightSplitter.Width, layout.RightSplitter.Height},
-                {0.35f, 0.37f, 0.42f, 1.0f}
+                m_Theme.Splitter
             );
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.RightBottom.X, layout.RightBottom.Y},
                 {layout.RightBottom.Width, layout.RightBottom.Height},
-                {0.21f, 0.22f, 0.24f, 1.0f}
+                m_Theme.PanelBackground
             );
 
-            // Details 骨架, 显示当前选中对象的平移分量
+            // Details 面板只借用绘画状态选择状态，绘制细节由面板自身负责
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
             {
-                const float textX = layout.RightBottom.X + 12.0f;
-                const float headerY = layout.RightBottom.Y + 8.0f;
-                const float rowHeight = m_FontAtlas->GetLineHeight() + 4.0f;
-
-                m_UIRenderer.SetClipRect(
+                m_DetailsPanel.Draw(
+                    *m_Session,
                     window,
-                    {layout.RightBottom.X, layout.RightBottom.Y},
-                    {layout.RightBottom.Width, layout.RightBottom.Height}
-                );
-
-                m_UIRenderer.DrawText(
-                    window,
-                    {textX, headerY},
-                    {0.85f, 0.85f, 0.85f, 1.0f},
+                    m_UIRenderer,
                     *m_FontAtlas,
-                    "Details"
+                    m_Theme,
+                    layout.RightBottom
                 );
-                const uint32_t selectedCount = m_Session->GetSelectedObjectCount();
-                if (selectedCount == 0)
+            }
+
+            if (m_ContentBrowser.IsDraggingAsset() &&
+                m_FontAtlas &&
+                m_FontAtlas->IsBuilt())
+            {
+                const auto [x, y] = Limen::Input::GetMousePos();
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {x - 3.0f, y - 3.0f},
+                    {6.0f, 6.0f},
+                    m_Theme.SelectionBackground);
+
+                if (m_HasDragPreviewBounds)
                 {
-                    // 空选择 告诉以后没有对象被选择
-                    m_UIRenderer.DrawText(
-                        window,
-                        {textX, headerY + rowHeight},
-                        {0.55f, 0.55f, 0.55f, 1.0f},
-                        *m_FontAtlas,
-                        "No selection"
-                    );
-                } else if (selectedCount > 1)
-                {
-                    // 多选暂时只显示数量；公共属性编辑后续再做。
-                    m_UIRenderer.DrawText(
-                        window,
-                        {textX, headerY + rowHeight},
-                        {0.75f, 0.75f, 0.75f, 1.0f},
-                        *m_FontAtlas,
-                        std::to_string(selectedCount) + " Objects selected");
-                } else
-                {
-                    // 单选：沿用现有 Transform 显示。
-                    glm::mat4 transform{1.0f};
-                    if (m_Session->TryGetSelectedObjectTransform(transform))
+                    glm::mat4 placementTransform{1.0f};
+                    if (m_ViewportPanel.TryGetPlacementTransformAt(
+                            x,
+                            y,
+                            placementTransform,
+                            m_PlacementDistance))
                     {
-                        std::string position = "Pos ";
-                        position += std::to_string(transform[3][0]);
-                        position += ", ";
-                        position += std::to_string(transform[3][1]);
-                        position += ", ";
-                        position += std::to_string(transform[3][2]);
-                        m_UIRenderer.DrawText(
-                            window,
-                            {textX, headerY + rowHeight},
-                            {0.75f, 0.75f, 0.75f, 1.0f},
-                            *m_FontAtlas,
-                            position);
-                    } else
-                    {
-                        m_UIRenderer.DrawText(
-                            window,
-                            {textX, headerY + rowHeight},
-                            {0.8f, 0.4f, 0.4f, 1.0f},
-                            *m_FontAtlas,
-                            "Transform unavailable");
+                        const Limen::AxisAlignedBoundingBox worldBounds =
+                            m_DragPreviewBounds.Transformed(
+                                placementTransform);
+                        glm::vec2 screenMin{};
+                        glm::vec2 screenMax{};
+                        if (m_ViewportPanel.TryProjectWorldBounds(
+                                worldBounds,
+                                screenMin,
+                                screenMax))
+                        {
+                            glm::vec4 outlineColor =
+                                m_Theme.SelectionBackground;
+                            outlineColor.a = 0.7f;
+                            constexpr float thickness = 2.0f;
+                            const float previewWidth =
+                                screenMax.x - screenMin.x;
+                            const float previewHeight =
+                                screenMax.y - screenMin.y;
+
+                            m_UIRenderer.DrawSolidRect(
+                                window,
+                                screenMin,
+                                {previewWidth, thickness},
+                                outlineColor);
+                            m_UIRenderer.DrawSolidRect(
+                                window,
+                                {screenMin.x, screenMax.y - thickness},
+                                {previewWidth, thickness},
+                                outlineColor);
+                            m_UIRenderer.DrawSolidRect(
+                                window,
+                                screenMin,
+                                {thickness, previewHeight},
+                                outlineColor);
+                            m_UIRenderer.DrawSolidRect(
+                                window,
+                                {screenMax.x - thickness, screenMin.y},
+                                {thickness, previewHeight},
+                                outlineColor);
+                        }
                     }
                 }
+
+                char distanceLabel[64]{};
+                std::snprintf(
+                    distanceLabel,
+                    sizeof(distanceLabel),
+                    "  Distance: %.1f",
+                    static_cast<double>(m_PlacementDistance));
+                std::string label = m_DragPreviewLabel.empty()
+                                        ? "Place asset"
+                                        : m_DragPreviewLabel;
+                label += distanceLabel;
+                m_UIRenderer.DrawText(
+                    window,
+                    {x + 12.0f, y + 12.0f},
+                    m_Theme.SelectionText,
+                    *m_FontAtlas,
+                    label);
             }
         }
 
         // event 是 Application 转发给本 Layer 的非拥有事件引用。
         void OnEvent(Limen::Event &event) override
         {
-            // 视口内滚轮交给相机控制器：飞行时调速，非飞行时沿视线推拉缩放。
-            if (event.GetEventType() == Limen::EventType::MouseScrolled &&
-                m_IsViewportHovered)
-                m_ViewportCameraController.OnEvent(event);
-
             // dispatcher 只在本次事件调用期间存在，用于按事件类型调用对应回调。
             Limen::EventDispatcher dispatcher(event);
 
-            // 右键（环视/飞行）或中键（平移）从中央区域按下时，视口接管相机导航。
-            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
-                [this](const Limen::MouseButtonPressedEvent &press)
-                {
-                    const auto button = press.GetButton();
-                    if (button != Limen::MouseButton::Right &&
-                        button != Limen::MouseButton::Middle)
-                        return false;
-                    // x、y 是鼠标的逻辑横、纵坐标，用于命中最近一次布局的中央区域。
-                    const auto [x, y] = Limen::Input::GetMousePos();
-                    if (!m_CenterRect.Contains(x, y))
-                        return false;
-                    m_IsNavigatingViewport = true;
-                    return true;
-                });
+            // 输入路由优先级：Viewport → Content Browser → Outliner →
+            // Splitter → 快捷键。被高优先级区域消费后不再进入后续区域。
+            if (m_ViewportPanel.OnEvent(event) || event.IsHandled())
+                return;
 
-            dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
-                [this](const Limen::MouseButtonReleasedEvent &release)
-                {
-                    const auto button = release.GetButton();
-                    if ((button != Limen::MouseButton::Right &&
-                         button != Limen::MouseButton::Middle) ||
-                        !m_IsNavigatingViewport)
-                        return false;
-                    m_IsNavigatingViewport = false;
-                    return true;
-                });
-
-
-            // Outliner 工具栏：Create Object 按钮。
-            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
-                [this](const Limen::MouseButtonPressedEvent &press)
-                {
-                    if (press.GetButton() != Limen::MouseButton::Left ||
-                        !m_Session)
-                        return false;
-                    const auto [x, y] = Limen::Input::GetMousePos();
-                    if (!m_CreateButtonRect.Contains(x, y))
-                        return false;
-                    LM_INFO("Editor create button clicked at ({}, {})", x, y);
-                    const auto &cubeMesh = m_SceneContent.GetCubeMesh();
-                    const auto &cubeMaterial = m_SceneContent.GetCubeMaterial();
-                    if (!cubeMesh || !cubeMaterial)
-                        return false;
-                    const auto created = m_Session->CreateRenderableObject(
-                        cubeMesh,
-                        cubeMaterial);
-                    LM_INFO("CreateRenderableObject valid={}, mesh={}, material={}",
-                            created.isValid(),
-                            static_cast<bool>(cubeMesh),
-                            static_cast<bool>(cubeMaterial));
-                    // 新建对象会成为单选目标，同时作为后续 Shift 范围的起点。
-                    if (created.isValid())
-                        m_SelectionAnchor = created;
-                    return created.isValid();
-                });
-
-            // 左键点击 Outliner 行：把鼠标 Y 映射为行号并选中对应对象。
+            // 视口左键：射线拾取对象；Cmd/Ctrl 支持增选。
             dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
                 [this](const Limen::MouseButtonPressedEvent &press)
                 {
@@ -470,51 +324,138 @@ namespace LimenEditor
                         return false;
 
                     const auto [x, y] = Limen::Input::GetMousePos();
-                    if (!m_RightTopRect.Contains(x, y))
+                    const bool toggle =
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::LeftControl) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::RightControl);
+
+                    return m_ViewportPanel.PickAndSelect(
+                        *m_Session, x, y, toggle);
+                });
+            if (event.IsHandled())
+                return;
+
+            // Content Browser 左键：按行号找到资产记录并切换资产选择。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
                         return false;
 
-                    const int row = FindListRowAt(
-                        m_OutlinerFirstRowY,
-                        m_OutlinerRowHeight,
-                        y,
-                        m_OutlinerRows.getSize());
-                    if (row < 0)
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    const ContentBrowserAction action =
+                        m_ContentBrowser.OnMousePressed(*m_Session, x, y);
+
+                    // 单击选择资产；双击留给资产编辑器；放置必须走显式 Place。
+                    if (action == ContentBrowserAction::ActivateAsset)
+                    {
+                        LM_INFO("Editor asset editor is not implemented yet");
+                        ShowStatus(
+                            "Asset editor is not implemented yet.",
+                            EditorStatusKind::Info);
+                        return true;
+                    }
+                    if (action == ContentBrowserAction::PlaceAsset)
+                        return PlaceSelectedAsset();
+
+                    return action == ContentBrowserAction::SelectionChanged;
+                });
+            if (event.IsHandled())
+                return;
+
+            // Outliner 只处理已有对象的选择。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
                         return false;
 
-                    const Limen::SceneObjectID clicked = m_OutlinerRows[static_cast<uint32_t>(row)];
-
-                    // Shift：从锚点到当前行连续选择；锚点失效时退化为单选。
-                    const bool shiftDown =
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftShift) ||
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightShift);
+                    const auto [x, y] = Limen::Input::GetMousePos();
 
                     // macOS 使用 Command，Windows/Linux 使用 Ctrl；统一接受两者。
                     const bool toggleDown =
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::LeftControl) ||
-                            Limen::Input::IsKeyPressed(Limen::KeyCode::RightControl);
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::LeftControl) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::RightControl);
+                    const bool rangeDown =
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::LeftShift) ||
+                        Limen::Input::IsKeyPressed(Limen::KeyCode::RightShift);
 
-                    if (shiftDown && m_SelectionAnchor.isValid())
-                    {
-                        // 范围始终按 Outliner 行顺序生成，与选择集合内部顺序无关。
-                        const auto range = BuildSelectionRange(
-                            m_OutlinerRows, m_SelectionAnchor, clicked);
-                        m_Session->SelectObjects(range);
-                    } else if (toggleDown)
-                    {
-                        // Cmd/Ctrl：增选或取消；只有增选成功才移动锚点。
-                        m_Session->ToggleObjectSelection(clicked);
-                        if (m_Session->IsObjectSelected(clicked))
-                            m_SelectionAnchor = clicked;
-                    } else
-                    {
-                        // 普通点击：替换为单选，并重置锚点。
-                        m_Session->SelectObject(clicked);
-                        m_SelectionAnchor = clicked;
-                    }
+                    const OutlinerPanelAction action =
+                        m_Outliner.OnMousePressed(
+                            *m_Session,
+                            x,
+                            y,
+                            toggleDown,
+                            rangeDown);
+
+                    return action == OutlinerPanelAction::SelectionChanged;
+                });
+            if (event.IsHandled())
+                return;
+
+            dispatcher.Dispatch<Limen::MouseMovedEvent>(
+                [this](const Limen::MouseMovedEvent &move)
+                {
+                    const bool wasDragging =
+                        m_ContentBrowser.IsDraggingAsset();
+                    m_ContentBrowser.OnMouseMoved(
+                        move.GetX(),
+                        move.GetY());
+                    if (!wasDragging &&
+                        m_ContentBrowser.IsDraggingAsset())
+                        BeginDragPreview();
+                    return false;
+                });
+            if (event.IsHandled())
+                return;
+
+            dispatcher.Dispatch<Limen::MouseScrolledEvent>(
+                [this](const Limen::MouseScrolledEvent &scroll)
+                {
+                    if (!m_ContentBrowser.IsDraggingAsset())
+                        return false;
+
+                    constexpr float distanceStep = 0.5f;
+                    constexpr float minDistance = 1.0f;
+                    constexpr float maxDistance = 20.0f;
+                    m_PlacementDistance = std::clamp(
+                        m_PlacementDistance -
+                        scroll.GetYOffset() * distanceStep,
+                        minDistance,
+                        maxDistance);
                     return true;
                 });
+            if (event.IsHandled())
+                return;
+
+            // Content Browser 拖到视口后释放：按鼠标射线生成对象。
+            dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
+                [this](const Limen::MouseButtonReleasedEvent &release)
+                {
+                    if (release.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
+                        return false;
+
+                    if (!m_ContentBrowser.EndDrag())
+                        return false;
+                    ResetDragPreview();
+
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    if (m_ViewportPanel.ContainsPoint(x, y))
+                        PlaceSelectedAssetAt(x, y);
+                    else
+                        ShowStatus(
+                            "Drop cancelled: release inside the Scene viewport.",
+                            EditorStatusKind::Error);
+                    return true;
+                });
+            if (event.IsHandled())
+                return;
 
             // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
             dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
@@ -532,6 +473,8 @@ namespace LimenEditor
                     LM_INFO("Editor right splitter grabbed");
                     return true;
                 });
+            if (event.IsHandled())
+                return;
 
             // release 仅提供鼠标按钮；这里只处理从分隔条开始的左键操作。
             dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
@@ -570,6 +513,8 @@ namespace LimenEditor
                     LM_INFO("Editor right splitter released");
                     return true;
                 });
+            if (event.IsHandled())
+                return;
 
             // 尺寸变化后，上一次绘制的逻辑坐标命中区域立即失效；下次 OnUIRender 会重建。
             dispatcher.Dispatch<Limen::WindowResizeEvent>(
@@ -582,12 +527,7 @@ namespace LimenEditor
                     if (m_IsDraggingRightSplitter)
                         LM_INFO("Editor right splitter drag cancelled: framebuffer size is zero");
 
-                    m_IsDraggingRightSplitter = false;
-
-                    // 零尺寸帧缓冲也会打断视口导航；恢复光标，避免右键环视锁定残留。
-                    m_IsNavigatingViewport = false;
-                    m_IsViewportHovered = false;
-                    m_ViewportCameraController.SetMouseLookEnabled(false);
+                    m_ViewportPanel.CancelNavigation();
                     return false;
                 }
             );
@@ -608,6 +548,150 @@ namespace LimenEditor
         }
 
     private:
+        // 只允许显式放置当前选中的资产；不提供隐藏的默认对象兜底。
+        bool PlaceSelectedAsset()
+        {
+            glm::mat4 placementTransform{1.0f};
+            if (!m_ViewportPanel.TryGetPlacementTransform(placementTransform))
+            {
+                LM_WARN("Editor place: viewport placement transform is unavailable");
+                ShowStatus(
+                    "Cannot place: Scene viewport is not ready.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+            return PlaceSelectedAssetWithTransform(placementTransform);
+        }
+
+        bool PlaceSelectedAssetAt(const float x, const float y)
+        {
+            glm::mat4 placementTransform{1.0f};
+            if (!m_ViewportPanel.TryGetPlacementTransformAt(
+                    x,
+                    y,
+                    placementTransform,
+                    m_PlacementDistance))
+            {
+                LM_WARN("Editor place: drop position is outside the viewport");
+                ShowStatus(
+                    "Cannot place: drop position is outside the Scene viewport.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+            return PlaceSelectedAssetWithTransform(placementTransform);
+        }
+
+        bool PlaceSelectedAssetWithTransform(const glm::mat4 &placementTransform)
+        {
+            if (!m_Session)
+            {
+                LM_WARN("Editor place: session is unavailable");
+                ShowStatus(
+                    "Cannot place: Editor session is unavailable.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+            if (!m_Session->GetSelectedAssetID().isValid())
+            {
+                LM_WARN("Editor place: no asset is selected");
+                ShowStatus(
+                    "Cannot place: no asset is selected.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            Limen::LArray<Limen::SceneObjectID> created;
+            std::string spawnError;
+            if (!m_AssetSpawner.SpawnSelectedAsset(
+                    *m_Session,
+                    m_SceneContent,
+                    placementTransform,
+                    created,
+                    &spawnError))
+            {
+                LM_WARN("Editor place: selected asset could not be instantiated");
+                ShowStatus(
+                    spawnError.empty()
+                        ? "Cannot place the selected asset."
+                        : spawnError,
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            if (created.getSize() == 0)
+            {
+                LM_WARN("Editor place: spawner returned no scene object");
+                ShowStatus(
+                    "Cannot place: spawner returned no scene object.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            // 新建对象成为当前选择，并作为后续 Shift 范围的起点。
+            m_Outliner.SetSelectionAnchor(created[created.getSize() - 1]);
+            LM_INFO("Editor place: created {} scene object(s)", created.getSize());
+            ShowStatus(
+                "Placed the selected asset.",
+                EditorStatusKind::Info);
+            return true;
+        }
+
+        void BeginDragPreview()
+        {
+            m_PlacementDistance = 4.0f;
+            m_HasDragPreviewBounds = false;
+            m_DragPreviewLabel.clear();
+
+            if (!m_Session ||
+                !m_Session->GetSelectedAssetID().isValid())
+                return;
+
+            Limen::AssetRecord record;
+            if (m_Session->GetAssetRegistry().TryFind(
+                    m_Session->GetSelectedAssetID(),
+                    record))
+            {
+                m_DragPreviewLabel.assign(
+                    record.LogicalPath.data(),
+                    record.LogicalPath.size());
+            }
+
+            Limen::AxisAlignedBoundingBox bounds;
+            std::string previewError;
+            if (m_AssetSpawner.TryGetSelectedAssetBounds(
+                    *m_Session,
+                    bounds,
+                    &previewError))
+            {
+                m_DragPreviewBounds = bounds;
+                m_HasDragPreviewBounds = true;
+                return;
+            }
+
+            if (!previewError.empty())
+                ShowStatus(previewError, EditorStatusKind::Error);
+            m_DragPreviewLabel = "Preview unavailable";
+        }
+
+        void ResetDragPreview() noexcept
+        {
+            m_HasDragPreviewBounds = false;
+            m_DragPreviewLabel.clear();
+        }
+
+        void ShowStatus(
+            std::string message,
+            const EditorStatusKind kind)
+        {
+            if (message.empty())
+                return;
+            LM_INFO("Editor status: {}", message);
+            m_StatusMessage.Show(
+                std::move(message),
+                kind,
+                std::chrono::steady_clock::now());
+        }
+
         //region attributes definitions
 
         // 本 Layer 按值拥有 UI 绘制器；OnAttach 初始化，OnDetach 在 Context 销毁前关闭。
@@ -622,38 +706,32 @@ namespace LimenEditor
 
         Limen::Ref<EditorSession> m_Session;
 
-        // 视口独占的离屏渲染器与相机；场景来自会话，只借用。
-        Limen::Scope<Limen::SceneRenderer> m_ViewportRenderer;
-        Limen::PerspectiveCameraController m_ViewportCameraController;
+        SceneViewportPanel m_ViewportPanel;
 
-        // 左栏 Content Browser 的命中与行布局，每次绘制重建
-        UIRect m_LeftRect{};
-        Limen::LArray<Limen::LString> m_AssetRows;
-        float m_AssetFirstRowY = 0.0f;
-        float m_AssetRowHeight = 0.0f;
+        // Editor 统一主题色；后续所有面板只从这里取颜色和间距。
+        EditorTheme m_Theme;
+        // 左侧资产浏览器面板：持有行布局与资产选择交互。
+        ContentBrowserPanel m_ContentBrowser;
+        // 拖拽放置沿相机视线的距离，滚轮可调。
+        float m_PlacementDistance = 4.0f;
+        Limen::AxisAlignedBoundingBox m_DragPreviewBounds;
+        std::string m_DragPreviewLabel;
+        bool m_HasDragPreviewBounds = false;
 
-        // 右上 Outliner 的命中与行布局，每次绘制重建
-        UIRect m_RightTopRect{};
-        Limen::LArray<Limen::SceneObjectID> m_OutlinerRows;
-        float m_OutlinerFirstRowY = 0.0f;
-        float m_OutlinerRowHeight = 0.0f;
-
-        // 最近一帧中央区域；用于判定光标是否在视口内。
-        UIRect m_CenterRect{};
-        bool m_IsViewportHovered = false;
-        bool m_IsNavigatingViewport = false;
-
-        // Shift 范围选择的锚点；普通点击或增选成功后更新。
-        Limen::SceneObjectID m_SelectionAnchor{};
-
-        // "create" button to use
-        UIRect m_CreateButtonRect{};
+        // 右上 Outliner：持有行布局与 Shift 锚点。
+        OutlinerPanel m_Outliner;
 
         // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。
         Limen::Scope<Limen::FontAtlas> m_FontAtlas;
 
         // Editor 默认立方体等引导内容；GPU 资源由渲染层持有。
         EditorSceneContent m_SceneContent;
+        // 资产选择到可渲染对象的转换器。
+        EditorAssetSpawner m_AssetSpawner;
+
+        // 右侧 Details 面板：无状态，只读取会话选择。
+        DetailsPanel m_DetailsPanel;
+        EditorStatusMessage m_StatusMessage;
         //endregion
     };
 }

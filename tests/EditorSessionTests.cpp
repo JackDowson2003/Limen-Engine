@@ -502,6 +502,93 @@ namespace
                         session.GetSelectedObjectCount() == 0);
         return passed;
     }
+
+    bool TestRenderableTransformContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+        const glm::mat4 moved = Translation(2.0f, 3.0f, 4.0f);
+
+        const Limen::SceneObjectID id =
+            session.CreateRenderableObject(mesh, material, moved);
+        bool passed = Check("renderable with transform is valid", id.isValid());
+
+        int visits = 0;
+        session.GetScene().ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &visitedID,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &transform)
+            {
+                if (!(visitedID == id))
+                    return;
+                ++visits;
+                passed &= Check("renderable keeps supplied transform",
+                                MatchesTransform(transform, moved));
+            });
+        passed &= Check("transformed renderable is visited once", visits == 1);
+
+        glm::mat4 out{1.0f};
+        passed &= Check("selected transform can be read back",
+                        session.TryGetSelectedObjectTransform(out) &&
+                        MatchesTransform(out, moved));
+
+        glm::mat4 byID{1.0f};
+        passed &= Check("transform by stable ID matches",
+                        session.TryGetObjectTransform(id, byID) &&
+                        MatchesTransform(byID, moved));
+
+        const Limen::SceneObjectID stale{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        };
+        glm::mat4 untouched = Translation(9.0f, 9.0f, 9.0f);
+        passed &= Check("stale ID cannot read transform",
+                        !session.TryGetObjectTransform(stale, untouched) &&
+                        MatchesTransform(untouched,
+                                         Translation(9.0f, 9.0f, 9.0f)));
+        return passed;
+    }
+
+    bool TestRenderableGroupContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+
+        Limen::LArray<Limen::SceneRenderObject> parts;
+        parts.push_back(Limen::SceneRenderObject{
+            mesh, material, Translation(1.0f, 0.0f, 0.0f)});
+        parts.push_back(Limen::SceneRenderObject{
+            mesh, material, Translation(0.0f, 2.0f, 0.0f)});
+
+        const Limen::SceneObjectID id =
+            session.CreateRenderableObjectGroup(parts);
+        bool passed = Check("renderable group creates one object ID",
+                            id.isValid());
+        passed &= Check("renderable group is single selection",
+                        session.GetSelectedObjectCount() == 1 &&
+                        session.GetSelectedObjectID() == id);
+
+        int visits = 0;
+        session.GetScene().ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &,
+                const Limen::SceneObjectID &visitedID,
+                const Limen::Ref<Limen::Mesh> &,
+                const Limen::Ref<Limen::Material> &,
+                const glm::mat4 &)
+            {
+                if (visitedID == id)
+                    ++visits;
+            });
+        passed &= Check("renderable group exposes both components",
+                        visits == 2);
+        return passed;
+    }
 }
 
 int main()
@@ -546,6 +633,8 @@ int main()
         passed &= TestMultiSelectionContract(configuration);
         passed &= TestAssetSelectionContract(configuration);
         passed &= TestBatchDeletionContract(configuration);
+        passed &= TestRenderableTransformContract(configuration);
+        passed &= TestRenderableGroupContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");

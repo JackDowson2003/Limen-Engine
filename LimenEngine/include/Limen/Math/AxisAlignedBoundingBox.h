@@ -4,7 +4,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <limits>
+#include <utility>
 
 #include <glm/common.hpp>
 #include <glm/vec3.hpp>
@@ -132,4 +135,62 @@ namespace Limen
             return (Max - Min) * 0.5f;
         }
     };
+
+    /**
+     * @brief 世界空间射线与 AABB 求交。
+     *
+     * @param bounds 世界空间包围盒。
+     * @param origin 射线起点。
+     * @param direction 射线方向，调用方应传入单位向量。
+     * @param outDistance 命中时写入最近的射线参数 t（世界单位）。
+     * @return 命中返回 true；失败返回 false 且不修改 outDistance。
+     */
+    [[nodiscard]]
+    inline bool IntersectRayAABB(
+        const AxisAlignedBoundingBox &bounds,
+        const glm::vec3 &origin,
+        const glm::vec3 &direction,
+        float &outDistance) noexcept
+    {
+        if (!bounds.IsValid())
+            return false;
+
+        float tNear = 0.0f;
+        float tFar = std::numeric_limits<float>::max();
+
+        for (int axis = 0; axis < 3; ++axis)
+        {
+            const float o = origin[axis];
+            const float d = direction[axis];
+            // 轴上的X, Y, Z 的最小最大值
+            const float min = bounds.Min[axis];
+            const float max = bounds.Max[axis];
+
+            // 平行于当前轴的射线只能命中边界之间。
+            // 现在是校验 线段几乎不变的情况
+            if (std::abs(d) <= 1.0e-6f)
+            {
+                if (o < min || o > max)
+                    return false;
+                continue;
+            }
+
+            float t1 = (min - o) / d;
+            float t2 = (max - o) / d;
+
+            if (t1 > t2)
+                std::swap(t1, t2);
+
+            tNear = std::max(tNear, t1);
+            tFar = std::min(tFar, t2);
+            if (tNear > tFar)
+                return false;
+        }
+
+        if (tFar < 0.0f)
+            return false;
+
+        outDistance = tNear;
+        return true;
+    }
 }
