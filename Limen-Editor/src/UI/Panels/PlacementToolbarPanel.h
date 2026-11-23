@@ -45,12 +45,12 @@ namespace LimenEditor
         }
 
         constexpr float leftPadding = 12.0f;
-        constexpr float labelWidth = 80.0f;
-        constexpr float gap = 8.0f;
-        constexpr float cubeWidth = 88.0f;
-        constexpr float pointLightWidth = 124.0f;
+        constexpr float labelWidth = 54.0f;
+        constexpr float gap = 6.0f;
+        constexpr float cubeWidth = 74.0f;
+        constexpr float pointLightWidth = 108.0f;
 
-        const float rowY = rect.Y + rowHeight + 4.0f;
+        const float rowY = rect.Y + rowHeight + 2.0f;
         if (rowY + rowHeight > rect.Y + rect.Height)
             return layout;
 

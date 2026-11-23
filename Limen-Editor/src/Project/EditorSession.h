@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <functional>
 #include <string_view>
 #include <utility>
 
@@ -399,6 +400,18 @@ namespace LimenEditor
             if (componentID.isValid())
                 MarkDirty();
             return componentID;
+        }
+
+        // 面板通过稳定对象 ID 只读遍历组件，不暴露运行期 SceneObjectHandle。
+        void ForEachObjectComponent(
+            const Limen::SceneObjectID id,
+            const std::function<void(
+                const Limen::SceneObjectComponent &)> &callback) const
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return;
+            m_Scene->ForEachObjectComponent(handle, callback);
         }
 
         [[nodiscard]]

@@ -31,7 +31,7 @@ int main()
 
     // 布局使用逻辑窗口尺寸；顶部和分隔条占高后，剩余高度才分给两块面板。
     const auto normal = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.5f);
-    if (!CheckNear("normal top height", normal.Top.Height, 128.0f))
+    if (!CheckNear("normal top height", normal.Top.Height, 96.0f))
         ++failures;
     if (!CheckNear("normal left width", normal.Left.Width, 280.0f))
         ++failures;
@@ -39,15 +39,15 @@ int main()
         ++failures;
     if (!CheckNear("normal right width", normal.RightTop.Width, 280.0f))
         ++failures;
-    if (!CheckNear("normal splitter y", normal.RightSplitter.Y, 512.0f))
+    if (!CheckNear("normal splitter y", normal.RightSplitter.Y, 497.0f))
         ++failures;
-    if (!CheckNear("normal splitter height", normal.RightSplitter.Height, 4.0f))
+    if (!CheckNear("normal splitter height", normal.RightSplitter.Height, 2.0f))
         ++failures;
-    if (!CheckNear("normal bottom y", normal.RightBottom.Y, 516.0f))
+    if (!CheckNear("normal bottom y", normal.RightBottom.Y, 499.0f))
         ++failures;
     if (!CheckNear("normal right body height",
                    normal.RightTop.Height + normal.RightSplitter.Height + normal.RightBottom.Height,
-                   772.0f))
+                   804.0f))
         ++failures;
 
     // 非全屏最大化只改变传入尺寸；三栏仍保持相同的宽度比例。
@@ -66,11 +66,13 @@ int main()
     const auto shortWindow = LimenEditor::CalculateEditorUILayout(800.0f, 130.0f, 0.5f);
     if (!CheckNear("short window splitter height", shortWindow.RightSplitter.Height, 2.0f))
         ++failures;
-    if (!CheckNear("short window top panel height", shortWindow.RightTop.Height, 0.0f))
+    if (!CheckNear("short window top panel height", shortWindow.RightTop.Height, 16.0f))
         ++failures;
-    if (!CheckNear("short window bottom panel height", shortWindow.RightBottom.Height, 0.0f))
+    if (!CheckNear("short window bottom panel height", shortWindow.RightBottom.Height, 16.0f))
         ++failures;
-    if (!CheckNear("short window bottom edge", shortWindow.RightBottom.Y, 130.0f))
+    if (!CheckNear("short window bottom edge",
+                   shortWindow.RightBottom.Y + shortWindow.RightBottom.Height,
+                   130.0f))
         ++failures;
 
     const auto minimized = LimenEditor::CalculateEditorUILayout(800.0f, 0.0f, 0.5f);
@@ -90,13 +92,13 @@ int main()
         1600.0f, 900.0f, normal.Center, 3200, 1800);
     if (!Check("viewport width maps with 2x framebuffer scale", scaled.Width == 2080))
         ++failures;
-    if (!Check("viewport height maps with 2x framebuffer scale", scaled.Height == 1544))
+    if (!Check("viewport height maps with 2x framebuffer scale", scaled.Height == 1608))
         ++failures;
 
     const auto identity = LimenEditor::CalculateViewportPixelSize(
         1600.0f, 900.0f, normal.Center, 1600, 900);
     if (!Check("viewport identity scale keeps logical size",
-               identity.Width == 1040 && identity.Height == 772))
+               identity.Width == 1040 && identity.Height == 804))
         ++failures;
 
     const auto tiny = LimenEditor::CalculateViewportPixelSize(

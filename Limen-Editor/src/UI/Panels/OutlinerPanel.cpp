@@ -1,5 +1,6 @@
 #include "UI/Panels/OutlinerPanel.h"
 
+#include <algorithm>
 #include <string>
 
 #include "Limen/Application/Window.h"
@@ -32,24 +33,60 @@ namespace LimenEditor
     {
         m_Rect = rect;
 
-        const float rowHeight = fontAtlas.GetLineHeight() + theme.RowSpacing;
-        const float textX = rect.X + theme.PanelPadding;
-        const float headerY = rect.Y + theme.HeaderOffset;
+        const float lineHeight = fontAtlas.GetLineHeight();
+        const float rowHeight = lineHeight + theme.RowSpacing;
+        const float headerHeight = theme.PanelHeaderHeight;
+        const float headerY =
+            rect.Y + std::max(0.0f, (headerHeight - lineHeight) * 0.5f);
 
         renderer.SetClipRect(
             window,
             {rect.X, rect.Y},
             {rect.Width, rect.Height});
 
+        renderer.DrawSolidRect(
+            window,
+            {rect.X, rect.Y},
+            {rect.Width, headerHeight},
+            theme.PanelHeaderBackground);
+        renderer.DrawSolidRect(
+            window,
+            {rect.X, rect.Y + headerHeight - 1.0f},
+            {rect.Width, 1.0f},
+            theme.PanelBorder);
+        renderer.DrawSolidRect(
+            window,
+            {rect.X + 8.0f, headerY},
+            {2.0f, lineHeight},
+            theme.Accent);
         renderer.DrawText(
             window,
-            {textX, headerY},
+            {rect.X + 16.0f, headerY},
             theme.TextPrimary,
             fontAtlas,
-            "Outliner");
+            "OUTLINER");
+        const std::string countText = std::to_string(m_Rows.getSize());
+        renderer.DrawText(
+            window,
+            {rect.X + rect.Width - theme.PanelPadding -
+                 static_cast<float>(countText.size()) * 8.0f,
+             headerY},
+            theme.TextMuted,
+            fontAtlas,
+            countText);
 
-        m_FirstRowY = headerY + rowHeight;
+        m_FirstRowY = rect.Y + headerHeight + 6.0f;
         m_RowHeight = rowHeight;
+
+        if (m_Rows.getSize() == 0)
+        {
+            renderer.DrawText(
+                window,
+                {rect.X + theme.PanelPadding, m_FirstRowY},
+                theme.TextMuted,
+                fontAtlas,
+                "No actors");
+        }
 
         for (uint32_t row = 0; row < m_Rows.getSize(); ++row)
         {
@@ -63,9 +100,14 @@ namespace LimenEditor
             {
                 renderer.DrawSolidRect(
                     window,
-                    {rect.X + 4.0f, rowY - 2.0f},
+                    {rect.X + 4.0f, rowY - 1.0f},
                     {rect.Width - 8.0f, rowHeight},
                     theme.SelectionBackground);
+                renderer.DrawSolidRect(
+                    window,
+                    {rect.X + 4.0f, rowY - 1.0f},
+                    {2.0f, rowHeight},
+                    theme.SelectionAccent);
             }
 
             Limen::LString label;
@@ -73,10 +115,27 @@ namespace LimenEditor
                 session.TryGetObjectLabel(id, label) && !label.empty();
             const std::string displayName = hasLabel
                 ? std::string(label.data(), label.size())
-                : "对象 " + std::to_string(row + 1);
+                : "Object " + std::to_string(row + 1);
+            const float iconX = rect.X + theme.PanelPadding;
+            const float iconY = rowY + 3.0f;
+            renderer.DrawSolidRect(
+                window,
+                {iconX, iconY},
+                {12.0f, 12.0f},
+                selected
+                    ? theme.SelectionAccent
+                    : theme.ButtonBorder);
             renderer.DrawText(
                 window,
-                {textX, rowY},
+                {iconX + 3.0f, iconY - 2.0f},
+                selected
+                    ? theme.SelectionText
+                    : theme.TextMuted,
+                fontAtlas,
+                ">");
+            renderer.DrawText(
+                window,
+                {iconX + 19.0f, rowY},
                 selected ? theme.SelectionText : theme.TextSecondary,
                 fontAtlas,
                 displayName);

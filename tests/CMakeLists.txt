@@ -161,6 +161,24 @@ add_test(
         COMMAND $<TARGET_FILE:LimenEditorSessionTests>
 )
 
+add_executable(LimenDetailsComponentTextTests
+        DetailsComponentTextTests.cpp
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src/UI/Panels/DetailsComponentText.cpp"
+)
+
+limen_configure_target(LimenDetailsComponentTextTests)
+
+target_include_directories(LimenDetailsComponentTextTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+target_link_libraries(LimenDetailsComponentTextTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenDetailsComponentText
+        COMMAND $<TARGET_FILE:LimenDetailsComponentTextTests>
+)
+
 add_executable(LimenEditorPrimitiveSpawnerTests
         EditorPrimitiveSpawnerTests.cpp
         "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorPrimitiveSpawner.cpp"

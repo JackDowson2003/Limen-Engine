@@ -17,7 +17,7 @@
 - ModelRenderer、PrimitiveRenderer、PointLight 三类 Authoring Component；
 - `CollectRuntimePointLights()` 合并组件点光源与遗留 Scene 级点光源；
 - `AssetID` 与项目级 `AssetRegistry`；
-- Editor 的资产、Cube 与 PointLight 放置，Label 显示、唯一默认命名、选择、Transform 查看、多选和脏状态。
+- Editor 的资产、Cube 与 PointLight 放置，Label 显示、唯一默认命名、选择、Transform 与只读组件摘要、多选和脏状态。
 
 当前尚未具备：
 
@@ -503,6 +503,67 @@ Engine 契约稳定后由 Editor 实现：
 - A2.2 已完成：`SceneComponent.h/.cpp` 已定义 ModelRenderer、PrimitiveRenderer、PointLight 和 ComponentID 生成；
 - A2.3 已完成：Scene 持有 Authoring Component，Editor 放置保存 ModelAssetID，并支持 Cube 与 PointLight 内置对象；
 - A2.4：删除过渡矩阵缓存，再进入 SceneSerializer。
+
+### A2.4.1 Authoring 快照
+
+新增 `LimenEngine/include/Limen/Scene/SceneAuthoring.h`，只定义可持久化对象快照，不包含 `SceneRenderObject`、Mesh、Material、Handle 或 Generation：
+
+```cpp
+struct SceneObjectAuthoringData
+{
+    SceneObjectID ID;
+    LString Label;
+    SceneTransform Transform;
+    LArray<SceneObjectComponent> Components;
+};
+```
+
+`Scene` 新增：
+
+```cpp
+void ForEachObjectAuthoring(
+    const std::function<void(
+        const SceneObjectAuthoringData &)> &callback
+) const;
+```
+
+语义：
+
+- 只为当前存活对象调用回调；
+- 回调收到本次调用的值快照，不能取得槽位、ID 或组件数组的内部引用；
+- 快照不包含运行期渲染组件、GPU 资源、Handle 或 Generation；
+- 回调期间不得增删对象或组件；
+- 遍历中的异常和并发修改不在第一版支持范围内。
+
+验收：
+
+- 创建两个对象并设置不同 ID、Label、TRS 和组件；
+- 遍历后值一致，且组件 ID 与 Variant 类型不变；
+- 删除一个对象后不再遍历它；
+- 修改快照副本不能影响 Scene。
+
+### A2.4.2 RestoreObject
+
+新增 `Scene::RestoreObject(const SceneObjectAuthoringData&)`。执行顺序固定为：
+
+1. 验证 ObjectID、TRS、全部组件和对象内 ComponentID 唯一性；
+2. 扫描重复 ObjectID；
+3. 验证通过后才分配槽位；
+4. 保留 ObjectID，分配新的 Handle/Generation；
+5. 写入 Label、AuthoringTransform、Components，并保持 `RenderComponents` 为空。
+
+任一验证失败或槽位耗尽时返回无效 Handle，且不留下半恢复对象。
+
+### A2.4.3 删除矩阵缓存
+
+删除 `ObjectSlot::Transform` 前必须迁移：
+
+- `TryGetObjectTransform(glm::mat4&)` 改为按需执行 `AuthoringTransform.ToMatrix()`；
+- `ForEachRenderableObject` 和 `PickObject` 按需派生对象世界矩阵；
+- `AddRenderableObject` 不再把任意运行期矩阵暗中当作持久对象 Transform；
+- Sandbox、Editor 与测试统一传入或设置 `SceneTransform`。
+
+这三项完成后，Scene 才只拥有一份可编辑对象 Transform。
 
 ### B. SceneSerializer CPU 基线
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "Limen/Application/Window.h"
+#include "Limen/Input/Input.h"
 #include "Limen/Renderer/FontAtlas.h"
 #include "Project/EditorSession.h"
 #include "Render/EditorUIRenderer.h"
@@ -32,49 +33,90 @@ namespace LimenEditor
     {
         m_Rect = rect;
         m_PlaceButtonRect = {};
-        const float rowHeight = fontAtlas.GetLineHeight() + theme.RowSpacing;
-        const float textX = rect.X + theme.PanelPadding;
-        const float headerY = rect.Y + theme.HeaderOffset;
+        const float lineHeight = fontAtlas.GetLineHeight();
+        const float rowHeight = lineHeight + theme.RowSpacing;
+        const float headerHeight = theme.PanelHeaderHeight;
+        const float headerY =
+            rect.Y + std::max(0.0f, (headerHeight - lineHeight) * 0.5f);
 
         renderer.SetClipRect(
             window,
             {rect.X, rect.Y},
             {rect.Width, rect.Height});
 
+        renderer.DrawSolidRect(
+            window,
+            {rect.X, rect.Y},
+            {rect.Width, headerHeight},
+            theme.PanelHeaderBackground);
+        renderer.DrawSolidRect(
+            window,
+            {rect.X, rect.Y + headerHeight - 1.0f},
+            {rect.Width, 1.0f},
+            theme.PanelBorder);
+        renderer.DrawSolidRect(
+            window,
+            {rect.X + 8.0f, headerY},
+            {2.0f, lineHeight},
+            theme.Accent);
         renderer.DrawText(
             window,
-            {textX, headerY},
+            {rect.X + 16.0f, headerY},
             theme.TextPrimary,
             fontAtlas,
-            "Content Browser");
+            "CONTENT BROWSER");
 
-        const float placeButtonWidth = std::min(72.0f, rect.Width - 16.0f);
+        const float placeButtonWidth =
+            std::min(58.0f, rect.Width - 16.0f);
         if (placeButtonWidth > 0.0f)
         {
+            const float buttonHeight =
+                std::min(22.0f, headerHeight - 6.0f);
             m_PlaceButtonRect = {
                 rect.X + rect.Width - placeButtonWidth - 8.0f,
-                headerY - 2.0f,
+                rect.Y + (headerHeight - buttonHeight) * 0.5f,
                 placeButtonWidth,
-                rowHeight
+                buttonHeight
             };
 
+            const auto [mouseX, mouseY] = Limen::Input::GetMousePos();
+            const bool canPlace = session.GetSelectedAssetID().isValid();
+            const bool hovered = m_PlaceButtonRect.Contains(mouseX, mouseY);
             renderer.DrawSolidRect(
                 window,
                 {m_PlaceButtonRect.X, m_PlaceButtonRect.Y},
                 {m_PlaceButtonRect.Width, m_PlaceButtonRect.Height},
-                theme.ButtonBackground);
-
-            const bool canPlace = session.GetSelectedAssetID().isValid();
+                canPlace ? theme.ButtonBorder : theme.PanelBorder);
+            renderer.DrawSolidRect(
+                window,
+                {m_PlaceButtonRect.X + 1.0f, m_PlaceButtonRect.Y + 1.0f},
+                {m_PlaceButtonRect.Width - 2.0f,
+                 m_PlaceButtonRect.Height - 2.0f},
+                canPlace
+                    ? (hovered
+                           ? theme.ButtonHoverBackground
+                           : theme.ButtonBackground)
+                    : theme.PanelBackground);
             renderer.DrawText(
                 window,
-                {m_PlaceButtonRect.X + 8.0f, m_PlaceButtonRect.Y + 2.0f},
+                {m_PlaceButtonRect.X + 8.0f, m_PlaceButtonRect.Y + 1.0f},
                 canPlace ? theme.ButtonText : theme.TextMuted,
                 fontAtlas,
-                "Place");
+                "PLACE");
         }
 
-        m_FirstRowY = headerY + rowHeight;
+        m_FirstRowY = rect.Y + headerHeight + 6.0f;
         m_RowHeight = rowHeight;
+
+        if (m_Rows.getSize() == 0)
+        {
+            renderer.DrawText(
+                window,
+                {rect.X + theme.PanelPadding, m_FirstRowY},
+                theme.TextMuted,
+                fontAtlas,
+                "No assets");
+        }
 
         for (uint32_t row = 0; row < m_Rows.getSize(); ++row)
         {
@@ -82,15 +124,37 @@ namespace LimenEditor
             const float rowY = m_FirstRowY + rowHeight * static_cast<float>(row);
             const bool selected = session.IsAssetSelected(record.ID);
 
-            // UE 风格：选中行先画蓝色背景，再用白色文字。
             if (selected)
             {
                 renderer.DrawSolidRect(
                     window,
-                    {rect.X + 4.0f, rowY - 2.0f},
+                    {rect.X + 4.0f, rowY - 1.0f},
                     {rect.Width - 8.0f, rowHeight},
                     theme.SelectionBackground);
+                renderer.DrawSolidRect(
+                    window,
+                    {rect.X + 4.0f, rowY - 1.0f},
+                    {2.0f, rowHeight},
+                    theme.SelectionAccent);
             }
+
+            const float iconSize = 12.0f;
+            const float iconX = rect.X + theme.PanelPadding;
+            const float iconY = rowY + 3.0f;
+            renderer.DrawSolidRect(
+                window,
+                {iconX, iconY},
+                {iconSize, iconSize},
+                selected
+                    ? theme.SelectionAccent
+                    : theme.ButtonBorder);
+            renderer.DrawSolidRect(
+                window,
+                {iconX + 2.0f, iconY + 2.0f},
+                {iconSize - 4.0f, iconSize - 4.0f},
+                selected
+                    ? theme.SelectionBackground
+                    : theme.ButtonBackground);
 
             glm::vec4 color = selected ? theme.SelectionText : theme.TextSecondary;
             if (!selected && record.Status == Limen::AssetRecordStatus::Missing)
@@ -98,7 +162,7 @@ namespace LimenEditor
 
             renderer.DrawText(
                 window,
-                {textX, rowY},
+                {iconX + iconSize + 7.0f, rowY},
                 color,
                 fontAtlas,
                 std::string_view(

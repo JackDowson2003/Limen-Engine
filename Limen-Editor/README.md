@@ -1,6 +1,6 @@
 # Limen Editor
 
-> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置和顶栏内置 `Cube`、`Point Light` 放置已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产与内置对象生成），见下文。
+> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置、顶栏内置 `Cube`/`Point Light` 放置和 Details 组件摘要已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产与内置对象生成），见下文。
 
 ## 当前已实现
 
@@ -93,8 +93,8 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 
 ### C：面板骨架与文字（已完成基础）
 
-- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，优先显示模型 Label，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Label 与 Transform 或多选数量。
-- 引入 `EditorTheme` 统一 UE 风格暗色主题；选中行使用蓝色行背景；视口、Details、Content Browser、Outliner 均已拆为独立面板。
+- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，优先显示模型 Label，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Label、Transform、Authoring Component 摘要或多选数量。
+- 引入 `EditorTheme` 统一 UE5 风格暗色主题：Editor 自有 18px 字体、96px 紧凑顶栏、30px 面板头部、细分隔线/边框和单一蓝色强调色；Content Browser 使用资产图标与描边 Place 按钮，Outliner 使用紧凑树行，Details 按 Selection/Transform/Components 分组，Scene 视口带 Perspective/Lit 浮动条和近黑清屏色。
 - 视口支持世界空间射线-AABB 拾取：左键点击选择对象，Command/Ctrl 增选，点击空白清空对象选择。
 - 鼠标输入采用 `Scene Viewport → Content Browser → Outliner → Splitter → 快捷键` 的固定优先级；前一个区域消费事件后，后续区域不再重复处理。
 - 引擎侧新增 `Scene::ForEachObject/ForEachRenderableObject` 与 `AssetRegistry::ForEachRecord`，面板只读借用数据。
@@ -124,6 +124,8 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 文件范围：`EditorSession`、`EditorSceneContent`、`EditorAssetSpawner`、`EditorPrimitiveSpawner`、`PlacementToolbarPanel`、`SceneViewportPanel`、`EditorUILayer`、Content Browser/Outliner 面板、测试与资产样例。已验证：完整构建和 CTest 通过；临时项目 OBJ 的 OpenGL GPU 端到端测试通过；真实窗口验证 `Cube` 出现在视口且 Outliner/Details 同步，`Point Light` 在 Outliner 新增并选中。验收：模型资产、Cube 和 PointLight 都能从显式 Place 入口创建；失败不留下半成品对象。
 
 PointLight 仍处于迁移期：新建 Editor 光源只使用 `PointLightComponent`；运行期通过 `CollectRuntimePointLights()` 与旧 `Scene::m_PointLights` 合并，兼容尚未迁移的 Sandbox/Renderer 调用。全部调用方迁移后再删除 Scene 级旧点光源数组。
+
+Details 当前只读显示组件：模型优先显示项目逻辑资产路径，Cube 显示 Primitive 类型，PointLight 分行显示 Color 与 Intensity。字段编辑需要 Engine 先提供按 `SceneComponentID` 校验并更新组件的命令接口，Editor 不直接修改 Scene 内部数组。
 
 ### UE5 参照边界
 

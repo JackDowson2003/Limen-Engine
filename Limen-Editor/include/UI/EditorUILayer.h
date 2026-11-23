@@ -58,7 +58,9 @@ namespace LimenEditor
             if (Limen::TryGetBuiltInAssetRoot(fontPath, fontError))
             {
                 fontPath /= "fonts/NotoSansCJKsc-Regular.otf";
-                m_FontAtlas = Limen::CreateScope<Limen::FontAtlas>(1024, 24.0f);
+                m_FontAtlas = Limen::CreateScope<Limen::FontAtlas>(
+                    1024,
+                    m_Theme.FontPixelHeight);
                 if (m_FontAtlas->LoadFontFile(fontPath))
                 {
                     std::string uiCharacters;
@@ -122,32 +124,70 @@ namespace LimenEditor
                 window,
                 {layout.Top.X, layout.Top.Y},
                 {layout.Top.Width, layout.Top.Height},
-                m_Theme.TopBarBackground
-            );
+                m_Theme.TopBarBackground);
+            m_UIRenderer.DrawSolidRect(
+                window,
+                {layout.Top.X, layout.Top.Y + layout.Top.Height - 1.0f},
+                {layout.Top.Width, 1.0f},
+                m_Theme.PanelBorder);
 
             if (m_FontAtlas && m_FontAtlas->IsBuilt())
             {
                 const auto now = std::chrono::steady_clock::now();
                 const std::string_view status = m_StatusMessage.GetText(now);
-                std::string header = "Limen Editor 场景 视图";
-                glm::vec4 headerColor = m_Theme.TextPrimary;
-                if (!status.empty())
-                {
-                    header += "    ";
-                    header += status;
-                    headerColor =
-                        m_StatusMessage.GetKind(now) == EditorStatusKind::Error
-                            ? m_Theme.MissingText
-                            : m_Theme.ButtonText;
-                }
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Top.X + 9.0f, layout.Top.Y + 7.0f},
+                    {3.0f, 18.0f},
+                    m_Theme.Accent);
 
                 m_UIRenderer.DrawText(
                     window,
-                    {layout.Top.X + 12.0f, layout.Top.Y + 8.0f},
-                    headerColor,
+                    {layout.Top.X + 18.0f, layout.Top.Y + 4.0f},
+                    m_Theme.TextPrimary,
                     *m_FontAtlas,
-                    header
-                );
+                    "LIMEN EDITOR");
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Top.X + 158.0f, layout.Top.Y + 6.0f},
+                    {1.0f, 18.0f},
+                    m_Theme.PanelBorder);
+                m_UIRenderer.DrawText(
+                    window,
+                    {layout.Top.X + 172.0f, layout.Top.Y + 4.0f},
+                    status.empty()
+                        ? m_Theme.TextMuted
+                        : (m_StatusMessage.GetKind(now) ==
+                                   EditorStatusKind::Error
+                               ? m_Theme.MissingText
+                               : m_Theme.TextSecondary),
+                    *m_FontAtlas,
+                    status.empty() ? "Ready" : status);
+
+                if (m_Session && layout.Top.Width > 900.0f)
+                {
+                    const Limen::LString &projectName =
+                        m_Session->GetConfiguration().DisplayName;
+                    const float projectLabelWidth =
+                        static_cast<float>(projectName.size()) * 8.0f;
+                    const float projectX =
+                        layout.Top.X + layout.Top.Width -
+                        projectLabelWidth - 72.0f;
+                    m_UIRenderer.DrawText(
+                        window,
+                        {projectX, layout.Top.Y + 4.0f},
+                        m_Theme.TextMuted,
+                        *m_FontAtlas,
+                        "PROJECT");
+                    m_UIRenderer.DrawText(
+                        window,
+                        {projectX + 58.0f, layout.Top.Y + 4.0f},
+                        m_Theme.TextSecondary,
+                        *m_FontAtlas,
+                        std::string_view(
+                            projectName.data(),
+                            projectName.size()));
+                }
 
                 m_PlacementToolbar.Draw(
                     window,
@@ -161,8 +201,7 @@ namespace LimenEditor
                 window,
                 {layout.Left.X, layout.Left.Y},
                 {layout.Left.Width, layout.Left.Height},
-                m_Theme.PanelBackground
-            );
+                m_Theme.PanelBackground);
             // Content Browser 的行数据、绘制和点击由面板自己管理。
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
             {
@@ -179,17 +218,65 @@ namespace LimenEditor
                 window,
                 {layout.Center.X, layout.Center.Y},
                 {layout.Center.Width, layout.Center.Height},
-                m_Theme.ViewportBackground
-            );
+                m_Theme.ViewportBackground);
 
             m_ViewportPanel.Draw(window,m_UIRenderer,layout.Center);
+            if (layout.Center.Width > 0.0f && layout.Center.Height > 0.0f)
+            {
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Center.X, layout.Center.Y},
+                    {layout.Center.Width, 1.0f},
+                    m_Theme.PanelBorder);
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Center.X,
+                     layout.Center.Y + layout.Center.Height - 1.0f},
+                    {layout.Center.Width, 1.0f},
+                    m_Theme.PanelBorder);
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Center.X, layout.Center.Y},
+                    {1.0f, layout.Center.Height},
+                    m_Theme.PanelBorder);
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Center.X + layout.Center.Width - 1.0f,
+                     layout.Center.Y},
+                    {1.0f, layout.Center.Height},
+                    m_Theme.PanelBorder);
+
+                if (m_FontAtlas && m_FontAtlas->IsBuilt())
+                {
+                    const float overlayHeight =
+                        m_FontAtlas->GetLineHeight() + 4.0f;
+                    m_UIRenderer.DrawSolidRect(
+                        window,
+                        {layout.Center.X + 10.0f,
+                         layout.Center.Y + 10.0f},
+                        {224.0f, overlayHeight},
+                        m_Theme.ViewportOverlayBackground);
+                    m_UIRenderer.DrawSolidRect(
+                        window,
+                        {layout.Center.X + 10.0f,
+                         layout.Center.Y + 10.0f},
+                        {3.0f, overlayHeight},
+                        m_Theme.Accent);
+                    m_UIRenderer.DrawText(
+                        window,
+                        {layout.Center.X + 20.0f,
+                         layout.Center.Y + 12.0f},
+                        m_Theme.TextSecondary,
+                        *m_FontAtlas,
+                        "PERSPECTIVE     LIT");
+                }
+            }
 
             m_UIRenderer.DrawSolidRect(
                 window,
                 {layout.RightTop.X, layout.RightTop.Y},
                 {layout.RightTop.Width, layout.RightTop.Height},
-                m_Theme.PanelBackground
-            );
+                m_Theme.PanelBackground);
 
             // Outliner 的行数据、多选和绘制由面板自己管理。
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
@@ -215,8 +302,29 @@ namespace LimenEditor
                 window,
                 {layout.RightBottom.X, layout.RightBottom.Y},
                 {layout.RightBottom.Width, layout.RightBottom.Height},
-                m_Theme.PanelBackground
-            );
+                m_Theme.PanelBackground);
+
+            // 面板边界使用细线，避免相邻大色块粘连。
+            if (layout.Left.Width > 0.0f)
+            {
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.Left.X + layout.Left.Width - 1.0f,
+                     layout.Left.Y},
+                    {1.0f, layout.Left.Height},
+                    m_Theme.PanelBorder);
+            }
+            if (layout.RightTop.Width > 0.0f)
+            {
+                m_UIRenderer.DrawSolidRect(
+                    window,
+                    {layout.RightTop.X, layout.RightTop.Y},
+                    {1.0f,
+                     layout.RightTop.Height +
+                         layout.RightSplitter.Height +
+                         layout.RightBottom.Height},
+                    m_Theme.PanelBorder);
+            }
 
             // Details 面板只借用绘画状态选择状态，绘制细节由面板自身负责
             if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())

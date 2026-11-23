@@ -26,6 +26,7 @@ namespace LimenEditor
         Limen::SceneRendererSpecification spec;
         spec.Width = 1;
         spec.Height = 1;
+        spec.ClearColor = {0.018f, 0.020f, 0.024f, 1.0f};
         spec.DebugName = "Editor Scene Viewport";
 
         m_Renderer = Limen::CreateScope<Limen::SceneRenderer>(spec);

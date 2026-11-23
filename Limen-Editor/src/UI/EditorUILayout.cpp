@@ -17,10 +17,10 @@ namespace LimenEditor
         if (logicalWidth <= 0.0f || logicalHeight <= 0.0f)
             return result;
 
-        constexpr float kTopHeight = 128.0f;
+        constexpr float kTopHeight = 96.0f;
         constexpr float kMiddlePreferredPercent = 0.65f;
         constexpr float kMinMiddleWidth = 240.0f;
-        constexpr float kSplitterHeight = 4.0f;
+        constexpr float kSplitterHeight = 2.0f;
 
         const float topHeight = std::min(kTopHeight, logicalHeight);
         result.Top =

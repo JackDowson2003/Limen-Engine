@@ -665,6 +665,62 @@ namespace
                         untouched == "keep");
         return passed;
     }
+
+    bool TestObjectComponentTraversalContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+        const Limen::SceneObjectID id = session.CreateObject();
+
+        Limen::SceneObjectComponent component;
+        component.Data = Limen::PrimitiveRendererComponent{
+            .Primitive = Limen::PrimitiveType::Cube
+        };
+        const Limen::SceneComponentID componentID =
+            session.AddObjectComponent(id, component);
+        bool passed = Check(
+            "session adds authoring component",
+            componentID.isValid());
+
+        std::uint32_t visits = 0;
+        session.ForEachObjectComponent(
+            id,
+            [&](const Limen::SceneObjectComponent &visited)
+            {
+                ++visits;
+                passed &= Check(
+                    "session component traversal preserves ID",
+                    visited.ID == componentID);
+                passed &= Check(
+                    "session component traversal preserves kind",
+                    Limen::GetSceneComponentKind(visited) ==
+                    Limen::SceneComponentKind::PrimitiveRenderer);
+                const auto *primitive =
+                    std::get_if<Limen::PrimitiveRendererComponent>(
+                        &visited.Data);
+                passed &= Check(
+                    "session component traversal preserves data",
+                    primitive &&
+                    primitive->Primitive == Limen::PrimitiveType::Cube);
+            });
+        passed &= Check("session component traversal visits once",
+                        visits == 1);
+
+        const Limen::SceneObjectID stale{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        };
+        visits = 0;
+        session.ForEachObjectComponent(
+            stale,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++visits;
+            });
+        passed &= Check("stale object ID exposes no components",
+                        visits == 0);
+        return passed;
+    }
 }
 
 int main()
@@ -712,6 +768,7 @@ int main()
         passed &= TestRenderableTransformContract(configuration);
         passed &= TestRenderableGroupContract(configuration);
         passed &= TestObjectLabelContract(configuration);
+        passed &= TestObjectComponentTraversalContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");
