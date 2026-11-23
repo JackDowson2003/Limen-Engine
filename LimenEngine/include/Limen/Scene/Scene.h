@@ -69,6 +69,7 @@ namespace Limen
         static constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
         std::uint32_t Index = InvalidIndex;
+        // 运行期槽位版本号
         std::uint32_t Generation = 0;
 
         [[nodiscard]] constexpr bool IsValid() const noexcept
@@ -359,6 +360,7 @@ namespace Limen
             // 过渡期的只读的运行缓存，由AuthoringTransform.ToMatrix() 推导
             glm::mat4 Transform{1.0f};
 
+            // 运行期槽位版本号
             std::uint32_t Generation = 1;
             // 可复用的槽位下标；InvalidIndex 表示不在空闲链中。
             std::uint32_t NextFree = SceneObjectHandle::InvalidIndex;
