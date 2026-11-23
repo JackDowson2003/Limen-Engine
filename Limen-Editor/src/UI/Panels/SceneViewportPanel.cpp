@@ -192,7 +192,7 @@ namespace LimenEditor
     }
 
     bool SceneViewportPanel::TryGetPlacementTransform(
-        glm::mat4 &outTransform,
+        Limen::SceneTransform &outTransform,
         const float distance) const
     {
         return TryGetPlacementTransformAt(
@@ -205,7 +205,7 @@ namespace LimenEditor
     bool SceneViewportPanel::TryGetPlacementTransformAt(
         const float x,
         const float y,
-        glm::mat4 &outTransform,
+        Limen::SceneTransform &outTransform,
         const float distance) const
     {
         if (distance <= 0.0f)
@@ -217,10 +217,11 @@ namespace LimenEditor
             return false;
 
         // 对象沿鼠标射线放在相机前方指定距离。
-        outTransform = glm::translate(
-            glm::mat4{1.0f},
+        Limen::SceneTransform placement;
+        placement.Location =
             m_CameraController->GetCamera().GetPosition() +
-            direction * distance);
+            direction * distance;
+        outTransform = placement;
         return true;
     }
 

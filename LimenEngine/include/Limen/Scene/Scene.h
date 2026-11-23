@@ -5,14 +5,19 @@
 #pragma once
 
 #include <limits>
+#include <string_view>
 #include <functional>
 #include <cstdint>
 #include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 
+#include "Limen/Scene/SceneIdentity.h"
+#include "Limen/Scene/SceneComponent.h"
 #include "Limen/Core/Core.h"
 #include "Limen/Scene/Light.h"
 #include "Limen/Tool/LArray.h"
+#include "Limen/Tool/LString.h"
+#include "Limen/Scene/SceneTransform.h"
 
 namespace Limen
 {
@@ -56,20 +61,7 @@ namespace Limen
         glm::mat4 Transform{1.0f};
     };
 
-    // 写入场景文件的对象身份 不同于资产身份AssetID
-    struct SceneObjectID
-    {
-        std::uint64_t High = 0;
-        std::uint64_t Low = 0;
 
-        [[nodiscard]]
-        constexpr bool isValid() const noexcept
-        {
-            return High !=0 || Low != 0;
-        }
-
-        friend constexpr bool operator==(const SceneObjectID&, const SceneObjectID&) noexcept = default;
-    };
 
     // 只用于所属 Scene 的运行期访问，不序列化。
     struct SceneObjectHandle
@@ -84,7 +76,7 @@ namespace Limen
             return Index != InvalidIndex && Generation != 0;
         }
 
-        friend constexpr bool operator==(const SceneObjectHandle&, const SceneObjectHandle&) noexcept = default;
+        friend constexpr bool operator==(const SceneObjectHandle &, const SceneObjectHandle &) noexcept = default;
     };
 
     /**
@@ -132,45 +124,133 @@ namespace Limen
         ~Scene() = default;
 
         [[nodiscard]] SceneObjectHandle CreateObject();
+
         [[nodiscard]] bool DestroyObject(SceneObjectHandle handle);
+
         [[nodiscard]] bool IsObjectAlive(SceneObjectHandle handle) const noexcept;
-        [[nodiscard]] bool TryGetObjectID(SceneObjectHandle handle, SceneObjectID& outID) const noexcept;
-        [[nodiscard]] bool TryFindObject(SceneObjectID id, SceneObjectHandle& outHandle) const noexcept;
-        [[nodiscard]] bool SetObjectTransform(SceneObjectHandle handle, const glm::mat4& transform);
-        [[nodiscard]] bool TryGetObjectTransform(SceneObjectHandle handle, glm::mat4& outTransform) const noexcept;
+
+        [[nodiscard]] bool TryGetObjectID(SceneObjectHandle handle, SceneObjectID &outID) const noexcept;
+
+        [[nodiscard]] bool TryFindObject(SceneObjectID id, SceneObjectHandle &outHandle) const noexcept;
+
+        [[nodiscard]] bool TryGetObjectTransform(SceneObjectHandle handle, glm::mat4 &outTransform) const noexcept;
+
+        [[nodiscard]]
+        bool SetObjectTransform(
+            SceneObjectHandle handle,
+            const SceneTransform &transform
+        );
+
+        [[nodiscard]]
+        bool TryGetObjectTransform(
+            SceneObjectHandle handle,
+            SceneTransform &outTransform
+        ) const noexcept;
+
+        /**
+         * @brief 设置对象 Authoring TRS
+         *
+         * Transform 必须是有限制，成功后会同步运行期矩阵缓存
+         * handle无效、Generation 过期或者 Transform 非法时返回false
+         */
+        [[nodiscard]]
+        bool SetObjectAuthoringTransform(
+            SceneObjectHandle handle,
+            const SceneTransform &transform
+        );
+
+        /**
+         * @brief 读取对象Authoring TRS的副本
+         *
+         * 查询失败时不修改 outTransform
+         */
+        [[nodiscard]]
+        bool TryGetObjectAuthoringTransform(
+            SceneObjectHandle handle,
+            SceneTransform &outTransform
+        ) const noexcept;
+
+        /**
+         * @brief 设置对象的用户可见名称
+         *
+         * Label 不参与对象查找，不要求唯一，也不改变SceneObjectID
+         * 空字符串合法，表示清除当前显示名称
+         * Handle无效, Generation 过期或对象已销毁时返回false
+         */
+        [[nodiscard]]
+        bool SetObjectLabel(SceneObjectHandle handle, std::string_view label);
+
+        /**
+         * @brief 读取对象 Label 的副本
+         *
+         * 返回副本而不是内部引用，避免槽位销毁或复用后留下悬空引用。
+         * 查询失败时不修改 outLabel。
+         */
+        [[nodiscard]]
+        bool TryGetObjectLabel(SceneObjectHandle handle, LString &outLabel) const;
+
+
         // 只读遍历全部存活对象；回调依次收到运行期句柄与稳定 ID。
         // 回调只借用数据，不得在遍历中创建或销毁对象。
         void ForEachObject(
-            const std::function<void(const SceneObjectHandle&, const SceneObjectID&)>& callback
+            const std::function<void(const SceneObjectHandle &, const SceneObjectID &)> &callback
         ) const;
+
         // 创建一个带渲染组件的场景对象；Mesh/Material 不能为空。
         [[nodiscard]] SceneObjectHandle AddRenderableObject(
-            const SceneRenderObject& renderObject
+            const SceneRenderObject &renderObject
         );
 
         // 一个对象挂多个渲染组件（例如多 Part 模型）。
         // 每个 part.Transform 是相对对象 Transform 的局部变换。
         [[nodiscard]] SceneObjectHandle AddRenderableObjectGroup(
-            const LArray<SceneRenderObject>& parts
+            const LArray<SceneRenderObject> &parts
         );
 
         // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform
         // 由“每个对象回调一次”改为“每个渲染组件回调一次”
         void ForEachRenderableObject(
             const std::function<void(
-                const SceneObjectHandle&,
-                const SceneObjectID&,
-                const Ref<Mesh>&,
-                const Ref<Material>&,
-                const glm::mat4&)>& callback
+                const SceneObjectHandle &,
+                const SceneObjectID &,
+                const Ref<Mesh> &,
+                const Ref<Material> &,
+                const glm::mat4 &)> &callback
         ) const;
 
         // 用世界空间射线拾取最近的可渲染对象；失败时不修改 outID。
         [[nodiscard]] bool PickObject(
-            const glm::vec3& rayOrigin,
-            const glm::vec3& rayDirection,
-            SceneObjectID& outID
+            const glm::vec3 &rayOrigin,
+            const glm::vec3 &rayDirection,
+            SceneObjectID &outID
         ) const noexcept;
+
+        /**
+         * @brief 给存活对象添加可持久化组件
+         *
+         * component.Id 无效时自动生成组件身份
+         * ComponentID 在同一对象内重复、数据非法或 handle 失效时失败
+         * 失败不会修改对象组件数组
+         *
+         * @return 成功时返回组件身份，失败返回无效Component
+         */
+         [[nodiscard]]
+        SceneComponentID AddObjectComponent(
+            SceneObjectHandle handle,
+            SceneObjectComponent component
+        );
+
+        /**
+         * @brief 只读遍历对象 Authoring Components。
+         *
+         * 回调借用组件数据，不得在遍历中增删组件。
+         * 句柄失效时一次也不调用。
+         */
+        void ForEachObjectComponent(
+            SceneObjectHandle handle,
+            const std::function<void(
+                const SceneObjectComponent &)> &callback
+        ) const;
 
         /**
          * @brief  设置当前场景的主平行光
@@ -180,7 +260,7 @@ namespace Limen
          * @param light
          * 包含光线的传播方向、RGB颜色和强度
          */
-        void SetDirectionalLight(const DirectionalLight& light);
+        void SetDirectionalLight(const DirectionalLight &light);
 
         /**
          * @brief 设置当前场景的常量环境光。
@@ -188,7 +268,7 @@ namespace Limen
          * @param light
          * 环境光的RGB颜色和整体强度。
          */
-        void SetAmbientLight(const AmbientLight& light);
+        void SetAmbientLight(const AmbientLight &light);
 
         /**
          * @brief 获取当前场景的常量环境光。
@@ -196,7 +276,7 @@ namespace Limen
          * 返回const引用，避免复制并禁止外部绕过Scene直接修改。
          */
         [[nodiscard]]
-        const AmbientLight&
+        const AmbientLight &
         GetAmbientLight() const noexcept;
 
         /**
@@ -206,7 +286,7 @@ namespace Limen
          * 点光源的位置、RGB颜色和强度。
          */
         [[nodiscard]]
-        ScenePointLightHandle AddPointLight(const PointLight& light);
+        ScenePointLightHandle AddPointLight(const PointLight &light);
 
         /**
          * @brief 修改Scene中指定的点光源。
@@ -225,7 +305,7 @@ namespace Limen
         [[nodiscard]]
         bool SetPointLight(
             ScenePointLightHandle handle,
-            const PointLight& light
+            const PointLight &light
         );
 
         /**
@@ -244,7 +324,7 @@ namespace Limen
         [[nodiscard]]
         bool TryGetPointLight(
             ScenePointLightHandle handle,
-            PointLight& outLight
+            PointLight &outLight
         ) const noexcept;
 
         /**
@@ -254,7 +334,7 @@ namespace Limen
          * 同时防止外部绕过Scene直接增删光源。
          */
         [[nodiscard]]
-        const LArray<PointLight>&
+        const LArray<PointLight> &
         GetPointLights() const noexcept;
 
         /**
@@ -263,35 +343,53 @@ namespace Limen
          * 返回 const 引用，不复制光源数据，
          * 同时禁止外部绕过 Scene 直接修改。
          */
-       [[nodiscard]]
-       const DirectionalLight&
-       GetDirectionalLight() const noexcept;
+        [[nodiscard]]
+        const DirectionalLight &
+        GetDirectionalLight() const noexcept;
 
     private:
         // 槽位下标可复用，Generation 用于让删除前的旧Handle失效
         struct ObjectSlot
         {
             SceneObjectID ID{};
+
+            // 编辑、保存和加载使用的唯一 Authoring Transform
+            SceneTransform AuthoringTransform{};
+
+            // 过渡期的只读的运行缓存，由AuthoringTransform.ToMatrix() 推导
             glm::mat4 Transform{1.0f};
+
             std::uint32_t Generation = 1;
+            // 可复用的槽位下标；InvalidIndex 表示不在空闲链中。
             std::uint32_t NextFree = SceneObjectHandle::InvalidIndex;
             bool Alive = false;
 
             // 一个对象可拥有多个渲染组件；空数组表示对象不可渲染。
             // 组件 Transform 是相对对象 Transform 的局部变换。
             LArray<SceneRenderObject> RenderComponents;
+
+            // 可持久化的 Authoring Component 列表
+            // 与 RenderComponents 不同，这里保存AssetID、ComponentID 和局部 TRS
+            // 不保存 Mesh/Material 等运行期资源
+            LArray<SceneObjectComponent> Components;
+
+            // 用户可见名称，用于 Outliner、Details 和场景序列化。
+            // Label 不是身份且允许重复，对象身份始终由 SceneObjectID 承担。
+            // 空 Label 表示客户端尚未为对象分配显示名称。
+            LString Label;
         };
+
         LArray<ObjectSlot> m_ObjectSlots;
 
         // Scene 对象槽位空闲链表的头指针
         std::uint32_t m_FreeHead = SceneObjectHandle::InvalidIndex;
 
-        #if defined(LIMEN_SCENE_TEST_HOOKS)
+#if defined(LIMEN_SCENE_TEST_HOOKS)
         // 白盒测试接缝：SceneObjectTests 通过它把槽位 Generation 直接推到
         // uint32 上限，覆盖“到达上限的槽位销毁后退休、不再进入空闲链”。
         // 该宏只在 BUILD_TESTING 构建中定义；此声明不改变对象布局与接口。
         friend struct SceneObjectSlotTestAccess;
-        #endif
+#endif
 
         /**
          * @brief 当前场景的主平行光。
@@ -316,6 +414,5 @@ namespace Limen
          * 因此直接按值保存。
          */
         AmbientLight m_AmbientLight;
-
     };
 }

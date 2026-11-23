@@ -7,6 +7,7 @@
 #include "Limen/Core/Core.h"
 #include "Limen/Math/AxisAlignedBoundingBox.h"
 #include "Limen/Scene/Scene.h"
+#include "Limen/Scene/SceneTransform.h"
 #include "Limen/Tool/LArray.h"
 
 namespace LimenEditor
@@ -23,7 +24,7 @@ namespace LimenEditor
         bool SpawnSelectedAsset(
             EditorSession &session,
             const EditorSceneContent &sceneContent,
-            const glm::mat4 &objectTransform,
+            const Limen::SceneTransform &objectTransform,
             Limen::LArray<Limen::SceneObjectID> &outIDs,
             std::string *outError = nullptr
         ) const;

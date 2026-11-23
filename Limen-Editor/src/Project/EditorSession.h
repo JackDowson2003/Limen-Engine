@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <string_view>
 #include <utility>
 
 #include "Limen/Asset/AssetRegistry.h"
@@ -80,7 +81,7 @@ namespace LimenEditor
         Limen::SceneObjectID CreateRenderableObject(
             Limen::Ref<Limen::Mesh> mesh,
             Limen::Ref<Limen::Material> material,
-            const glm::mat4 &transform = glm::mat4{1.0f})
+            const Limen::SceneTransform &transform = {})
         {
             if (!mesh || !material)
                 return {};
@@ -90,8 +91,13 @@ namespace LimenEditor
                         {
                             .MeshResource = std::move(mesh),
                             .MaterialResource = std::move(material),
-                        .Transform = transform
+                            .Transform = glm::mat4{1.0f}
                         });
+            if (!m_Scene->SetObjectTransform(handle, transform))
+            {
+                static_cast<void>(m_Scene->DestroyObject(handle));
+                return {};
+            }
             Limen::SceneObjectID id{};
             if (!m_Scene->TryGetObjectID(handle, id))
                 return {};
@@ -104,7 +110,8 @@ namespace LimenEditor
         [[nodiscard]]
         Limen::SceneObjectID CreateRenderableObjectGroup(
             const Limen::LArray<Limen::SceneRenderObject> &parts,
-            const glm::mat4 &transform = glm::mat4{1.0f})
+            const Limen::SceneTransform &transform = {},
+            const std::string_view label = {})
         {
             if (parts.getSize() == 0)
                 return {};
@@ -112,6 +119,11 @@ namespace LimenEditor
             const Limen::SceneObjectHandle handle =
                 m_Scene->AddRenderableObjectGroup(parts);
             if (!m_Scene->SetObjectTransform(handle, transform))
+            {
+                static_cast<void>(m_Scene->DestroyObject(handle));
+                return {};
+            }
+            if (!m_Scene->SetObjectLabel(handle, label))
             {
                 static_cast<void>(m_Scene->DestroyObject(handle));
                 return {};
@@ -273,7 +285,9 @@ namespace LimenEditor
         }
 
         // 多选暂不做批量变换：只有恰好一个对象时生效。
-        bool SetSelectedObjectTransform(const glm::mat4 &transform)
+        // Authoring 编辑入口：只写入 TRS，由 Scene 同步运行期矩阵缓存。
+        bool SetSelectedObjectTransform(
+            const Limen::SceneTransform &transform)
         {
             if (m_SelectedObjectIDs.getSize() != 1)
                 return false;
@@ -302,6 +316,18 @@ namespace LimenEditor
             return m_Scene->TryGetObjectTransform(handle, outTransform);
         }
 
+        [[nodiscard]]
+        bool TryGetSelectedObjectTransform(
+            Limen::SceneTransform &outTransform) const noexcept
+        {
+            if (m_SelectedObjectIDs.getSize() != 1)
+                return false;
+
+            return TryGetObjectTransform(
+                m_SelectedObjectIDs[0],
+                outTransform);
+        }
+
         // 按稳定 ID 读取任意对象 Transform；失败时不修改 outTransform。
         [[nodiscard]]
         bool TryGetObjectTransform(
@@ -312,6 +338,68 @@ namespace LimenEditor
             if (!m_Scene->TryFindObject(id, handle))
                 return false;
             return m_Scene->TryGetObjectTransform(handle, outTransform);
+        }
+
+        [[nodiscard]]
+        bool TryGetObjectTransform(
+            const Limen::SceneObjectID id,
+            Limen::SceneTransform &outTransform) const noexcept
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return false;
+            return m_Scene->TryGetObjectTransform(handle, outTransform);
+        }
+
+        // Label 是可编辑的显示名称，修改成功会使场景进入脏状态。
+        bool SetObjectLabel(
+            const Limen::SceneObjectID id,
+            const std::string_view label)
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return false;
+            if (!m_Scene->SetObjectLabel(handle, label))
+                return false;
+
+            MarkDirty();
+            return true;
+        }
+
+        // 按稳定 ID 读取显示名称；失败时不修改 outLabel。
+        [[nodiscard]]
+        bool TryGetObjectLabel(
+            const Limen::SceneObjectID id,
+            Limen::LString &outLabel) const
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return false;
+            return m_Scene->TryGetObjectLabel(handle, outLabel);
+        }
+
+        // 给现有对象添加 Authoring Component；成功会置脏。
+        [[nodiscard]]
+        Limen::SceneComponentID AddObjectComponent(
+            const Limen::SceneObjectID id,
+            Limen::SceneObjectComponent component)
+        {
+            Limen::SceneObjectHandle handle{};
+            if (!m_Scene->TryFindObject(id, handle))
+                return {};
+
+            const Limen::SceneComponentID componentID =
+                m_Scene->AddObjectComponent(handle, std::move(component));
+            if (componentID.isValid())
+                MarkDirty();
+            return componentID;
+        }
+
+        [[nodiscard]]
+        bool TryGetSelectedObjectLabel(Limen::LString &outLabel) const
+        {
+            return m_SelectedObjectIDs.getSize() == 1 &&
+                   TryGetObjectLabel(m_SelectedObjectIDs[0], outLabel);
         }
 
 

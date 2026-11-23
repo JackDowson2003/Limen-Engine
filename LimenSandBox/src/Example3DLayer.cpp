@@ -7,6 +7,7 @@
 
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 
 #include "Limen/Application/Application.h"
@@ -590,27 +591,26 @@ namespace SandBox
          */
         m_CubeRotationDegrees = std::remainder(m_CubeRotationDegrees, 360.0f);
 
-        // 从单位矩阵开始构造当前立方体的矩阵模型
-        glm::mat4 cubeTransform{1.f};
+        // Authoring Transform 使用 TRS；本示例只修改旋转。
+        Limen::SceneTransform cubeTransform;
 
-        //围绕 Y 轴的旋转
-        cubeTransform = glm::rotate(
-            cubeTransform,
-            glm::radians(m_CubeRotationDegrees),
-            glm::vec3(0.0f, 1.0f, 0.0f)
-        );
+        // 绕世界 Y 轴计算 Yaw。
+        const float yawRadians = glm::radians(m_CubeRotationDegrees);
 
-        //组合绕 X 轴的旋转，方便观察立方体上表面
-        cubeTransform = glm::rotate(
-            cubeTransform,
-            glm::radians(m_CubeRotationDegrees * 0.5f),
-            glm::vec3(1.0f, 0.0f, 0.0f)
-        );
+        // 绕局部 X 轴计算 Pitch。
+        const float pitchRadians = glm::radians(m_CubeRotationDegrees * 0.5f);
 
         /*
-         * Layer 不直接访问 Scene 内部数组，
-         * 而是通过创建立方体时取得的句柄修改 Transform。
+         * 原矩阵代码先绕 Y 旋转，再绕 X 旋转，
+         * 等价于 Rx * Ry。
+         *
+         * 四元数组合必须保持同一顺序：qX * qY，
+         * 因为 GLM 对列向量采用 q * v * inverse(q)。
          */
+        cubeTransform.Rotation =
+                glm::angleAxis(pitchRadians, glm::vec3{1.0f, 0.0f, 0.0f}) *
+                glm::angleAxis(yawRadians, glm::vec3{0.0f, 1.0f, 0.0f});
+
         const bool transformUpdated = m_Scene.SetObjectTransform(m_CubeObjectHandle, cubeTransform);
 
         LM_CORE_ASSERT(transformUpdated, "Transform update failed");
@@ -767,12 +767,12 @@ namespace SandBox
                 float exposure = m_SceneRenderer->GetExposure();
 
                 if (ImGui::DragFloat(
-                        "Exposure",
-                        &exposure,
-                        0.05f,
-                        0.0f,
-                        8.0f,
-                        "%.2f"))
+                    "Exposure",
+                    &exposure,
+                    0.05f,
+                    0.0f,
+                    8.0f,
+                    "%.2f"))
                 {
                     if (!m_SceneRenderer->SetExposure(exposure))
                         LM_CORE_WARN("Rejected invalid post-process exposure: {}", exposure);

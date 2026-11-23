@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cmath>
 #include <iostream>
 #include <limits>
 
@@ -40,6 +41,16 @@ namespace
         return glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
     }
 
+    Limen::SceneTransform LocationTransform(
+        const float x,
+        const float y,
+        const float z)
+    {
+        Limen::SceneTransform transform;
+        transform.Location = {x, y, z};
+        return transform;
+    }
+
     void CheckTransform(
         const char* name,
         const glm::mat4& actual,
@@ -62,6 +73,32 @@ namespace
                 return;
             }
         }
+    }
+
+    void CheckAuthoringTransform(
+        const char* name,
+        const Limen::SceneTransform& actual,
+        const Limen::SceneTransform& expected)
+    {
+        const auto sameVec3 = [](const glm::vec3& a, const glm::vec3& b)
+        {
+            return std::abs(a.x - b.x) <= 1.0e-5f &&
+                   std::abs(a.y - b.y) <= 1.0e-5f &&
+                   std::abs(a.z - b.z) <= 1.0e-5f;
+        };
+        const bool sameRotation =
+            std::abs(actual.Rotation.x - expected.Rotation.x) <= 1.0e-5f &&
+            std::abs(actual.Rotation.y - expected.Rotation.y) <= 1.0e-5f &&
+            std::abs(actual.Rotation.z - expected.Rotation.z) <= 1.0e-5f &&
+            std::abs(actual.Rotation.w - expected.Rotation.w) <= 1.0e-5f;
+
+        if (sameVec3(actual.Location, expected.Location) &&
+            sameRotation &&
+            sameVec3(actual.Scale, expected.Scale))
+            return;
+
+        ++g_Failures;
+        std::cerr << "FAIL: " << name << '\n';
     }
 
     // 这些指针只充当 CPU 侧资源身份标记。
@@ -105,9 +142,11 @@ namespace
               scene.TryGetObjectTransform(first, transform));
         CheckTransform("initial transform", transform, glm::mat4(1.0f));
 
-        const glm::mat4 moved = Translation(2.0f, 3.0f, 4.0f);
+        const Limen::SceneTransform movedTransform =
+            LocationTransform(2.0f, 3.0f, 4.0f);
+        const glm::mat4 moved = movedTransform.ToMatrix();
         Check("set object transform succeeds",
-              scene.SetObjectTransform(first, moved));
+              scene.SetObjectTransform(first, movedTransform));
         Check("updated transform can be read",
               scene.TryGetObjectTransform(first, transform));
         CheckTransform("updated transform", transform, moved);
@@ -130,7 +169,9 @@ namespace
 
         auto untouched = Translation(90.0f, 91.0f, 92.0f);
         Check("stale handle cannot set transform",
-              !scene.SetObjectTransform(first, Translation(8.0f, 9.0f, 10.0f)));
+              !scene.SetObjectTransform(
+                  first,
+                  LocationTransform(8.0f, 9.0f, 10.0f)));
         Check("stale handle cannot read transform",
               !scene.TryGetObjectTransform(first, untouched));
         CheckTransform("failed transform query preserves output",
@@ -155,9 +196,11 @@ namespace
               scene.TryFindObject(reusedID, found));
         Check("new ID lookup returns current handle", found == reused);
 
-        const glm::mat4 reusedTransform = Translation(-1.0f, -2.0f, -3.0f);
+        const Limen::SceneTransform reusedAuthoring =
+            LocationTransform(-1.0f, -2.0f, -3.0f);
+        const glm::mat4 reusedTransform = reusedAuthoring.ToMatrix();
         Check("new handle can update reused slot",
-              scene.SetObjectTransform(reused, reusedTransform));
+              scene.SetObjectTransform(reused, reusedAuthoring));
         Check("reused transform can be read",
               scene.TryGetObjectTransform(reused, transform));
         CheckTransform("reused slot transform", transform, reusedTransform);
@@ -189,9 +232,11 @@ namespace
         Check("two live objects have different persistent IDs",
               !(firstID == secondID));
 
-        const glm::mat4 secondTransform = Translation(4.0f, 5.0f, 6.0f);
+        const Limen::SceneTransform secondAuthoring =
+            LocationTransform(4.0f, 5.0f, 6.0f);
+        const glm::mat4 secondTransform = secondAuthoring.ToMatrix();
         Check("second object accepts transform",
-              scene.SetObjectTransform(second, secondTransform));
+              scene.SetObjectTransform(second, secondAuthoring));
         Check("first object can be deleted independently",
               scene.DestroyObject(first));
         Check("second object survives first deletion",
@@ -206,7 +251,9 @@ namespace
         Check("replacement does not invalidate surviving object",
               scene.IsObjectAlive(second));
         Check("surviving object can still be updated",
-              scene.SetObjectTransform(second, Translation(7.0f, 8.0f, 9.0f)));
+              scene.SetObjectTransform(
+                  second,
+                  LocationTransform(7.0f, 8.0f, 9.0f)));
 
         Check("replacement can be deleted", scene.DestroyObject(replacement));
         Check("survivor can be deleted", scene.DestroyObject(second));
@@ -224,7 +271,7 @@ namespace
             Check("invalid ID query preserves output", idOutput == idSentinel);
 
             Check("invalid handle cannot set transform",
-                  !scene.SetObjectTransform(handle, glm::mat4(2.0f)));
+                  !scene.SetObjectTransform(handle, Limen::SceneTransform{}));
 
             auto output = Translation(50.0f, 60.0f, 70.0f);
             Check("invalid handle cannot read transform",
@@ -304,7 +351,8 @@ namespace
         auto untouched = Translation(70.0f, 80.0f, 90.0f);
         Check("retired handle cannot set transform",
               !scene.SetObjectTransform(
-                  maxed, Translation(1.0f, 2.0f, 3.0f)));
+                  maxed,
+                  LocationTransform(1.0f, 2.0f, 3.0f)));
         Check("retired handle cannot read transform",
               !scene.TryGetObjectTransform(maxed, untouched));
         CheckTransform("failed transform query preserves output",
@@ -442,9 +490,11 @@ namespace
             });
         Check("one renderable object is visited", renderVisits == 1);
 
-        const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
+        const Limen::SceneTransform movedAuthoring =
+            LocationTransform(4.0f, 5.0f, 6.0f);
+        const glm::mat4 moved = movedAuthoring.ToMatrix();
         Check("renderable transform follows object transform",
-              scene.SetObjectTransform(handle, moved));
+              scene.SetObjectTransform(handle, movedAuthoring));
 
         renderVisits = 0;
         scene.ForEachRenderableObject(
@@ -557,7 +607,9 @@ namespace
         Check("group exposes two render components", componentVisits == 2);
 
         Check("group object transform moves all components",
-              scene.SetObjectTransform(handle, Translation(10.0f, 0.0f, 0.0f)));
+              scene.SetObjectTransform(
+                  handle,
+                  LocationTransform(10.0f, 0.0f, 0.0f)));
 
         componentVisits = 0;
         scene.ForEachRenderableObject(
@@ -595,6 +647,316 @@ namespace
             });
         Check("destroy clears grouped components", componentVisits == 0);
     }
+
+    void TestObjectLabels()
+    {
+        Limen::Scene scene;
+        const auto first = scene.CreateObject();
+        const auto second = scene.CreateObject();
+
+        Limen::LString label("sentinel");
+        Check("new object label can be read",
+              scene.TryGetObjectLabel(first, label));
+        Check("new object starts with an empty label", label.empty());
+
+        Limen::SceneObjectID idBeforeLabel{};
+        Check("capture object ID before label edit",
+              scene.TryGetObjectID(first, idBeforeLabel));
+        Check("set object label succeeds",
+              scene.SetObjectLabel(first, "TestCube"));
+        Check("set label can be read",
+              scene.TryGetObjectLabel(first, label) &&
+              label == "TestCube");
+
+        Limen::SceneObjectID idAfterLabel{};
+        Check("label edit preserves object ID",
+              scene.TryGetObjectID(first, idAfterLabel) &&
+              idAfterLabel == idBeforeLabel);
+
+        Check("overwrite object label succeeds",
+              scene.SetObjectLabel(first, "场景对象"));
+        Check("overwritten label can be read",
+              scene.TryGetObjectLabel(first, label) &&
+              label == "场景对象");
+
+        Check("empty label clears display name",
+              scene.SetObjectLabel(first, ""));
+        Check("cleared label can be read",
+              scene.TryGetObjectLabel(first, label) &&
+              label.empty());
+
+        Check("labels are independent per object",
+              scene.SetObjectLabel(second, "SecondObject"));
+        Check("second object label can be read",
+              scene.TryGetObjectLabel(second, label) &&
+              label == "SecondObject");
+
+        Check("destroy labeled object", scene.DestroyObject(first));
+        Limen::LString untouched("keep");
+        Check("stale handle cannot read label",
+              !scene.TryGetObjectLabel(first, untouched));
+        Check("failed label query preserves output",
+              untouched == "keep");
+        Check("stale handle cannot set label",
+              !scene.SetObjectLabel(first, "stale"));
+
+        const auto reused = scene.CreateObject();
+        Check("label test reuses freed slot",
+              reused.Index == first.Index);
+        Check("reused slot label can be read",
+              scene.TryGetObjectLabel(reused, label));
+        Check("reused slot does not retain old label", label.empty());
+
+        Check("surviving object label is unchanged",
+              scene.TryGetObjectLabel(second, label) &&
+              label == "SecondObject");
+    }
+
+    void TestAuthoringTransform()
+    {
+        Limen::Scene scene;
+        const auto handle = scene.CreateObject();
+
+        Limen::SceneTransform actual;
+        Check("new object exposes identity authoring TRS",
+              scene.TryGetObjectAuthoringTransform(handle, actual));
+        CheckAuthoringTransform(
+            "new object authoring TRS",
+            actual,
+            Limen::SceneTransform{});
+
+        Limen::SceneTransform authoring;
+        authoring.Location = {1.0f, 2.0f, 3.0f};
+        authoring.Rotation = glm::angleAxis(
+            glm::radians(45.0f),
+            glm::vec3{0.0f, 1.0f, 0.0f});
+        authoring.Scale = {2.0f, 3.0f, 4.0f};
+        Check("authoring TRS can be set",
+              scene.SetObjectAuthoringTransform(handle, authoring));
+        Check("authoring TRS can be read",
+              scene.TryGetObjectAuthoringTransform(handle, actual));
+        CheckAuthoringTransform(
+            "authoring TRS matches",
+            actual,
+            authoring);
+
+        // 新实现把 Authoring TRS 同步到运行期矩阵缓存。
+        glm::mat4 matrix{};
+        Check("authoring TRS updates matrix cache",
+              scene.TryGetObjectTransform(handle, matrix));
+        CheckTransform(
+            "authoring TRS matrix cache",
+            matrix,
+            authoring.ToMatrix());
+
+        Limen::SceneTransform untouched = authoring;
+        untouched.Location.x = 99.0f;
+        Check("NaN authoring TRS is rejected",
+              !scene.SetObjectAuthoringTransform(
+                  handle,
+                  []()
+                  {
+                      Limen::SceneTransform invalid;
+                      invalid.Location.x =
+                          std::numeric_limits<float>::quiet_NaN();
+                      return invalid;
+                  }()));
+        Check("rejected authoring TRS preserves previous value",
+              scene.TryGetObjectAuthoringTransform(handle, untouched));
+        CheckAuthoringTransform(
+            "rejected authoring TRS keeps previous value",
+            untouched,
+            authoring);
+
+        const Limen::SceneObjectHandle stale{999, 999};
+        Check("stale handle cannot set authoring TRS",
+              !scene.SetObjectAuthoringTransform(stale, Limen::SceneTransform{}));
+        Check("stale handle cannot read authoring TRS",
+              !scene.TryGetObjectAuthoringTransform(stale, untouched));
+        CheckAuthoringTransform(
+            "failed authoring query preserves output",
+            untouched,
+            authoring);
+
+        Check("authoring transform object can be destroyed",
+              scene.DestroyObject(handle));
+        const auto reused = scene.CreateObject();
+        Check("authoring transform slot is reused",
+              reused.Index == handle.Index);
+        Check("reused object exposes default authoring TRS",
+              scene.TryGetObjectAuthoringTransform(reused, actual));
+        CheckAuthoringTransform(
+            "reused object authoring TRS is reset",
+            actual,
+            Limen::SceneTransform{});
+    }
+
+    void TestSceneObjectComponents()
+    {
+        Limen::Scene scene;
+        const auto handle = scene.CreateObject();
+
+        int visits = 0;
+        scene.ForEachObjectComponent(
+            handle,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++visits;
+            });
+        Check("new object has no authoring components", visits == 0);
+
+        Limen::SceneObjectComponent model;
+        model.Data = Limen::ModelRendererComponent{
+            .ModelAssetID = {
+                0x0011223344556677ULL,
+                0x8899aabbccddeeffULL
+            }
+        };
+        const Limen::SceneComponentID modelID =
+            scene.AddObjectComponent(handle, model);
+        Check("model component receives generated ID", modelID.isValid());
+
+        Limen::SceneObjectComponent primitive;
+        primitive.Data = Limen::PrimitiveRendererComponent{
+            .Primitive = Limen::PrimitiveType::Cube
+        };
+        const Limen::SceneComponentID primitiveID =
+            scene.AddObjectComponent(handle, primitive);
+        Check("primitive component receives generated ID",
+              primitiveID.isValid() && !(primitiveID == modelID));
+
+        Limen::SceneObjectComponent light;
+        light.LocalTransform.Location = {1.0f, 2.0f, 3.0f};
+        light.Data = Limen::PointLightComponent{
+            .Color = {1.0f, 0.5f, 0.25f},
+            .Intensity = 4.0f
+        };
+        const Limen::SceneComponentID lightID =
+            scene.AddObjectComponent(handle, light);
+        Check("point light component receives generated ID",
+              lightID.isValid() &&
+              !(lightID == modelID) &&
+              !(lightID == primitiveID));
+
+        int modelVisits = 0;
+        int primitiveVisits = 0;
+        int lightVisits = 0;
+        scene.ForEachObjectComponent(
+            handle,
+            [&](const Limen::SceneObjectComponent &component)
+            {
+                switch (Limen::GetSceneComponentKind(component))
+                {
+                    case Limen::SceneComponentKind::ModelRenderer:
+                        ++modelVisits;
+                        break;
+                    case Limen::SceneComponentKind::PrimitiveRenderer:
+                        ++primitiveVisits;
+                        break;
+                    case Limen::SceneComponentKind::PointLight:
+                        ++lightVisits;
+                        break;
+                }
+            });
+        Check("all three authoring component kinds are stored",
+              modelVisits == 1 &&
+              primitiveVisits == 1 &&
+              lightVisits == 1);
+
+        Limen::SceneObjectComponent duplicate;
+        duplicate.ID = modelID;
+        duplicate.Data = Limen::ModelRendererComponent{
+            .ModelAssetID = {
+                0x1111222233334444ULL,
+                0x5555666677778888ULL
+            }
+        };
+        Check("duplicate component ID is rejected",
+              !scene.AddObjectComponent(handle, duplicate).isValid());
+
+        Limen::SceneObjectComponent invalidModel;
+        invalidModel.Data = Limen::ModelRendererComponent{};
+        Check("model component requires valid AssetID",
+              !scene.AddObjectComponent(handle, invalidModel).isValid());
+
+        Limen::SceneObjectComponent invalidPrimitive;
+        invalidPrimitive.Data = Limen::PrimitiveRendererComponent{
+            .Primitive =
+                static_cast<Limen::PrimitiveType>(255)
+        };
+        Check("invalid primitive type is rejected",
+              !scene.AddObjectComponent(handle, invalidPrimitive).isValid());
+
+        Limen::SceneObjectComponent invalidLight;
+        invalidLight.Data = Limen::PointLightComponent{
+            .Color = {1.0f, 0.0f, 0.0f},
+            .Intensity = -1.0f
+        };
+        Check("negative light intensity is rejected",
+              !scene.AddObjectComponent(handle, invalidLight).isValid());
+
+        invalidLight.Data = Limen::PointLightComponent{
+            .Color = {
+                std::numeric_limits<float>::quiet_NaN(),
+                0.0f,
+                0.0f
+            },
+            .Intensity = 1.0f
+        };
+        Check("non-finite light color is rejected",
+              !scene.AddObjectComponent(handle, invalidLight).isValid());
+
+        Limen::SceneObjectComponent invalidTransform;
+        invalidTransform.LocalTransform.Location.x =
+            std::numeric_limits<float>::quiet_NaN();
+        invalidTransform.Data = Limen::PointLightComponent{};
+        Check("non-finite component transform is rejected",
+              !scene.AddObjectComponent(handle, invalidTransform).isValid());
+
+        visits = 0;
+        scene.ForEachObjectComponent(
+            handle,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++visits;
+            });
+        Check("failed component additions preserve stored components",
+              visits == 3);
+
+        Check("invalid handle cannot add component",
+              !scene.AddObjectComponent(
+                  Limen::SceneObjectHandle{},
+                  primitive).isValid());
+        Check("out-of-range handle cannot add component",
+              !scene.AddObjectComponent(
+                  Limen::SceneObjectHandle{999, 1},
+                  primitive).isValid());
+
+        Check("component container object can be destroyed",
+              scene.DestroyObject(handle));
+        visits = 0;
+        scene.ForEachObjectComponent(
+            handle,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++visits;
+            });
+        Check("destroy removes component traversal", visits == 0);
+        Check("stale handle cannot add component",
+              !scene.AddObjectComponent(handle, primitive).isValid());
+
+        const auto reused = scene.CreateObject();
+        Check("component slot is reused",
+              reused.Index == handle.Index);
+        visits = 0;
+        scene.ForEachObjectComponent(
+            reused,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++visits;
+            });
+        Check("reused slot has no stale components", visits == 0);
+    }
 }
 
 int main()
@@ -605,6 +967,9 @@ int main()
     TestForEachObject();
     TestSceneRenderableComponent();
     TestGroupedRenderableComponents();
+    TestObjectLabels();
+    TestAuthoringTransform();
+    TestSceneObjectComponents();
 
     if (g_Failures == 0)
         std::cout

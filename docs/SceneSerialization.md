@@ -7,18 +7,21 @@
 当前已经具备：
 
 - `SceneObjectID` 稳定对象身份；
+- `SceneComponentID` 稳定组件身份类型与 UUID 转换；
 - `SceneObjectHandle` 运行期 `Index + Generation` 访问句柄；
 - 对象槽位复用、旧句柄失效和 Generation 退休；
+- 对象 Label 的存储、查询、修改和槽位复用清理；
+- Authoring 级 `SceneTransform` 与矩阵转换；
+- SceneObject 的 AuthoringTransform，以及过渡期运行期矩阵缓存；
 - 一个 SceneObject 挂多个 `SceneRenderObject`；
 - `AssetID` 与项目级 `AssetRegistry`；
-- Editor 的资产放置、选择、Transform 查看、多选和脏状态。
+- Editor 的资产放置、Label 显示、唯一默认命名、选择、Transform 查看、多选和脏状态。
 
 当前尚未具备：
 
-- 可序列化的对象名称；
-- 与 `glm::mat4` 分离的 Authoring 级 TRS Transform；
-- 稳定 ComponentID；
+- 持久化的 Authoring Component 列表；
 - 对象来源资产或组件来源数据；
+- `Scene::RestoreObject` 与 Authoring 快照遍历；
 - `.lscene` schema、保存器、加载器和原子替换；
 - Project 起始场景；
 - Scene 往返加载测试。
@@ -28,7 +31,8 @@
 ## 2. 当前实现阻塞点
 
 - `SceneRenderObject` 只有运行期 `Ref<Mesh>`、`Ref<Material>` 和局部矩阵，没有可持久化的资源身份，见 [`Scene.h`](../LimenEngine/include/Limen/Scene/Scene.h)。
-- Scene 槽位只有 `SceneObjectID`、对象矩阵和运行期渲染组件，没有 Label、Authoring Component 或来源资产。
+- Scene 槽位已有 ObjectID、Label、AuthoringTransform 和运行期渲染组件，但还没有 Authoring Component 数组或来源 AssetID。
+- `ObjectSlot::Transform` 仍作为过渡期矩阵缓存存在；它不能成为第二份可编辑 Transform。
 - [`EditorAssetSpawner.cpp`](../Limen-Editor/src/Render/EditorAssetSpawner.cpp) 已取得模型 `AssetID`，但完成运行期实例化后丢弃来源信息。
 - [`EditorSession.h`](../Limen-Editor/src/Project/EditorSession.h) 有脏状态，但没有场景路径、保存命令或成功加载后的 Scene 替换操作。
 - [`ProjectConfiguration.h`](../LimenEngine/include/Limen/Project/ProjectConfiguration.h) 尚无起始场景字段。
@@ -65,6 +69,56 @@
 - 多 Scene Streaming。
 
 第一版对象的 Transform 是 Scene 世界空间 Transform。父子层级以后通过明确的 schema 版本演进加入。
+
+UE 的 `AActor` Transform 通常由根 `USceneComponent` 提供。Limen v1 用一个场景对象根 TRS 表达相同职责，不额外创建 RootComponent 类型；组件 Transform 相对于对象根 TRS。这个简化保留“对象根 + 相对组件”的语义，同时避免第一版引入完整组件层级。
+
+### 3.1 代码类型与文件边界
+
+UE 的 `AActor`、`USceneComponent` 和 `UStaticMeshComponent` 是不同对象类型，拥有各自的声明、职责和生命周期。UE 不会把全部 Component 数据定义塞进 `Actor` 或 `World` 文件。Limen 不复制 `UObject` 反射体系，但遵循相同的类型职责分离。
+
+Scene 相关公共类型按以下文件组织：
+
+```text
+LimenEngine/include/Limen/Scene/SceneIdentity.h
+LimenEngine/src/Scene/SceneIdentity.cpp
+
+LimenEngine/include/Limen/Scene/SceneTransform.h
+LimenEngine/src/Scene/SceneTransform.cpp
+
+LimenEngine/include/Limen/Scene/SceneComponent.h
+LimenEngine/src/Scene/SceneComponent.cpp
+
+LimenEngine/include/Limen/Scene/Scene.h
+LimenEngine/src/Scene/Scene.cpp
+```
+
+职责：
+
+| 文件 | 职责 |
+|---|---|
+| `SceneIdentity` | `SceneObjectID`、`SceneComponentID`、UUID 严格文本转换 |
+| `SceneTransform` | Authoring TRS、矩阵转换和有限值检查 |
+| `SceneComponent` | Component 类型、Authoring 组件数据、ComponentID 生成 |
+| `Scene` | 对象槽位、运行期 Handle/Generation、Scene 级编辑与遍历 API |
+
+约束：
+
+- `Scene.h` 不定义 `SceneObjectComponent`、Model/Primitive/Light 组件数据。
+- `SceneComponent.h` 不反向包含 `Scene.h`，避免 `Scene.h → SceneComponent.h → Scene.h` 的循环脆弱依赖。
+- `SceneComponent.h` 只依赖 `SceneIdentity.h`、`SceneTransform.h` 和 `AssetID.h`。
+- `Scene.h` 包含 `SceneComponent.h`，因为 Scene 槽位需要拥有组件数组。
+- 运行期 `SceneRenderObject` 与 Authoring `SceneObjectComponent` 是不同数据，不能合并成一个可持久结构。
+- 文件拆分不改变公开类型名；现有 `Limen::SceneObjectID` 等调用方式保持不变。
+
+迁移顺序：
+
+1. 新建 `SceneIdentity.h/.cpp`，移动两种 Scene ID 及转换函数；
+2. `Scene.h` 改为 include `SceneIdentity.h`；
+3. 新建 `SceneComponent.h/.cpp`，只定义 Authoring 类型与 ComponentID 生成；
+4. `Scene.h` include `SceneComponent.h`，再把组件数组接入 `ObjectSlot`；
+5. 最后迁移 ObjectSlot 的矩阵缓存和历史运行期入口。
+
+禁止的顺序是先向 `Scene.h` 添加组件结构，再为了拆文件同时修改 ID、组件、ObjectSlot 和 Serializer；这样会把类型迁移与行为迁移混在一起，无法可靠定位回归。
 
 ## 4. 身份、名称与所有权
 
@@ -129,35 +183,124 @@ struct SceneObjectAuthoringData
 
 ### 5.3 第一版组件
 
-```text
-ModelRendererComponent
-    SceneComponentID
-    SceneTransform LocalTransform
-    AssetID ModelAssetID
+第一版支持 ModelRenderer、PrimitiveRenderer 和 PointLight。组件使用“公共头 + 类型数据 variant”，避免用一个聚合塞入全部可选字段而造成无效组合：
 
-PrimitiveRendererComponent
-    SceneComponentID
-    SceneTransform LocalTransform
-    PrimitiveType = Cube
+```cpp
+enum class SceneComponentKind : std::uint8_t
+{
+    ModelRenderer,
+    PrimitiveRenderer,
+    PointLight
+};
 
-PointLightComponent
-    SceneComponentID
-    SceneTransform LocalTransform
-    Color
-    Intensity
+enum class PrimitiveType : std::uint8_t
+{
+    Cube
+};
+
+struct ModelRendererComponent
+{
+    AssetID ModelAssetID{};
+};
+
+struct PrimitiveRendererComponent
+{
+    PrimitiveType Primitive = PrimitiveType::Cube;
+};
+
+struct PointLightComponent
+{
+    glm::vec3 Color{1.0f};
+    float Intensity = 1.0f;
+};
+
+using SceneComponentData = std::variant<
+    ModelRendererComponent,
+    PrimitiveRendererComponent,
+    PointLightComponent
+>;
+
+struct SceneObjectComponent
+{
+    SceneComponentID ID{};
+    SceneTransform LocalTransform{};
+    SceneComponentData Data;
+};
 ```
 
 - 一个 OBJ 模型是“一个 SceneObject + 一个 ModelRendererComponent”。
 - Model 的 Front、Back、Left 等 part 是加载 Model 后得到的运行期子项，不序列化成多个对象。
+- `PrimitiveType::Cube` 只保存 primitive 类型；实际 Cube Mesh/Material 由运行期 Primitive 资源提供者解析。
+- `PointLightComponent` 的位置由 `LocalTransform.Location` 与对象根 Transform 组合得到，不再保存独立的 `PointLight::Position`。
 - 第一版不序列化 Mesh/Material 的 `Ref`。
 - 第一版没有 Material Override；材质由 Model 导入结果或 Primitive 默认材质解析。
 - Component 数组下标不是 ComponentID。
+
+采用 `std::variant` 的理由：
+
+- 与 UE 的 Component 类型区分一致，不同组件拥有不同数据；
+- 编译期阻止 ModelRenderer 携带 Light 参数之类的无效组合；
+- 解析和序列化通过 `std::visit` 或类型判断显式处理每个组件种类；
+- 第一版不需要虚基类、反射或堆分配的 Component 多态，降低生命周期复杂度。
+
+运行期仍可保留轻量多态或解析缓存；持久化 Authoring 数据使用 variant。
 
 ### 5.4 运行期解析结果
 
 加载或编辑 ModelRendererComponent 后，Engine 通过 `AssetManager` 得到 Model，再把各 ModelPart 展开为 `SceneRenderObject` 一类运行期渲染项。
 
 `SceneRenderer` 不应在每帧通过 AssetID 重新加载模型。对象或组件变化时重建并缓存运行期渲染项。
+
+PointLight 存在过渡期：
+
+1. 现有 `Scene::m_PointLights` 和 `AddPointLight` 继续服务旧 Sandbox/Renderer；
+2. 新增 `PointLightComponent` 作为 Authoring 数据；
+3. 场景加载或组件变更时，把 PointLightComponent 解析为运行期 `PointLight`；
+4. Editor 与 Player 不再直接创建脱离 SceneObject 的点光源；
+5. 全部调用迁移后删除 Scene 级点光源数组和旧 Handle。
+
+Primitive 也存在解析边界：
+
+- `PrimitiveRendererComponent` 不拥有 Mesh/Material；
+- 运行期由 Primitive 资源提供者根据 `PrimitiveType` 返回共享 Mesh/Material；
+- 第一版只要求 Cube；
+- Primitive Mesh 的 CPU/GPU 所有权不得进入 SceneComponent 数据。
+
+### 5.5 UE 对照后的接口约束
+
+`SceneRenderObject` 是**运行期渲染项**，不是 UE `StaticMeshComponent` 的直接替代。
+
+因此下面的接口不能成为最终 Editor 场景数据入口：
+
+```cpp
+SceneObjectHandle AddRenderableObject(
+    const SceneRenderObject &runtimeRenderable,
+    const SceneTransform &objectTransform
+);
+```
+
+它只能作为 Sandbox、测试和迁移期的运行期调试入口。正式 Authoring 入口必须创建：
+
+```text
+SceneObject
+    Root SceneTransform
+    SceneObjectComponent[]
+        ModelRendererComponent
+            SceneComponentID
+            Local SceneTransform
+            Model AssetID
+```
+
+Editor 放置模型时保存 Model AssetID，不保存运行期 Mesh/Material `Ref`。加载或组件变化时再由解析器展开运行期 `SceneRenderObject` 缓存。
+
+临时迁移顺序固定为：
+
+1. 保留运行期 `SceneRenderObject` 和矩阵缓存，维持 Renderer/Sandbox 可运行；
+2. 新增 Authoring Component 数据；
+3. Editor 改为创建 ModelRendererComponent；
+4. 建立 AssetID → Model → 运行期 part 的解析缓存；
+5. 删除 `ObjectSlot::Transform` 矩阵缓存，矩阵只由 AuthoringTransform 派生；
+6. 再进入 Serializer。
 
 ## 6. `.lscene` 文件格式
 
@@ -319,16 +462,15 @@ AssetID
 
 以下属于 Engine 数据契约，应先由用户实现：
 
-1. `SceneObjectIDToString/TryParseSceneObjectID`。
-2. `SceneComponentID`、格式化与严格解析。
-3. `SceneTransform` 与 `ToMatrix()`。
-4. SceneObject Label 的 Get/Set/Restore。
-5. Authoring Component 数据与稳定 ComponentID。
-6. `Scene::RestoreObject(const SceneObjectAuthoringData&)`：保留 ObjectID、分配新 Handle/Generation、拒绝重复 ID。
-7. 只读 Authoring 快照遍历，供保存器使用。
-8. `SceneDocument`、`SceneSerializer`、严格 schema 与结构化错误。
-9. ProjectConfiguration/运行设置增加 `startup_scene_asset_id`。
-10. CPU 序列化测试和 Scene 实例化测试。
+1. `SceneIdentity.h/.cpp`：迁移 `SceneObjectID`、`SceneComponentID` 及严格文本转换。
+2. `SceneTransform` 与 `ToMatrix()`。
+3. SceneObject Label 的 Get/Set/Restore。
+4. `SceneComponent.h/.cpp`：ModelRenderer、PrimitiveRenderer、PointLight 三类 Authoring Component、稳定 ComponentID 与生成接口。
+5. `Scene::RestoreObject(const SceneObjectAuthoringData&)`：保留 ObjectID、分配新 Handle/Generation、拒绝重复 ID。
+6. 只读 Authoring 快照遍历，供保存器使用。
+7. `SceneDocument`、`SceneSerializer`、严格 schema 与结构化错误。
+8. ProjectConfiguration/运行设置增加 `startup_scene_asset_id`。
+9. CPU 序列化测试和 Scene 实例化测试。
 
 ### 10.2 Editor 改动
 
@@ -353,6 +495,14 @@ Engine 契约稳定后由 Editor 实现：
 - 旧 Handle 与 Generation 测试继续通过。
 
 验收：创建 → 设置 Label/TRS/组件 → 快照读取 → 值一致；删除后旧 Handle 失效。
+
+当前进度：
+
+- A1 已完成：ObjectID、ComponentID、SceneTransform、Label、AuthoringTransform 与矩阵同步；
+- A2.1 待完成：把 ID 从 `Scene.h` 迁移到独立的 `SceneIdentity.h/.cpp`；
+- A2.2：新增 `SceneComponent.h/.cpp`，定义 ModelRenderer、PrimitiveRenderer、PointLight 和 ComponentID 生成；
+- A2.3：Scene 持有 Authoring Component，Editor 放置保存 ModelAssetID；
+- A2.4：删除过渡矩阵缓存，再进入 SceneSerializer。
 
 ### B. SceneSerializer CPU 基线
 

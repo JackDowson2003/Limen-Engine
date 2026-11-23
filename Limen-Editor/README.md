@@ -93,7 +93,7 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 
 ### C：面板骨架与文字（已完成基础）
 
-- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Transform 或多选数量。
+- 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，优先显示模型 Label，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Label 与 Transform 或多选数量。
 - 引入 `EditorTheme` 统一 UE 风格暗色主题；选中行使用蓝色行背景；视口、Details、Content Browser、Outliner 均已拆为独立面板。
 - 视口支持世界空间射线-AABB 拾取：左键点击选择对象，Command/Ctrl 增选，点击空白清空对象选择。
 - 鼠标输入采用 `Scene Viewport → Content Browser → Outliner → Splitter → 快捷键` 的固定优先级；前一个区域消费事件后，后续区域不再重复处理。
@@ -109,6 +109,7 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 3. 通过 `AssetRegistry` 的 `LogicalPath` 调用 `AssetManager::LoadModel` 加载模型；用 `ModelMaterialBuilder::BuildBlinnPhong` 和 `EditorSceneContent` 的 Blinn-Phong Pipeline 构建运行时材质。
 4. 第一版只支持模型资产（OBJ + sidecar）；纹理只作为材质输入，不作为可生成对象。多 Part 模型现在是**一个 SceneObject + 多个渲染组件**，Outliner 只出现一行，Details 显示该实例的 Transform。
 5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`，渲染时与世界 Transform 组合；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
+   放置时以模型文件名生成 Label，例如 `TestCube`；同名对象使用 `TestCube_2`、`TestCube_3`。Label 只用于显示和序列化，对象身份仍由 `SceneObjectID` 承担。
 6. `Place` 按钮把对象放在视口中心；拖拽释放则按鼠标位置生成世界空间射线，默认距离也是相机前方 4 个世界单位。拖拽开始时读取模型局部 AABB，按当前落点投影为半透明屏幕包围框，同时显示资产路径和距离；滚轮按每次 0.5 个单位在 1.0～20.0 范围调整距离。连续放置不依赖硬编码世界原点。GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用。
 7. Place 成功或失败会在顶栏显示 10 秒状态：缺失资产、OBJ 加载失败、无渲染组件、视口未就绪和拖拽落到视口外都有可见反馈；控制台同时记录一次点击级诊断。
 

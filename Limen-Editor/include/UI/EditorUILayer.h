@@ -235,7 +235,7 @@ namespace LimenEditor
 
                 if (m_HasDragPreviewBounds)
                 {
-                    glm::mat4 placementTransform{1.0f};
+                    Limen::SceneTransform placementTransform;
                     if (m_ViewportPanel.TryGetPlacementTransformAt(
                             x,
                             y,
@@ -244,7 +244,7 @@ namespace LimenEditor
                     {
                         const Limen::AxisAlignedBoundingBox worldBounds =
                             m_DragPreviewBounds.Transformed(
-                                placementTransform);
+                                placementTransform.ToMatrix());
                         glm::vec2 screenMin{};
                         glm::vec2 screenMax{};
                         if (m_ViewportPanel.TryProjectWorldBounds(
@@ -551,7 +551,7 @@ namespace LimenEditor
         // 只允许显式放置当前选中的资产；不提供隐藏的默认对象兜底。
         bool PlaceSelectedAsset()
         {
-            glm::mat4 placementTransform{1.0f};
+            Limen::SceneTransform placementTransform;
             if (!m_ViewportPanel.TryGetPlacementTransform(placementTransform))
             {
                 LM_WARN("Editor place: viewport placement transform is unavailable");
@@ -565,7 +565,7 @@ namespace LimenEditor
 
         bool PlaceSelectedAssetAt(const float x, const float y)
         {
-            glm::mat4 placementTransform{1.0f};
+            Limen::SceneTransform placementTransform;
             if (!m_ViewportPanel.TryGetPlacementTransformAt(
                     x,
                     y,
@@ -581,7 +581,8 @@ namespace LimenEditor
             return PlaceSelectedAssetWithTransform(placementTransform);
         }
 
-        bool PlaceSelectedAssetWithTransform(const glm::mat4 &placementTransform)
+        bool PlaceSelectedAssetWithTransform(
+            const Limen::SceneTransform &placementTransform)
         {
             if (!m_Session)
             {

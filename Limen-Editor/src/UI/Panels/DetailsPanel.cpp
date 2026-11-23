@@ -120,9 +120,20 @@ namespace LimenEditor
             glm::mat4 transform{1.0f};
             if (session.TryGetSelectedObjectTransform(transform))
             {
+                Limen::LString label;
+                if (session.TryGetSelectedObjectLabel(label) &&
+                    !label.empty())
+                {
+                    renderer.DrawText(
+                        window,
+                        {textX, headerY + rowHeight},
+                        theme.TextSecondary,
+                        fontAtlas,
+                        std::string(label.data(), label.size()));
+                }
                 renderer.DrawText(
                     window,
-                    {textX, headerY + rowHeight},
+                    {textX, headerY + rowHeight * 2.0f},
                     theme.TextSecondary,
                     fontAtlas,
                     FormatPosition(transform));

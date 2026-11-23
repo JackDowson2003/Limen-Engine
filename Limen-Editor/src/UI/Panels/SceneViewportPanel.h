@@ -10,6 +10,7 @@
 
 #include "Limen/Core/Core.h"
 #include "Limen/Math/AxisAlignedBoundingBox.h"
+#include "Limen/Scene/SceneTransform.h"
 #include "UI/EditorUILayout.h"
 
 namespace Limen
@@ -69,7 +70,7 @@ namespace LimenEditor
         // 在视口前方生成对象；失败时不修改 outTransform。
         [[nodiscard]]
         bool TryGetPlacementTransform(
-            glm::mat4 &outTransform,
+            Limen::SceneTransform &outTransform,
             float distance = 4.0f) const;
 
         // 按视口内逻辑坐标生成放置矩阵；坐标不在视口内或视口未就绪时失败。
@@ -77,7 +78,7 @@ namespace LimenEditor
         bool TryGetPlacementTransformAt(
             float x,
             float y,
-            glm::mat4 &outTransform,
+            Limen::SceneTransform &outTransform,
             float distance = 4.0f) const;
 
         [[nodiscard]]

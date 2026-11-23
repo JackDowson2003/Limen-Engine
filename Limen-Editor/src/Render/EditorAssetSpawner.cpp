@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "Limen/Asset/AssetManager.h"
 #include "Limen/Asset/Model.h"
@@ -32,12 +33,50 @@ namespace LimenEditor
             if (outError)
                 *outError = std::string(message);
         }
+
+        bool IsLabelInUse(
+            const EditorSession &session,
+            const std::string_view label)
+        {
+            bool used = false;
+            session.GetScene().ForEachObject(
+                [&](const Limen::SceneObjectHandle &,
+                    const Limen::SceneObjectID &id)
+                {
+                    if (used)
+                        return;
+
+                    Limen::LString existing;
+                    if (session.TryGetObjectLabel(id, existing) &&
+                        static_cast<std::string_view>(existing) == label)
+                        used = true;
+                });
+            return used;
+        }
+
+        std::string MakeUniqueLabel(
+            const EditorSession &session,
+            const std::string_view base)
+        {
+            const std::string safeBase =
+                base.empty() ? std::string{"Object"} : std::string{base};
+            if (!IsLabelInUse(session, safeBase))
+                return safeBase;
+
+            for (uint32_t suffix = 2;; ++suffix)
+            {
+                std::string candidate =
+                    safeBase + "_" + std::to_string(suffix);
+                if (!IsLabelInUse(session, candidate))
+                    return candidate;
+            }
+        }
     }
 
     bool EditorAssetSpawner::SpawnSelectedAsset(
         EditorSession &session,
         const EditorSceneContent &sceneContent,
-        const glm::mat4 &objectTransform,
+        const Limen::SceneTransform &objectTransform,
         Limen::LArray<Limen::SceneObjectID> &outIDs,
         std::string *outError) const
     {
@@ -133,11 +172,30 @@ namespace LimenEditor
         }
 
         // 一个模型实例 = 一个 SceneObject + 多个渲染组件。
+        const std::string label = MakeUniqueLabel(
+            session,
+            std::filesystem::path(logicalPath).stem().string());
         const Limen::SceneObjectID id =
-            session.CreateRenderableObjectGroup(components, objectTransform);
+            session.CreateRenderableObjectGroup(
+                components,
+                objectTransform,
+                label);
         if (!id.isValid())
         {
             SetError(outError, "Failed to create a scene object.");
+            return false;
+        }
+
+        Limen::SceneObjectComponent modelComponent;
+        modelComponent.Data = Limen::ModelRendererComponent{
+            .ModelAssetID = assetID
+        };
+        if (!session.AddObjectComponent(
+                id,
+                std::move(modelComponent)).isValid())
+        {
+            static_cast<void>(session.DeleteObject(id));
+            SetError(outError, "Failed to attach model renderer component.");
             return false;
         }
 

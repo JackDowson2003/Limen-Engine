@@ -68,12 +68,18 @@ namespace LimenEditor
                     theme.SelectionBackground);
             }
 
+            Limen::LString label;
+            const bool hasLabel =
+                session.TryGetObjectLabel(id, label) && !label.empty();
+            const std::string displayName = hasLabel
+                ? std::string(label.data(), label.size())
+                : "对象 " + std::to_string(row + 1);
             renderer.DrawText(
                 window,
                 {textX, rowY},
                 selected ? theme.SelectionText : theme.TextSecondary,
                 fontAtlas,
-                "对象 " + std::to_string(row + 1));
+                displayName);
         }
 
         renderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});

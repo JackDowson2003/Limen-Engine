@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <variant>
 
 #include "Limen/Asset/AssetRegistry.h"
 #include "Limen/Asset/AssetManager.h"
@@ -238,9 +239,8 @@ int main()
 
         LimenEditor::EditorAssetSpawner spawner;
         Limen::LArray<Limen::SceneObjectID> created;
-        const glm::mat4 spawnTransform = glm::translate(
-            glm::mat4{1.0f},
-            glm::vec3{0.5f, 0.0f, 0.0f});
+        Limen::SceneTransform spawnTransform;
+        spawnTransform.Location = {0.5f, 0.0f, 0.0f};
         success = Check("selected model spawns scene objects",
                         spawner.SpawnSelectedAsset(
                             session, spawnContent, spawnTransform, created)) && success;
@@ -250,6 +250,43 @@ int main()
                         session.GetSelectedObjectCount() == 1 &&
                         session.GetSelectedObjectID() == created[0]) && success;
 
+        Limen::LString spawnedLabel;
+        success = Check("spawn applies model label",
+                        created.getSize() == 1 &&
+                        session.TryGetObjectLabel(
+                            created[0],
+                            spawnedLabel) &&
+                        spawnedLabel == "TestCube") && success;
+
+        Limen::SceneObjectHandle createdHandle{};
+        int authoringComponents = 0;
+        Limen::AssetID authoringModelID{};
+        success = Check("spawned object can be found",
+                        created.getSize() == 1 &&
+                        session.GetScene().TryFindObject(
+                            created[0],
+                            createdHandle)) && success;
+        if (createdHandle.IsValid())
+        {
+            session.GetScene().ForEachObjectComponent(
+                createdHandle,
+                [&](const Limen::SceneObjectComponent &component)
+                {
+                    ++authoringComponents;
+                    if (Limen::GetSceneComponentKind(component) ==
+                        Limen::SceneComponentKind::ModelRenderer)
+                    {
+                        authoringModelID =
+                            std::get<Limen::ModelRendererComponent>(
+                                component.Data).ModelAssetID;
+                    }
+                });
+        }
+        success = Check("spawn attaches one authoring component",
+                        authoringComponents == 1) && success;
+        success = Check("spawned authoring component stores model asset ID",
+                        authoringModelID == assetID) && success;
+
         glm::mat4 spawnedTransform{1.0f};
         success = Check("spawn applies object transform",
                         created.getSize() == 1 &&
@@ -257,6 +294,16 @@ int main()
                             created[0],
                             spawnedTransform) &&
                         std::abs(spawnedTransform[3][0] - 0.5f) <= 1.0e-6f) &&
+                  success;
+
+        Limen::SceneTransform spawnedAuthoring;
+        success = Check("spawn writes authoring transform",
+                        created.getSize() == 1 &&
+                        session.TryGetObjectTransform(
+                            created[0],
+                            spawnedAuthoring) &&
+                        std::abs(spawnedAuthoring.Location.x - 0.5f) <=
+                        1.0e-6f) &&
                   success;
 
         Limen::SceneObjectID picked{};
@@ -318,6 +365,23 @@ int main()
                                 difference > 4) && success;
             }
         }
+
+        Limen::LArray<Limen::SceneObjectID> secondSpawn;
+        Limen::SceneTransform secondSpawnTransform;
+        secondSpawnTransform.Location = {-0.5f, 0.0f, 0.0f};
+        success = Check("second model instance spawns",
+                        spawner.SpawnSelectedAsset(
+                            session,
+                            spawnContent,
+                            secondSpawnTransform,
+                            secondSpawn)) && success;
+        Limen::LString secondLabel;
+        success = Check("second model instance receives unique label",
+                        secondSpawn.getSize() == 1 &&
+                        session.TryGetObjectLabel(
+                            secondSpawn[0],
+                            secondLabel) &&
+                        secondLabel == "TestCube_2") && success;
 
         fs::remove_all(projectRoot);
     }

@@ -239,7 +239,9 @@ namespace
 
         // 无选择时编辑必须失败，且不能改脏位、不能改 out 参数。
         session.ClearSelection();
-        const glm::mat4 sentinel = Translation(90.0f, 91.0f, 92.0f);
+        Limen::SceneTransform sentinelTransform;
+        sentinelTransform.Location = {90.0f, 91.0f, 92.0f};
+        const glm::mat4 sentinel = sentinelTransform.ToMatrix();
         glm::mat4 out = sentinel;
         passed &= Check("transform query fails without selection",
                         !session.TryGetSelectedObjectTransform(out));
@@ -247,14 +249,17 @@ namespace
                         MatchesTransform(out, sentinel));
         passed &= Check("failed edit keeps session clean",
                         !session.SetSelectedObjectTransform(
-                            Translation(1.0f, 2.0f, 3.0f)) &&
+                            Limen::SceneTransform{
+                                .Location = {1.0f, 2.0f, 3.0f}}) &&
                         !session.IsDirty());
 
         // 选中后编辑：成功、可读回、置脏。
         passed &= Check("reselect first object", session.SelectObject(first));
-        const glm::mat4 moved = Translation(4.0f, 5.0f, 6.0f);
+        Limen::SceneTransform movedTransform;
+        movedTransform.Location = {4.0f, 5.0f, 6.0f};
+        const glm::mat4 moved = movedTransform.ToMatrix();
         passed &= Check("selected object accepts transform",
-                        session.SetSelectedObjectTransform(moved));
+                        session.SetSelectedObjectTransform(movedTransform));
         passed &= Check("editing marks the session dirty", session.IsDirty());
         out = glm::mat4(0.0f);
         passed &= Check("edited transform can be read back",
@@ -402,7 +407,8 @@ namespace
 
         passed &= Check("multi selection rejects transform edit",
                         !session.SetSelectedObjectTransform(
-                            Translation(1.0f, 2.0f, 3.0f)));
+                            Limen::SceneTransform{
+                                .Location = {1.0f, 2.0f, 3.0f}}));
 
         glm::mat4 out = Translation(9.0f, 9.0f, 9.0f);
         passed &= Check("multi selection rejects transform query",
@@ -509,10 +515,12 @@ namespace
         LimenEditor::EditorSession session = MakeSession(configuration);
         const auto mesh = MakeMeshToken();
         const auto material = MakeMaterialToken();
-        const glm::mat4 moved = Translation(2.0f, 3.0f, 4.0f);
+        Limen::SceneTransform movedTRS;
+        movedTRS.Location = {2.0f, 3.0f, 4.0f};
+        const glm::mat4 moved = movedTRS.ToMatrix();
 
         const Limen::SceneObjectID id =
-            session.CreateRenderableObject(mesh, material, moved);
+            session.CreateRenderableObject(mesh, material, movedTRS);
         bool passed = Check("renderable with transform is valid", id.isValid());
 
         int visits = 0;
@@ -541,6 +549,14 @@ namespace
                         session.TryGetObjectTransform(id, byID) &&
                         MatchesTransform(byID, moved));
 
+        Limen::SceneTransform authoring{};
+        passed &= Check("authoring transform by stable ID matches",
+                        session.TryGetObjectTransform(id, authoring));
+        passed &= Check("authoring transform keeps location",
+                        std::abs(authoring.Location.x - 2.0f) <= 1.0e-5f &&
+                        std::abs(authoring.Location.y - 3.0f) <= 1.0e-5f &&
+                        std::abs(authoring.Location.z - 4.0f) <= 1.0e-5f);
+
         const Limen::SceneObjectID stale{
             0xDEADBEEFDEADBEEFULL,
             0xDEADBEEFDEADBEEFULL
@@ -550,6 +566,22 @@ namespace
                         !session.TryGetObjectTransform(stale, untouched) &&
                         MatchesTransform(untouched,
                                          Translation(9.0f, 9.0f, 9.0f)));
+
+        session.ClearDirty();
+        Limen::SceneTransform updated;
+        updated.Location = {5.0f, 6.0f, 7.0f};
+        passed &= Check("selected authoring transform can be changed",
+                        session.SetSelectedObjectTransform(updated));
+        passed &= Check("authoring transform change marks session dirty",
+                        session.IsDirty());
+        passed &= Check("selected authoring transform can be read",
+                        session.TryGetSelectedObjectTransform(authoring) &&
+                        std::abs(authoring.Location.x - 5.0f) <= 1.0e-5f &&
+                        std::abs(authoring.Location.y - 6.0f) <= 1.0e-5f &&
+                        std::abs(authoring.Location.z - 7.0f) <= 1.0e-5f);
+        passed &= Check("authoring transform synchronizes matrix cache",
+                        session.TryGetSelectedObjectTransform(out) &&
+                        MatchesTransform(out, updated.ToMatrix()));
         return passed;
     }
 
@@ -587,6 +619,50 @@ namespace
             });
         passed &= Check("renderable group exposes both components",
                         visits == 2);
+        return passed;
+    }
+
+    bool TestObjectLabelContract(
+        const Limen::ProjectConfiguration &configuration)
+    {
+        LimenEditor::EditorSession session = MakeSession(configuration);
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+
+        Limen::LArray<Limen::SceneRenderObject> parts;
+        parts.push_back(Limen::SceneRenderObject{
+            mesh, material, glm::mat4{1.0f}});
+
+        const Limen::SceneObjectID id =
+            session.CreateRenderableObjectGroup(
+                parts,
+                Limen::SceneTransform{},
+                "TestCube");
+        bool passed = Check("labeled group is created", id.isValid());
+
+        Limen::LString label;
+        passed &= Check("created group exposes initial label",
+                        session.TryGetObjectLabel(id, label) &&
+                        label == "TestCube");
+
+        session.ClearDirty();
+        passed &= Check("label can be changed",
+                        session.SetObjectLabel(id, "场景对象"));
+        passed &= Check("label change marks session dirty",
+                        session.IsDirty());
+        passed &= Check("changed label can be read",
+                        session.TryGetObjectLabel(id, label) &&
+                        label == "场景对象");
+
+        const Limen::SceneObjectID stale{
+            0xDEADBEEFDEADBEEFULL,
+            0xDEADBEEFDEADBEEFULL
+        };
+        Limen::LString untouched("keep");
+        passed &= Check("stale ID cannot read label",
+                        !session.TryGetObjectLabel(stale, untouched));
+        passed &= Check("failed label query preserves output",
+                        untouched == "keep");
         return passed;
     }
 }
@@ -635,6 +711,7 @@ int main()
         passed &= TestBatchDeletionContract(configuration);
         passed &= TestRenderableTransformContract(configuration);
         passed &= TestRenderableGroupContract(configuration);
+        passed &= TestObjectLabelContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");

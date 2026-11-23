@@ -53,6 +53,58 @@ add_test(
         COMMAND $<TARGET_FILE:LimenAssetIDTests>
 )
 
+add_executable(LimenSceneObjectIDTests
+        SceneObjectIDTests.cpp
+)
+
+limen_configure_target(LimenSceneObjectIDTests)
+
+target_link_libraries(LimenSceneObjectIDTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneObjectID
+        COMMAND $<TARGET_FILE:LimenSceneObjectIDTests>
+)
+
+add_executable(LimenSceneComponentIDTests
+        SceneComponentIDTests.cpp
+)
+
+limen_configure_target(LimenSceneComponentIDTests)
+
+target_link_libraries(LimenSceneComponentIDTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneComponentID
+        COMMAND $<TARGET_FILE:LimenSceneComponentIDTests>
+)
+
+add_executable(LimenSceneComponentTests
+        SceneComponentTests.cpp
+)
+
+limen_configure_target(LimenSceneComponentTests)
+
+target_link_libraries(LimenSceneComponentTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneComponent
+        COMMAND $<TARGET_FILE:LimenSceneComponentTests>
+)
+
+add_executable(LimenSceneTransformTests
+        SceneTransformTests.cpp
+)
+
+limen_configure_target(LimenSceneTransformTests)
+
+target_link_libraries(LimenSceneTransformTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneTransform
+        COMMAND $<TARGET_FILE:LimenSceneTransformTests>
+)
+
 add_executable(LimenAssetRegistryTests
         AssetRegistryTests.cpp
 )
