@@ -1,12 +1,12 @@
 # Limen Editor
 
-> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产驱动生成），见下文。
+> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置和顶栏内置 `Cube`、`Point Light` 放置已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产与内置对象生成），见下文。
 
 ## 当前已实现
 
 - `EditorApp` 注册 `EditorUILayer`；引擎在场景更新、窗口清屏之后调用 `OnUIRender()` 绘制正式 Editor UI，不依赖 Sandbox 的 ImGui。
 - `EditorUILayout` 使用逻辑窗口尺寸计算顶部、左侧、中央、右上、分隔条和右下六个区域；常规宽度下三栏保持比例，极窄窗口优先满足中央最小宽度，左右栏可能缩至零。
-- `EditorUIRenderer` 通过 OpenGL 后端绘制纯色和纹理矩形，并区分逻辑窗口坐标与帧缓冲像素尺寸；目前用引擎白纹理进行最小绘制检查，文字、裁剪和输入焦点尚未接入。
+- `EditorUIRenderer` 通过 OpenGL 后端绘制纯色、纹理与文字，设置矩形裁剪并区分逻辑窗口坐标与帧缓冲像素尺寸；面板输入命中由各自保存的逻辑矩形负责。
 - 右侧分隔条在鼠标按下后记录交互状态，松开时按右侧正文总高（包含分隔条）更新上下比例；不要求分隔条精确贴住松开位置，也不在移动时实时调整。零尺寸帧缓冲事件会取消拖动并清除旧命中区域。
 - `LimenEditorUILayout` CPU 测试覆盖常规与放大窗口的布局比例、右侧总高、极矮窗口和矩形命中边界；它不替代窗口画面与输入验证。
 - `LimenOpenGLEditorUITextureTests` 使用非对称 RGBA 纹理与隐藏 OpenGL 窗口读回像素，验证 UV、sRGB、Alpha 以及逻辑尺寸到 2 倍帧缓冲尺寸的映射；这不是实际 Retina 显示器或可见 Editor 窗口的验收。
@@ -57,7 +57,7 @@ flowchart TB
 
 ## 当前代码与目标之间的差距
 
-- 当前可见区域仍以单窗口占位矩形和白图为主；非对称纹理的 GPU 数值测试不等于正式面板已有真实数据，尚无 Scene 视口或编辑功能。
+- 当前已有单窗口真实 Scene 视口、模型/内置对象放置和同步面板；仍缺停靠、多原生窗口、通用输入焦点、Gizmo、Undo/Redo 与场景保存/加载闭环。
 - 目前 [`Application`](../LimenEngine/include/Limen/Application/Application.h) 只持有一个 `Window`，主循环只轮询并呈现这一个窗口；多窗口宿主尚未实现。
 - Sandbox 的 [`ImGUILayer`](../LimenEngine/src/Editor/ImGui/ImGUILayer.cpp) 启用停靠，但关闭了多原生窗口。仅开启 ImGui 的多视口标志不能替代正式 Editor 的窗口、面板和状态所有权设计。
 - [`Example3DLayer`](../LimenSandBox/src/Example3DLayer.h) 将测试场景、`SceneRenderer` 与视口状态放在一个 Layer 中；正式 Editor 需要把跨面板共享的场景/选择状态与每个视口自己的状态分开。
@@ -68,7 +68,7 @@ flowchart TB
 Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)，不是单独无限扩张的 UI 技术演示。每个节点都以真实项目数据和可重复操作验收：
 
 1. **G0：收稳最小 UI 路径。**用非对称 RGBA 图验证纹理 UV、颜色、Alpha、缩放与高 DPI；保留已有“松开才调整、区域可接近收起”的分隔条交互，并复验窗口缩放、非全屏最大化、最小化恢复及非零尺寸变化到下一次绘制之间的旧命中区域。让 `LimenEditor` 有显式构建/测试入口。
-2. **G1：等待并接入真实数据契约。**Engine 提供项目配置、稳定 AssetID、场景对象身份与保存/加载；Editor 会话借用活动 Scene/Asset，管理统一选择和脏状态。不能用临时数组下标充当跨面板长期引用。
+2. **G1：接入真实数据契约并完成保存/加载（进行中）。**项目配置、稳定 AssetID、场景对象身份、Authoring Component 和 Editor 会话已接入；剩余 Authoring 快照、SceneSerializer、`RestoreObject` 与保存/加载命令。不能用临时数组下标充当跨面板长期引用。
 3. **G2：做出可用的场景编辑器。**只补齐真实面板需要的文字、裁剪、焦点与事件路由；中央 Scene 视口消费 `SceneRenderer` 的最终颜色，按视口尺寸更新离屏目标与相机宽高比，并检查逻辑尺寸、帧缓冲像素尺寸及 GPU Context 生命周期。Hierarchy/Outliner、Inspector/Details、Content Browser 操作同一场景。加入 Picking、Transform 编辑、Undo/Redo、保存反馈；以“修改后关闭重开仍一致”验收。UI 不拥有或释放 Scene。
 4. **G3–G4：接入游戏工作流。**Play/Stop 使用隔离的运行世界，Editor 将构建/发布入口连接到独立 Player、C# 游戏脚本和 Cooker；游戏能力及发布包由引擎主线负责，Editor 不复制一套运行时。
 5. **后续工作区能力。**真实面板、输入焦点和资源生命周期稳定后，再做停靠、浮动原生窗口与独立于场景的布局持久化；多窗口共享同一个 Editor 会话，不是 G2 基本编辑闭环的前置条件。
@@ -100,9 +100,17 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 - 引擎侧新增 `Scene::ForEachObject/ForEachRenderableObject` 与 `AssetRegistry::ForEachRecord`，面板只读借用数据。
 - 验收：面板显示会话真实数据；选择、删除在面板间同步；字体方向、裁剪和纹理直通 GPU 测试通过。
 
-### D：资产驱动对象生成（进行中）
+### D：资产与内置对象生成（进行中）
 
-当前生成入口已经统一到 Content Browser 的显式 `Place`，Outliner 不再拥有创建按钮。流程参考 UE 的 Content Browser 选中资产 → Place：
+当前有三个显式 Place 入口：
+
+- Content Browser 的 `Place`：放置当前选中的 OBJ 模型资产；
+- 顶栏 `Place → Cube`：创建一个带 `PrimitiveRendererComponent(PrimitiveType::Cube)` 和共享 Cube Mesh/Material 的可渲染对象；
+- 顶栏 `Place → Point Light`：创建一个不可渲染对象，并挂载 `PointLightComponent`；对象根 TRS 的 Translation 决定灯光世界位置。
+
+内置对象使用 `Cube`、`Cube_2`、`PointLight`、`PointLight_2` 这类唯一 Label。按钮使用 350 ms 命令去抖，双击不会重复生成两个对象。Outliner 不拥有创建按钮。
+
+模型资产放置流程参考 UE 的 Content Browser 选中资产 → Place：
 
 1. Content Browser 行点击调用 `EditorSession::SelectAsset(AssetID)`，选中行高亮；单击只改变资产选择，双击保留为后续资产编辑器入口，不实例化对象。资产选择与场景对象选择互相独立。按住资产行拖动超过 5 个逻辑像素后可拖入 Scene 视口，在释放位置生成对象。
 2. `Place` 要求存在选中资产且 `AssetRecordStatus::Present`；资产缺失或加载失败时不修改 Scene，并留下明确诊断。
@@ -111,9 +119,11 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`，渲染时与世界 Transform 组合；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
    放置时以模型文件名生成 Label，例如 `TestCube`；同名对象使用 `TestCube_2`、`TestCube_3`。Label 只用于显示和序列化，对象身份仍由 `SceneObjectID` 承担。
 6. `Place` 按钮把对象放在视口中心；拖拽释放则按鼠标位置生成世界空间射线，默认距离也是相机前方 4 个世界单位。拖拽开始时读取模型局部 AABB，按当前落点投影为半透明屏幕包围框，同时显示资产路径和距离；滚轮按每次 0.5 个单位在 1.0～20.0 范围调整距离。连续放置不依赖硬编码世界原点。GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用。
-7. Place 成功或失败会在顶栏显示 10 秒状态：缺失资产、OBJ 加载失败、无渲染组件、视口未就绪和拖拽落到视口外都有可见反馈；控制台同时记录一次点击级诊断。
+7. Place 成功或失败会在顶栏显示 10 秒状态：缺失资产、OBJ 加载失败、无渲染组件、内置资源不可用、视口未就绪和拖拽落到视口外都有可见反馈。
 
-文件范围：`EditorSession`、`EditorSceneContent`、`EditorAssetSpawner`、`SceneViewportPanel`、`EditorUILayer`、Content Browser/Outliner 面板、测试与资产样例。已验证：完整构建通过，完整 CTest 25/25 通过，临时项目 OBJ 的 OpenGL GPU 端到端测试通过，并已在真实窗口验证按钮放置、拖拽放置和滚轮距离调整。验收：选中一个已注册模型资产 → 点击 Place 或拖入视口 → 模型出现在对应位置，Outliner 只增加一行，Details 显示 Pos；重复实例共享 Mesh/Material；缺失资产不留下半成品对象。
+文件范围：`EditorSession`、`EditorSceneContent`、`EditorAssetSpawner`、`EditorPrimitiveSpawner`、`PlacementToolbarPanel`、`SceneViewportPanel`、`EditorUILayer`、Content Browser/Outliner 面板、测试与资产样例。已验证：完整构建和 CTest 通过；临时项目 OBJ 的 OpenGL GPU 端到端测试通过；真实窗口验证 `Cube` 出现在视口且 Outliner/Details 同步，`Point Light` 在 Outliner 新增并选中。验收：模型资产、Cube 和 PointLight 都能从显式 Place 入口创建；失败不留下半成品对象。
+
+PointLight 仍处于迁移期：新建 Editor 光源只使用 `PointLightComponent`；运行期通过 `CollectRuntimePointLights()` 与旧 `Scene::m_PointLights` 合并，兼容尚未迁移的 Sandbox/Renderer 调用。全部调用方迁移后再删除 Scene 级旧点光源数组。
 
 ### UE5 参照边界
 

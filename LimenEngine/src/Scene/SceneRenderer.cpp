@@ -19,6 +19,7 @@
 
 #include "Limen/RHI/VertexArray.h"
 #include "Limen/RHI/IndexBuffer.h"
+#include "Limen/Scene/SceneRuntime.h"
 
 namespace Limen
 {
@@ -497,15 +498,18 @@ namespace Limen
 
         m_ShadowFramebuffer->BindDepthAttachment(shadowMapTextureSlot);
 
-        // 把相机、光源和阴影数据交给Renderer。
+        const LArray<PointLight> & runtimePointLights = CollectRuntimePointLights(scene);
+
+        // 去收集场景中的点光源信息去传入
         Renderer::BeginScene(
             camera,
             scene.GetAmbientLight(),
             scene.GetDirectionalLight(),
-            scene.GetPointLights(),
+            runtimePointLights,
             m_DirectionalLightViewProjectionMatrix,
             shadowMapTextureSlot
         );
+
 
         /*
          * Scene 只保存对象数据，SceneRenderer 负责遍历并提交。

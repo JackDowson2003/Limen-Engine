@@ -89,7 +89,7 @@ int main()
                   Result::SelectionChanged) &&
               success;
 
-    LimenEditor::ContentBrowserCommandGuard placeGuard;
+    LimenEditor::EditorCommandGuard placeGuard;
     success = Check(
                   "place command triggers once",
                   placeGuard.TryAcquire(start)) &&

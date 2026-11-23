@@ -23,10 +23,13 @@
 #include "Limen/Scene/SceneRenderer.h"
 #include "Project/EditorSession.h"
 #include "Render/EditorAssetSpawner.h"
+#include "Render/EditorPrimitiveSpawner.h"
 #include "Render/EditorSceneContent.h"
 
 namespace
 {
+    namespace fs = std::filesystem;
+
     bool Check(const char *name, const bool condition)
     {
         if (condition)
@@ -124,6 +127,148 @@ int main()
         success = Check("default cube material exists",
                         static_cast<bool>(content.GetCubeMaterial())) && success;
 
+        // Primitive Spawner 依赖真实 Mesh/Material，因此在 OpenGL 上下文中验证。
+        if (content.GetCubeMesh() && content.GetCubeMaterial())
+        {
+            const auto stamp =
+                std::chrono::steady_clock::now().time_since_epoch().count();
+            const fs::path primitiveProjectRoot =
+                fs::temp_directory_path() /
+                ("limen-editor-primitive-render-test-" +
+                 std::to_string(stamp));
+            const fs::path primitiveAssetRoot =
+                primitiveProjectRoot / "assets";
+            fs::create_directories(primitiveAssetRoot);
+
+            Limen::ProjectConfiguration primitiveConfiguration;
+            primitiveConfiguration.AssetRootAbsolute = primitiveAssetRoot;
+            auto primitiveRegistry =
+                Limen::CreateScope<Limen::AssetRegistry>(
+                    primitiveAssetRoot);
+            Limen::AssetRegistryError primitiveRegistryError;
+            const bool registryLoaded =
+                primitiveRegistry->TryLoad(primitiveRegistryError);
+            success = Check("primitive test registry loads",
+                            registryLoaded) && success;
+
+            if (registryLoaded)
+            {
+                LimenEditor::EditorSession primitiveSession(
+                    std::move(primitiveConfiguration),
+                    std::move(primitiveRegistry));
+                LimenEditor::EditorPrimitiveSpawner primitiveSpawner;
+
+                Limen::SceneTransform cubeTransform;
+                cubeTransform.Location = {1.0f, 2.0f, 3.0f};
+                Limen::LArray<Limen::SceneObjectID> cubes;
+                std::string primitiveError;
+                success = Check(
+                    "cube primitive spawns",
+                    primitiveSpawner.SpawnCube(
+                        primitiveSession,
+                        content,
+                        cubeTransform,
+                        cubes,
+                        &primitiveError)) && success;
+                success = Check("cube primitive creates one object",
+                                cubes.getSize() == 1) && success;
+
+                Limen::LString cubeLabel;
+                success = Check(
+                    "cube primitive receives default label",
+                    cubes.getSize() == 1 &&
+                    primitiveSession.TryGetObjectLabel(
+                        cubes[0],
+                        cubeLabel) &&
+                    cubeLabel == "Cube") && success;
+
+                Limen::SceneTransform storedCubeTransform;
+                success = Check(
+                    "cube primitive stores placement transform",
+                    cubes.getSize() == 1 &&
+                    primitiveSession.TryGetObjectTransform(
+                        cubes[0],
+                        storedCubeTransform) &&
+                    std::abs(storedCubeTransform.Location.x - 1.0f) <=
+                    1.0e-5f &&
+                    std::abs(storedCubeTransform.Location.y - 2.0f) <=
+                    1.0e-5f &&
+                    std::abs(storedCubeTransform.Location.z - 3.0f) <=
+                    1.0e-5f) && success;
+
+                std::uint32_t renderVisits = 0;
+                primitiveSession.GetScene().ForEachRenderableObject(
+                    [&](const Limen::SceneObjectHandle &,
+                        const Limen::SceneObjectID &visitedID,
+                        const Limen::Ref<Limen::Mesh> &,
+                        const Limen::Ref<Limen::Material> &,
+                        const glm::mat4 &)
+                    {
+                        if (cubes.getSize() == 1 &&
+                            visitedID == cubes[0])
+                        {
+                            ++renderVisits;
+                        }
+                    });
+                success = Check(
+                    "cube primitive attaches one render component",
+                    renderVisits == 1) && success;
+
+                Limen::SceneObjectHandle cubeHandle{};
+                std::uint32_t authoringComponents = 0;
+                bool primitiveIsCube = false;
+                success = Check(
+                    "spawned cube can be found",
+                    cubes.getSize() == 1 &&
+                    primitiveSession.GetScene().TryFindObject(
+                        cubes[0],
+                        cubeHandle)) && success;
+                if (cubeHandle.IsValid())
+                {
+                    primitiveSession.GetScene().ForEachObjectComponent(
+                        cubeHandle,
+                        [&](const Limen::SceneObjectComponent &component)
+                        {
+                            ++authoringComponents;
+                            const auto *primitive =
+                                std::get_if<Limen::PrimitiveRendererComponent>(
+                                    &component.Data);
+                            primitiveIsCube =
+                                primitive &&
+                                primitive->Primitive ==
+                                Limen::PrimitiveType::Cube;
+                        });
+                }
+                success = Check(
+                    "cube primitive attaches one authoring component",
+                    authoringComponents == 1) && success;
+                success = Check(
+                    "cube primitive stores Cube type",
+                    primitiveIsCube) && success;
+
+                Limen::LArray<Limen::SceneObjectID> secondCube;
+                Limen::SceneTransform secondCubeTransform;
+                secondCubeTransform.Location = {-1.0f, 2.0f, 3.0f};
+                success = Check(
+                    "second cube primitive spawns",
+                    primitiveSpawner.SpawnCube(
+                        primitiveSession,
+                        content,
+                        secondCubeTransform,
+                        secondCube)) && success;
+                Limen::LString secondCubeLabel;
+                success = Check(
+                    "second cube primitive receives unique label",
+                    secondCube.getSize() == 1 &&
+                    primitiveSession.TryGetObjectLabel(
+                        secondCube[0],
+                        secondCubeLabel) &&
+                    secondCubeLabel == "Cube_2") && success;
+            }
+
+            fs::remove_all(primitiveProjectRoot);
+        }
+
         Limen::Scene scene;
         if (content.GetCubeMesh() && content.GetCubeMaterial())
         {
@@ -188,8 +333,6 @@ int main()
 
     // 资产驱动端到端：临时项目中的 OBJ → 选中资产 → Spawner → SceneRenderer。
     {
-        namespace fs = std::filesystem;
-
         const auto stamp =
             std::chrono::steady_clock::now().time_since_epoch().count();
         const fs::path projectRoot =

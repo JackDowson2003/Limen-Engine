@@ -14,13 +14,13 @@
 - Authoring 级 `SceneTransform` 与矩阵转换；
 - SceneObject 的 AuthoringTransform，以及过渡期运行期矩阵缓存；
 - 一个 SceneObject 挂多个 `SceneRenderObject`；
+- ModelRenderer、PrimitiveRenderer、PointLight 三类 Authoring Component；
+- `CollectRuntimePointLights()` 合并组件点光源与遗留 Scene 级点光源；
 - `AssetID` 与项目级 `AssetRegistry`；
-- Editor 的资产放置、Label 显示、唯一默认命名、选择、Transform 查看、多选和脏状态。
+- Editor 的资产、Cube 与 PointLight 放置，Label 显示、唯一默认命名、选择、Transform 查看、多选和脏状态。
 
 当前尚未具备：
 
-- 持久化的 Authoring Component 列表；
-- 对象来源资产或组件来源数据；
 - `Scene::RestoreObject` 与 Authoring 快照遍历；
 - `.lscene` schema、保存器、加载器和原子替换；
 - Project 起始场景；
@@ -31,9 +31,9 @@
 ## 2. 当前实现阻塞点
 
 - `SceneRenderObject` 只有运行期 `Ref<Mesh>`、`Ref<Material>` 和局部矩阵，没有可持久化的资源身份，见 [`Scene.h`](../LimenEngine/include/Limen/Scene/Scene.h)。
-- Scene 槽位已有 ObjectID、Label、AuthoringTransform 和运行期渲染组件，但还没有 Authoring Component 数组或来源 AssetID。
+- Scene 槽位已有 ObjectID、Label、AuthoringTransform、运行期渲染组件和 Authoring Component，但缺少保存器所需的完整快照/恢复接口。
 - `ObjectSlot::Transform` 仍作为过渡期矩阵缓存存在；它不能成为第二份可编辑 Transform。
-- [`EditorAssetSpawner.cpp`](../Limen-Editor/src/Render/EditorAssetSpawner.cpp) 已取得模型 `AssetID`，但完成运行期实例化后丢弃来源信息。
+- [`EditorAssetSpawner.cpp`](../Limen-Editor/src/Render/EditorAssetSpawner.cpp) 已把模型 `AssetID` 写入 `ModelRendererComponent`，但尚无可读取全部 Authoring 数据的序列化入口。
 - [`EditorSession.h`](../Limen-Editor/src/Project/EditorSession.h) 有脏状态，但没有场景路径、保存命令或成功加载后的 Scene 替换操作。
 - [`ProjectConfiguration.h`](../LimenEngine/include/Limen/Project/ProjectConfiguration.h) 尚无起始场景字段。
 
@@ -499,9 +499,9 @@ Engine 契约稳定后由 Editor 实现：
 当前进度：
 
 - A1 已完成：ObjectID、ComponentID、SceneTransform、Label、AuthoringTransform 与矩阵同步；
-- A2.1 待完成：把 ID 从 `Scene.h` 迁移到独立的 `SceneIdentity.h/.cpp`；
-- A2.2：新增 `SceneComponent.h/.cpp`，定义 ModelRenderer、PrimitiveRenderer、PointLight 和 ComponentID 生成；
-- A2.3：Scene 持有 Authoring Component，Editor 放置保存 ModelAssetID；
+- A2.1 已完成：ID 已迁移到独立的 `SceneIdentity.h/.cpp`；
+- A2.2 已完成：`SceneComponent.h/.cpp` 已定义 ModelRenderer、PrimitiveRenderer、PointLight 和 ComponentID 生成；
+- A2.3 已完成：Scene 持有 Authoring Component，Editor 放置保存 ModelAssetID，并支持 Cube 与 PointLight 内置对象；
 - A2.4：删除过渡矩阵缓存，再进入 SceneSerializer。
 
 ### B. SceneSerializer CPU 基线

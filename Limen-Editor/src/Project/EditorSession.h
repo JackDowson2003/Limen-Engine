@@ -81,7 +81,8 @@ namespace LimenEditor
         Limen::SceneObjectID CreateRenderableObject(
             Limen::Ref<Limen::Mesh> mesh,
             Limen::Ref<Limen::Material> material,
-            const Limen::SceneTransform &transform = {})
+            const Limen::SceneTransform &transform = {},
+            const std::string_view label = {})
         {
             if (!mesh || !material)
                 return {};
@@ -94,6 +95,11 @@ namespace LimenEditor
                             .Transform = glm::mat4{1.0f}
                         });
             if (!m_Scene->SetObjectTransform(handle, transform))
+            {
+                static_cast<void>(m_Scene->DestroyObject(handle));
+                return {};
+            }
+            if (!m_Scene->SetObjectLabel(handle, label))
             {
                 static_cast<void>(m_Scene->DestroyObject(handle));
                 return {};

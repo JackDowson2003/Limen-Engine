@@ -92,6 +92,19 @@ add_test(
         COMMAND $<TARGET_FILE:LimenSceneComponentTests>
 )
 
+add_executable(LimenSceneRuntimeTests
+        SceneRuntimeTests.cpp
+)
+
+limen_configure_target(LimenSceneRuntimeTests)
+
+target_link_libraries(LimenSceneRuntimeTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenSceneRuntime
+        COMMAND $<TARGET_FILE:LimenSceneRuntimeTests>
+)
+
 add_executable(LimenSceneTransformTests
         SceneTransformTests.cpp
 )
@@ -146,6 +159,24 @@ target_link_libraries(LimenEditorSessionTests PRIVATE LimenEngine)
 add_test(
         NAME LimenEditorSession
         COMMAND $<TARGET_FILE:LimenEditorSessionTests>
+)
+
+add_executable(LimenEditorPrimitiveSpawnerTests
+        EditorPrimitiveSpawnerTests.cpp
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorPrimitiveSpawner.cpp"
+)
+
+limen_configure_target(LimenEditorPrimitiveSpawnerTests)
+
+target_include_directories(LimenEditorPrimitiveSpawnerTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+target_link_libraries(LimenEditorPrimitiveSpawnerTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenEditorPrimitiveSpawner
+        COMMAND $<TARGET_FILE:LimenEditorPrimitiveSpawnerTests>
 )
 
 # 用无副作用的错误参数检查 Editor 启动分支；避免 CPU 测试构造 OpenGL 窗口。
@@ -334,6 +365,24 @@ add_test(
         COMMAND $<TARGET_FILE:LimenContentBrowserClickStateTests>
 )
 
+add_executable(LimenPlacementToolbarPanelTests
+        PlacementToolbarPanelTests.cpp
+)
+
+limen_configure_target(LimenPlacementToolbarPanelTests)
+
+target_include_directories(LimenPlacementToolbarPanelTests PRIVATE
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/include"
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src"
+)
+
+target_link_libraries(LimenPlacementToolbarPanelTests PRIVATE LimenEngine)
+
+add_test(
+        NAME LimenPlacementToolbarPanel
+        COMMAND $<TARGET_FILE:LimenPlacementToolbarPanelTests>
+)
+
 add_executable(LimenEditorStatusMessageTests
         EditorStatusMessageTests.cpp
 )
@@ -491,6 +540,7 @@ if (APPLE)
     add_executable(LimenEditorSceneRenderTests
             EditorSceneRenderTests.cpp
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorAssetSpawner.cpp"
+            "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorPrimitiveSpawner.cpp"
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneContent.cpp"
     )
 

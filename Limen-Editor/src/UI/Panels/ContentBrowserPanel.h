@@ -4,6 +4,7 @@
 
 #include "Limen/Asset/AssetRegistry.h"
 #include "Limen/Core/Core.h"
+#include "UI/EditorCommandGuard.h"
 #include "UI/EditorUILayout.h"
 
 namespace Limen
@@ -67,35 +68,6 @@ namespace LimenEditor
     private:
         Limen::AssetID m_LastClickedAsset{};
         std::chrono::steady_clock::time_point m_LastClickTime{};
-    };
-
-    // 命令型按钮去抖：双击按钮也只执行一次放置。
-    class ContentBrowserCommandGuard final
-    {
-    public:
-        [[nodiscard]] bool TryAcquire(
-            const std::chrono::steady_clock::time_point now) noexcept
-        {
-            constexpr auto repeatInterval = std::chrono::milliseconds(350);
-            if (m_HasTriggered &&
-                now >= m_LastTriggerTime &&
-                now - m_LastTriggerTime < repeatInterval)
-                return false;
-
-            m_LastTriggerTime = now;
-            m_HasTriggered = true;
-            return true;
-        }
-
-        void Reset() noexcept
-        {
-            m_LastTriggerTime = {};
-            m_HasTriggered = false;
-        }
-
-    private:
-        std::chrono::steady_clock::time_point m_LastTriggerTime{};
-        bool m_HasTriggered = false;
     };
 
     // 资产行拖拽状态：按下后移动超过阈值才进入拖拽。
@@ -194,7 +166,7 @@ namespace LimenEditor
         float m_FirstRowY = 0.0f;
         float m_RowHeight = 0.0f;
         ContentBrowserClickState m_ClickState;
-        ContentBrowserCommandGuard m_PlaceCommandGuard;
+        EditorCommandGuard m_PlaceCommandGuard;
         ContentBrowserDragState m_DragState;
     };
 }

@@ -9,6 +9,7 @@
 
 #include "Render/EditorUIRenderer.h"
 #include "Render/EditorAssetSpawner.h"
+#include "Render/EditorPrimitiveSpawner.h"
 #include "Render/EditorSceneContent.h"
 #include "Limen/Platform/PlatformPaths.h"
 #include "Limen/Renderer/FontAtlas.h"
@@ -29,6 +30,7 @@
 #include "UI/Panels/ContentBrowserPanel.h"
 #include "UI/Panels/DetailsPanel.h"
 #include "UI/Panels/OutlinerPanel.h"
+#include "UI/Panels/PlacementToolbarPanel.h"
 #include "UI/Panels/SceneViewportPanel.h"
 
 namespace LimenEditor
@@ -146,6 +148,13 @@ namespace LimenEditor
                     *m_FontAtlas,
                     header
                 );
+
+                m_PlacementToolbar.Draw(
+                    window,
+                    m_UIRenderer,
+                    *m_FontAtlas,
+                    m_Theme,
+                    layout.Top);
             }
 
             m_UIRenderer.DrawSolidRect(
@@ -309,6 +318,37 @@ namespace LimenEditor
         {
             // dispatcher 只在本次事件调用期间存在，用于按事件类型调用对应回调。
             Limen::EventDispatcher dispatcher(event);
+
+            // Place 工具区位于顶栏；按下后立即生成本帧唯一的放置命令。
+            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
+                [this](const Limen::MouseButtonPressedEvent &press)
+                {
+                    if (press.GetButton() != Limen::MouseButton::Left ||
+                        !m_Session)
+                    {
+                        return false;
+                    }
+
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    const PlacementToolbarAction action =
+                        m_PlacementToolbar.OnMousePressed(
+                            x,
+                            y,
+                            std::chrono::steady_clock::now());
+                    if (action == PlacementToolbarAction::PlaceCube)
+                    {
+                        static_cast<void>(PlaceCube());
+                        return true;
+                    }
+                    if (action == PlacementToolbarAction::PlacePointLight)
+                    {
+                        static_cast<void>(PlacePointLight());
+                        return true;
+                    }
+                    return false;
+                });
+            if (event.IsHandled())
+                return;
 
             // 输入路由优先级：Viewport → Content Browser → Outliner →
             // Splitter → 快捷键。被高优先级区域消费后不再进入后续区域。
@@ -548,6 +588,79 @@ namespace LimenEditor
         }
 
     private:
+        bool PlaceCube()
+        {
+            Limen::SceneTransform placementTransform;
+            if (!m_ViewportPanel.TryGetPlacementTransform(
+                    placementTransform,
+                    m_PlacementDistance))
+            {
+                ShowStatus(
+                    "Cannot place Cube: Scene viewport is not ready.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            Limen::LArray<Limen::SceneObjectID> created;
+            std::string spawnError;
+            if (!m_PrimitiveSpawner.SpawnCube(
+                    *m_Session,
+                    m_SceneContent,
+                    placementTransform,
+                    created,
+                    &spawnError) ||
+                created.getSize() == 0)
+            {
+                ShowStatus(
+                    spawnError.empty()
+                        ? "Cannot place Cube."
+                        : spawnError,
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            m_Outliner.SetSelectionAnchor(
+                created[created.getSize() - 1]);
+            ShowStatus("Placed Cube.", EditorStatusKind::Info);
+            return true;
+        }
+
+        bool PlacePointLight()
+        {
+            Limen::SceneTransform placementTransform;
+            if (!m_ViewportPanel.TryGetPlacementTransform(
+                    placementTransform,
+                    m_PlacementDistance))
+            {
+                ShowStatus(
+                    "Cannot place Point Light: Scene viewport is not ready.",
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            Limen::LArray<Limen::SceneObjectID> created;
+            std::string spawnError;
+            if (!m_PrimitiveSpawner.SpawnPointLight(
+                    *m_Session,
+                    placementTransform,
+                    created,
+                    &spawnError) ||
+                created.getSize() == 0)
+            {
+                ShowStatus(
+                    spawnError.empty()
+                        ? "Cannot place Point Light."
+                        : spawnError,
+                    EditorStatusKind::Error);
+                return false;
+            }
+
+            m_Outliner.SetSelectionAnchor(
+                created[created.getSize() - 1]);
+            ShowStatus("Placed Point Light.", EditorStatusKind::Info);
+            return true;
+        }
+
         // 只允许显式放置当前选中的资产；不提供隐藏的默认对象兜底。
         bool PlaceSelectedAsset()
         {
@@ -729,6 +842,10 @@ namespace LimenEditor
         EditorSceneContent m_SceneContent;
         // 资产选择到可渲染对象的转换器。
         EditorAssetSpawner m_AssetSpawner;
+        // 内置 Cube 与 PointLight 的 Authoring 创建入口。
+        EditorPrimitiveSpawner m_PrimitiveSpawner;
+        // 顶栏 Place 工具区的按钮布局与输入命中。
+        PlacementToolbarPanel m_PlacementToolbar;
 
         // 右侧 Details 面板：无状态，只读取会话选择。
         DetailsPanel m_DetailsPanel;
