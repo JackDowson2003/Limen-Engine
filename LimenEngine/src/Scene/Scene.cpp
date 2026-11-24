@@ -39,8 +39,6 @@ namespace Limen
 
             return id;
         }
-
-
     }
 
     SceneObjectHandle Scene::CreateObject()
@@ -71,30 +69,12 @@ namespace Limen
                 break;
         }
 
-        std::uint32_t index;
-        if (m_FreeHead != invalidIndex)
-        {
-            index = m_FreeHead;
-            const bool validFreeSlot =
-                    index < m_ObjectSlots.getSize() &&
-                    !m_ObjectSlots[index].Alive &&
-                    m_ObjectSlots[index].Generation != 0;
-
-            LM_CORE_ASSERT(validFreeSlot, "Scene object free list is corrupted");
-            if (!validFreeSlot)
-                return {};
-
-            m_FreeHead = m_ObjectSlots[index].NextFree;
-        } else
-        {
-            index = m_ObjectSlots.getSize();
-            m_ObjectSlots.emplace_back();
-        }
-
+        const auto index = AcquireObjectSlot();
+        if (index == SceneObjectHandle::InvalidIndex)
+            return {};
         auto &[
             ID,
             AuthoringTransform,
-            Transform,
             Generation,
             NextFree,
             Alive,
@@ -105,8 +85,6 @@ namespace Limen
         ID = id;
         // 新对象的 Authoring TRS 被重置为单位变换。
         AuthoringTransform = SceneTransform{};
-        // 过渡期的矩阵缓存与 Authoring TRS 一致
-        Transform = AuthoringTransform.ToMatrix();
         NextFree = invalidIndex;
         Alive = true;
         RenderComponents.clear();
@@ -122,51 +100,117 @@ namespace Limen
         };
     }
 
-    SceneObjectHandle Scene::AddRenderableObject(const SceneRenderObject &renderObject)
+    SceneObjectHandle Scene::Restore(const SceneObjectAuthoringData &data)
     {
-        LM_CORE_ASSERT(renderObject.MeshResource,
-                       "Renderable object requires Mesh");
-        LM_CORE_ASSERT(renderObject.MaterialResource,
-                       "Renderable object requires Material");
-        if (!renderObject.MeshResource || !renderObject.MaterialResource)
+        if (!data.ID.isValid() || !data.Transform.IsFinite())
             return {};
 
-        const SceneObjectHandle handle = CreateObject();
+        for (std::uint32_t i = 0; i < data.Components.getSize(); ++i)
+        {
+            const auto &component = data.Components[i];
+            if (!IsSceneObjectComponentValid(component))
+                return {};
+
+            // 组件id必须唯一
+            for (std::uint32_t j = 0; j < i; j++)
+                if (data.Components[j].ID == component.ID)
+                    return {};
+        }
+
+        SceneObjectHandle existing{};
+        // 查找是否已经存在
+        if (TryFindObject(data.ID, existing))
+            return {};
+
+        // 拷贝的内存可能分配，所以先准备好数据再修改空闲链
+        LString label(data.Label);
+        LArray<SceneObjectComponent> components(data.Components);
+
+        // 取到空闲槽位
+        const auto index = AcquireObjectSlot();
+        if (index == SceneObjectHandle::InvalidIndex)
+            return {};
+
+        ObjectSlot &slot = m_ObjectSlots[index];
+
+        slot.ID = data.ID;
+        slot.Label = std::move(label);
+        slot.Components = std::move(components);
+        slot.AuthoringTransform = data.Transform;
+        slot.RenderComponents.clear();
+        slot.Alive = true;
+
+        return {.Index = index, .Generation = slot.Generation};
+    }
+
+    std::uint32_t Scene::AcquireObjectSlot()
+    {
+        std::uint32_t index;
+        if (m_FreeHead != SceneObjectHandle::InvalidIndex)
+        {
+            index = m_FreeHead;
+            const bool validFreeSlot =
+                    index < m_ObjectSlots.getSize() &&
+                    !m_ObjectSlots[index].Alive &&
+                    m_ObjectSlots[index].Generation != 0;
+
+            LM_CORE_ASSERT(validFreeSlot, "Scene object free list is corrupted");
+            if (!validFreeSlot)
+                return SceneObjectHandle::InvalidIndex;
+
+            ObjectSlot &slot = m_ObjectSlots[index];
+            m_FreeHead = slot.NextFree;
+            slot.NextFree = SceneObjectHandle::InvalidIndex;
+        } else
+        {
+            index = m_ObjectSlots.getSize();
+            if (index >= SceneObjectHandle::InvalidIndex)
+                return SceneObjectHandle::InvalidIndex;
+            m_ObjectSlots.emplace_back();
+        }
+        return index;
+    }
+
+    SceneObjectHandle Scene::AddRenderableObject(const SceneRenderObject &renderObject,
+                                                 const SceneTransform &objectTransform)
+    {
+        if (!renderObject.MeshResource || !renderObject.MaterialResource || !objectTransform.IsFinite())
+            return {};
+
+        LArray<SceneRenderObject> preparedParts{renderObject};
+
+        const SceneObjectHandle &handle = CreateObject();
         if (!handle.IsValid() || handle.Index >= m_ObjectSlots.getSize())
             return {};
 
         ObjectSlot &slot = m_ObjectSlots[handle.Index];
-        slot.Transform = renderObject.Transform;
-        // 单组件入口把传入 Transform 当作对象变换，组件局部变换保持单位矩阵。
-        slot.RenderComponents.push_back(SceneRenderObject{
-            .MeshResource = renderObject.MeshResource,
-            .MaterialResource = renderObject.MaterialResource,
-            .Transform = glm::mat4{1.0f}
-        });
+        slot.AuthoringTransform = objectTransform;
+        slot.RenderComponents = std::move(preparedParts);
         return handle;
     }
 
-    SceneObjectHandle Scene::AddRenderableObjectGroup(
-        const LArray<SceneRenderObject> &parts)
+    SceneObjectHandle Scene::AddRenderableObjectGroup(const LArray<SceneRenderObject> &parts,
+                                                      const SceneTransform &objectTransform)
     {
-        if (parts.getSize() == 0)
+        if (parts.empty() || !objectTransform.IsFinite())
             return {};
 
-        for (const SceneRenderObject &part: parts)
+        for (const SceneRenderObject & part : parts)
         {
             if (!part.MeshResource || !part.MaterialResource)
                 return {};
         }
 
-        const SceneObjectHandle handle = CreateObject();
-        if (!handle.IsValid() || handle.Index >= m_ObjectSlots.getSize())
+        // 拷贝可能分配内存，先准备部件，再创建场景对象。
+        LArray preparedParts(parts);
+
+        const SceneObjectHandle & handle = CreateObject();
+        if (!handle.IsValid())
             return {};
 
         ObjectSlot &slot = m_ObjectSlots[handle.Index];
-        slot.Transform = glm::mat4{1.0f};
-        for (const SceneRenderObject &part: parts)
-            slot.RenderComponents.push_back(part);
-
+        slot.AuthoringTransform = objectTransform;
+        slot.RenderComponents = std::move(preparedParts);
         return handle;
     }
 
@@ -181,6 +225,7 @@ namespace Limen
             if (!slot.Alive || slot.RenderComponents.getSize() == 0)
                 continue;
 
+            const glm::mat4 objectToWorld = slot.AuthoringTransform.ToMatrix();
             for (const auto &[MeshResource, MaterialResource, Transform]: slot.RenderComponents)
             {
                 callback(
@@ -191,7 +236,7 @@ namespace Limen
                     slot.ID,
                     MeshResource,
                     MaterialResource,
-                    slot.Transform * Transform
+                    objectToWorld * Transform
                 );
             }
         }
@@ -220,6 +265,7 @@ namespace Limen
             if (!slot.Alive || slot.RenderComponents.getSize() == 0)
                 continue;
 
+            const glm::mat4 objectTransform = slot.AuthoringTransform.ToMatrix();
             for (const SceneRenderObject &component: slot.RenderComponents)
             {
                 if (!component.MeshResource)
@@ -227,7 +273,7 @@ namespace Limen
 
                 const AxisAlignedBoundingBox worldBounds =
                         component.MeshResource->GetLocalBounds().Transformed(
-                            slot.Transform * component.Transform);
+                            objectTransform * component.Transform);
 
                 float distance = 0.0f;
                 if (!IntersectRayAABB(
@@ -264,7 +310,6 @@ namespace Limen
         slot.ID = {};
         // 销毁后恢复默认 TRS，防止槽位复用残留上一代变换。
         slot.AuthoringTransform = SceneTransform{};
-        slot.Transform = slot.AuthoringTransform.ToMatrix();
         slot.Alive = false;
         slot.RenderComponents.clear();
         slot.Components.clear();
@@ -336,9 +381,8 @@ namespace Limen
     {
         if (!IsObjectAlive(handle) || !transform.IsFinite())
             return false;
-        ObjectSlot & slot = m_ObjectSlots[handle.Index];
+        ObjectSlot &slot = m_ObjectSlots[handle.Index];
         slot.AuthoringTransform = transform;
-        slot.Transform = transform.ToMatrix();
         return true;
     }
 
@@ -354,14 +398,13 @@ namespace Limen
     {
         if (!IsObjectAlive(handle) || !transform.IsFinite())
             return false;
-        ObjectSlot & slot = m_ObjectSlots[handle.Index];
+        ObjectSlot &slot = m_ObjectSlots[handle.Index];
         slot.AuthoringTransform = transform;
-        // Renderer 当前仍读取矩阵缓存，因此在同一个成功操作中同步更新。
-        slot.Transform = transform.ToMatrix();
         return true;
     }
 
-    bool Scene::TryGetObjectAuthoringTransform(const SceneObjectHandle handle,SceneTransform &outTransform) const noexcept
+    bool Scene::TryGetObjectAuthoringTransform(const SceneObjectHandle handle,
+                                               SceneTransform &outTransform) const noexcept
     {
         if (!IsObjectAlive(handle))
             return false;
@@ -377,7 +420,7 @@ namespace Limen
         if (!IsObjectAlive(handle))
             return false;
 
-        outTransform = m_ObjectSlots[handle.Index].Transform;
+        outTransform = m_ObjectSlots[handle.Index].AuthoringTransform.ToMatrix();
         return true;
     }
 
@@ -398,6 +441,25 @@ namespace Limen
         // 返回副本，避免调用方引用槽位内部字符串。
         outLabel = m_ObjectSlots[handle.Index].Label;
         return true;
+    }
+
+    void Scene::ForEachObjectAuthoring(const std::function<void(const SceneObjectAuthoringData &)> &callback) const
+    {
+        for (std::uint32_t index = 0; index < m_ObjectSlots.getSize(); ++index)
+        {
+            const ObjectSlot &slot = m_ObjectSlots[index];
+            if (!slot.Alive)
+                continue;
+
+            // 每次构造快照，避免取得Scene内部引用
+            const SceneObjectAuthoringData snapshot{
+                .ID = slot.ID,
+                .Label = slot.Label,
+                .Transform = slot.AuthoringTransform,
+                .Components = slot.Components
+            };
+            callback(snapshot);
+        }
     }
 
     void Scene::ForEachObject(
@@ -427,7 +489,7 @@ namespace Limen
 
         LArray<SceneObjectComponent> &components = m_ObjectSlots[handle.Index].Components;
 
-        for (const auto &existing : components)
+        for (const auto &existing: components)
         {
             if (existing.ID == component.ID)
                 return {};
@@ -438,11 +500,11 @@ namespace Limen
     }
 
     void Scene::ForEachObjectComponent(SceneObjectHandle handle,
-        const std::function<void(const SceneObjectComponent &)> &callback) const
+                                       const std::function<void(const SceneObjectComponent &)> &callback) const
     {
         if (!IsObjectAlive(handle))
             return;
-        for (const SceneObjectComponent & component : m_ObjectSlots[handle.Index].Components)
+        for (const SceneObjectComponent &component: m_ObjectSlots[handle.Index].Components)
         {
             callback(component);
         }
@@ -591,7 +653,4 @@ namespace Limen
     {
         return m_DirectionalLight;
     }
-
-
-
 }

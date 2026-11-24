@@ -13,11 +13,12 @@
 
 #include "Limen/Scene/SceneIdentity.h"
 #include "Limen/Scene/SceneComponent.h"
+#include "Limen/Scene/SceneTransform.h"
+#include "Limen/Scene/SceneAuthoring.h"
 #include "Limen/Core/Core.h"
 #include "Limen/Scene/Light.h"
 #include "Limen/Tool/LArray.h"
 #include "Limen/Tool/LString.h"
-#include "Limen/Scene/SceneTransform.h"
 
 namespace Limen
 {
@@ -54,7 +55,7 @@ namespace Limen
        */
         Ref<Material> MaterialResource;
         /**
-         * @brief 物体从模型空间变换到世界空间的矩阵。
+         * @brief component到object根的局部矩阵
          *
          * 单位矩阵表示物体保持 Mesh 原始的位置、旋转和大小。
          */
@@ -124,6 +125,10 @@ namespace Limen
 
         ~Scene() = default;
 
+        // 保留在快照中的持久ID，返回目标Scene的运行期的 Handle
+        [[nodiscard]]
+        SceneObjectHandle Restore(const SceneObjectAuthoringData& data);
+
         [[nodiscard]] SceneObjectHandle CreateObject();
 
         [[nodiscard]] bool DestroyObject(SceneObjectHandle handle);
@@ -190,6 +195,11 @@ namespace Limen
         [[nodiscard]]
         bool TryGetObjectLabel(SceneObjectHandle handle, LString &outLabel) const;
 
+        // 遍历可持久化对象快照；回调得到值副本，不能访问槽位或运行期资源。
+        void ForEachObjectAuthoring(
+            const std::function<void(
+                const SceneObjectAuthoringData &)> &callback
+        ) const;
 
         // 只读遍历全部存活对象；回调依次收到运行期句柄与稳定 ID。
         // 回调只借用数据，不得在遍历中创建或销毁对象。
@@ -197,15 +207,16 @@ namespace Limen
             const std::function<void(const SceneObjectHandle &, const SceneObjectID &)> &callback
         ) const;
 
-        // 创建一个带渲染组件的场景对象；Mesh/Material 不能为空。
-        [[nodiscard]] SceneObjectHandle AddRenderableObject(
-            const SceneRenderObject &renderObject
+        [[nodiscard]]
+        SceneObjectHandle AddRenderableObject(
+            const SceneRenderObject& renderObject,
+            const SceneTransform& objectTransform
         );
 
-        // 一个对象挂多个渲染组件（例如多 Part 模型）。
-        // 每个 part.Transform 是相对对象 Transform 的局部变换。
-        [[nodiscard]] SceneObjectHandle AddRenderableObjectGroup(
-            const LArray<SceneRenderObject> &parts
+        [[nodiscard]]
+        SceneObjectHandle AddRenderableObjectGroup(
+            const LArray<SceneRenderObject>& parts,
+            const SceneTransform& objectTransform
         );
 
         // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform
@@ -349,6 +360,11 @@ namespace Limen
         GetDirectionalLight() const noexcept;
 
     private:
+        // 取出空闲槽或追加新槽，失败返回InvalidIndex
+        [[nodiscard]]
+        std::uint32_t AcquireObjectSlot();
+
+    private:
         // 槽位下标可复用，Generation 用于让删除前的旧Handle失效
         struct ObjectSlot
         {
@@ -356,9 +372,6 @@ namespace Limen
 
             // 编辑、保存和加载使用的唯一 Authoring Transform
             SceneTransform AuthoringTransform{};
-
-            // 过渡期的只读的运行缓存，由AuthoringTransform.ToMatrix() 推导
-            glm::mat4 Transform{1.0f};
 
             // 运行期槽位版本号
             std::uint32_t Generation = 1;

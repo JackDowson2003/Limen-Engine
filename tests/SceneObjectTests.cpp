@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <variant>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -10,7 +11,7 @@
 namespace Limen
 {
     // 与 Scene 中受 LIMEN_SCENE_TEST_HOOKS 保护的 friend 声明配对。
-    // 只用于把槽位 Generation 推进到 uint32 上限，覆盖槽位退休边界。
+    // 覆盖公开接口无法直接观察的槽位退休和空闲链状态。
     struct SceneObjectSlotTestAccess
     {
         static void SetSlotGeneration(
@@ -19,6 +20,11 @@ namespace Limen
             const std::uint32_t generation)
         {
             scene.m_ObjectSlots[index].Generation = generation;
+        }
+
+        static std::uint32_t GetNextFree(const Scene& scene, const std::uint32_t index)
+        {
+            return scene.m_ObjectSlots[index].NextFree;
         }
     };
 }
@@ -446,9 +452,12 @@ namespace
         Limen::SceneRenderObject source;
         source.MeshResource = mesh;
         source.MaterialResource = material;
-        source.Transform = Translation(1.0f, 2.0f, 3.0f);
+        source.Transform = Translation(1.0f, 2.0f, 0.0f);
+        auto objectTransform = LocationTransform(10.0f, 0.0f, 0.0f);
+        objectTransform.Rotation = glm::quat{0.0f, 0.0f, 0.0f, 1.0f};
+        objectTransform.Scale = {2.0f, 3.0f, 4.0f};
 
-        const auto handle = scene.AddRenderableObject(source);
+        const auto handle = scene.AddRenderableObject(source, objectTransform);
         Check("renderable object handle is valid", handle.IsValid());
         Check("renderable object is alive", scene.IsObjectAlive(handle));
 
@@ -470,6 +479,16 @@ namespace
         Check("renderable object appears in object traversal",
               objectVisits == 1);
 
+        int snapshotVisits = 0;
+        scene.ForEachObjectAuthoring([&](const Limen::SceneObjectAuthoringData &snapshot)
+        {
+            ++snapshotVisits;
+            Check("renderable snapshot preserves object ID", snapshot.ID == objectID);
+            CheckAuthoringTransform("renderable snapshot preserves root TRS",
+                                    snapshot.Transform, objectTransform);
+        });
+        Check("renderable creates one authoring snapshot", snapshotVisits == 1);
+
         int renderVisits = 0;
         scene.ForEachRenderableObject(
             [&](const Limen::SceneObjectHandle &visitedHandle,
@@ -486,7 +505,10 @@ namespace
                 Check("renderable traversal material matches",
                       materialResource == material);
                 CheckTransform("renderable traversal transform",
-                               transform, source.Transform);
+                               transform, objectTransform.ToMatrix() * source.Transform);
+                // 局部偏移 (1, 2) 先缩放为 (2, 6)，旋转 180° 后再叠加根位移。
+                Check("component offset is composed in object space",
+                      glm::vec3(transform[3]) == glm::vec3{8.0f, -6.0f, 0.0f});
             });
         Check("one renderable object is visited", renderVisits == 1);
 
@@ -506,7 +528,7 @@ namespace
             {
                 ++renderVisits;
                 CheckTransform("render traversal sees updated transform",
-                               transform, moved);
+                               transform, moved * source.Transform);
             });
         Check("updated renderable is visited once", renderVisits == 1);
 
@@ -537,7 +559,7 @@ namespace
 
         // 复用槽位不得残留上一代渲染组件。
         const auto again = scene.AddRenderableObject(
-            Limen::SceneRenderObject{mesh, material, glm::mat4{1.0f}});
+            Limen::SceneRenderObject{mesh, material}, {});
         Check("replacement renderable is valid", again.IsValid());
         Check("replacement renderable reuses slot",
               again.Index == handle.Index);
@@ -571,16 +593,36 @@ namespace
         parts.push_back(Limen::SceneRenderObject{
             mesh, material, Translation(0.0f, 2.0f, 0.0f)});
 
-        const auto handle = scene.AddRenderableObjectGroup(parts);
+        const Limen::SceneTransform objectTransform = LocationTransform(3.0f, -1.0f, 0.0f);
+        auto invalidTransform = objectTransform;
+        invalidTransform.Location.x = std::numeric_limits<float>::infinity();
+        Limen::LArray<Limen::SceneRenderObject> invalidParts(parts);
+        invalidParts[1].MaterialResource.reset();
+        Check("single renderable rejects non-finite root TRS",
+              !scene.AddRenderableObject(parts[0], invalidTransform).IsValid());
+        Check("single renderable rejects missing resources",
+              !scene.AddRenderableObject(invalidParts[1], objectTransform).IsValid());
+        Check("renderable group rejects empty parts",
+              !scene.AddRenderableObjectGroup({}, objectTransform).IsValid());
+        Check("renderable group rejects an invalid second part",
+              !scene.AddRenderableObjectGroup(invalidParts, objectTransform).IsValid());
+        Check("renderable group rejects non-finite root TRS",
+              !scene.AddRenderableObjectGroup(parts, invalidTransform).IsValid());
+
+        const auto handle = scene.AddRenderableObjectGroup(parts, objectTransform);
         Check("grouped renderable object is valid", handle.IsValid());
+        Limen::SceneTransform storedTransform;
+        Check("grouped root TRS is available",
+              scene.TryGetObjectTransform(handle, storedTransform));
+        CheckAuthoringTransform("grouped root TRS is preserved", storedTransform, objectTransform);
 
         int objectVisits = 0;
         scene.ForEachObject(
             [&](const Limen::SceneObjectHandle &visitedHandle,
                 const Limen::SceneObjectID &)
             {
-                if (visitedHandle == handle)
-                    ++objectVisits;
+                ++objectVisits;
+                Check("group traversal sees only the created handle", visitedHandle == handle);
             });
         Check("group is one scene object", objectVisits == 1);
 
@@ -595,13 +637,13 @@ namespace
                 if (!(visitedHandle == handle))
                     return;
                 if (componentVisits == 0)
-                    CheckTransform("first component local transform",
+                    CheckTransform("first component world transform after creation",
                                    transform,
-                                   Translation(1.0f, 0.0f, 0.0f));
+                                   Translation(4.0f, -1.0f, 0.0f));
                 else if (componentVisits == 1)
-                    CheckTransform("second component local transform",
+                    CheckTransform("second component world transform after creation",
                                    transform,
-                                   Translation(0.0f, 2.0f, 0.0f));
+                                   Translation(3.0f, 1.0f, 0.0f));
                 ++componentVisits;
             });
         Check("group exposes two render components", componentVisits == 2);
@@ -957,6 +999,300 @@ namespace
             });
         Check("reused slot has no stale components", visits == 0);
     }
+
+    void TestObjectAuthoringSnapshot()
+    {
+        Limen::Scene scene;
+        const Limen::SceneObjectHandle first = scene.CreateObject();
+        const Limen::SceneObjectHandle second = scene.CreateObject();
+        const Limen::SceneObjectHandle third = scene.CreateObject();
+
+        Limen::SceneObjectID firstID{};
+        Limen::SceneObjectID secondID{};
+        Limen::SceneObjectID thirdID{};
+        Check("snapshot first ID is available",
+              scene.TryGetObjectID(first, firstID));
+        Check("snapshot second ID is available",
+              scene.TryGetObjectID(second, secondID));
+        Check("snapshot third ID is available",
+              scene.TryGetObjectID(third, thirdID));
+
+        Check("snapshot first label is set",
+              scene.SetObjectLabel(first, "First"));
+        Check("snapshot second label is set",
+              scene.SetObjectLabel(second, "Second"));
+        Check("snapshot third label is set",
+              scene.SetObjectLabel(third, "Third"));
+
+        const Limen::SceneTransform firstTransform =
+            LocationTransform(1.0f, 2.0f, 3.0f);
+        const Limen::SceneTransform thirdTransform =
+            LocationTransform(-3.0f, -2.0f, -1.0f);
+        Check("snapshot first transform is set",
+              scene.SetObjectAuthoringTransform(first, firstTransform));
+        Check("snapshot third transform is set",
+              scene.SetObjectAuthoringTransform(third, thirdTransform));
+
+        Limen::SceneObjectComponent primitive;
+        primitive.ID = {0x1111222233334444ULL, 0x5555666677778888ULL};
+        primitive.LocalTransform.Location = {0.25f, 0.5f, 0.75f};
+        primitive.Data = Limen::PrimitiveRendererComponent{
+            .Primitive = Limen::PrimitiveType::Cube
+        };
+        Check("snapshot first component is added",
+              scene.AddObjectComponent(first, primitive).isValid());
+
+        Limen::SceneObjectComponent light;
+        light.ID = {0x9999aaaabbbbccccULL, 0xddddeeeeffff0000ULL};
+        light.LocalTransform.Location = {0.0f, 1.0f, 0.0f};
+        light.Data = Limen::PointLightComponent{
+            .Color = {1.0f, 0.5f, 0.25f},
+            .Intensity = 4.0f
+        };
+        Check("snapshot third component is added",
+              scene.AddObjectComponent(third, light).isValid());
+
+        int snapshotVisits = 0;
+        bool sawFirst = false;
+        bool sawSecond = false;
+        bool sawThird = false;
+        scene.ForEachObjectAuthoring(
+            [&](const Limen::SceneObjectAuthoringData &snapshot)
+            {
+                ++snapshotVisits;
+                if (snapshot.ID == firstID)
+                {
+                    sawFirst = true;
+                    Check("snapshot first label matches",
+                          snapshot.Label == "First");
+                    CheckAuthoringTransform(
+                        "snapshot first transform matches",
+                        snapshot.Transform,
+                        firstTransform);
+                    Check("snapshot first has one component",
+                          snapshot.Components.getSize() == 1);
+                    if (snapshot.Components.getSize() == 1)
+                    {
+                        const Limen::SceneObjectComponent &component =
+                            snapshot.Components[0];
+                        Check("snapshot first component ID matches",
+                              component.ID == primitive.ID);
+                        Check("snapshot first component kind matches",
+                              Limen::GetSceneComponentKind(component) ==
+                              Limen::SceneComponentKind::PrimitiveRenderer);
+                        CheckAuthoringTransform(
+                            "snapshot first component local transform matches",
+                            component.LocalTransform,
+                            primitive.LocalTransform);
+                    }
+
+                    // 快照持有独立副本；修改副本不能影响 Scene。
+                    Limen::SceneObjectAuthoringData copy = snapshot;
+                    copy.Label = "Mutated";
+                    copy.Components.clear();
+                }
+                else if (snapshot.ID == secondID)
+                {
+                    sawSecond = true;
+                    Check("snapshot second label matches",
+                          snapshot.Label == "Second");
+                    Check("snapshot second has no components",
+                          snapshot.Components.getSize() == 0);
+                }
+                else if (snapshot.ID == thirdID)
+                {
+                    sawThird = true;
+                    Check("snapshot third label matches",
+                          snapshot.Label == "Third");
+                    CheckAuthoringTransform(
+                        "snapshot third transform matches",
+                        snapshot.Transform,
+                        thirdTransform);
+                    Check("snapshot third has one component",
+                          snapshot.Components.getSize() == 1);
+                    if (snapshot.Components.getSize() == 1)
+                    {
+                        const auto *pointLight =
+                            std::get_if<Limen::PointLightComponent>(
+                                &snapshot.Components[0].Data);
+                        Check("snapshot third component kind matches",
+                              pointLight != nullptr);
+                        if (pointLight)
+                        {
+                            Check(
+                                "snapshot third light data matches",
+                                pointLight->Color ==
+                                    glm::vec3{1.0f, 0.5f, 0.25f} &&
+                                std::abs(pointLight->Intensity - 4.0f) <=
+                                    1.0e-5f);
+                        }
+                    }
+                }
+            });
+        Check("authoring traversal visits every live object",
+              snapshotVisits == 3 &&
+              sawFirst &&
+              sawSecond &&
+              sawThird);
+
+        Limen::LString firstLabel;
+        Check("mutating snapshot copy preserves Scene label",
+              scene.TryGetObjectLabel(first, firstLabel) &&
+              firstLabel == "First");
+        int storedComponents = 0;
+        scene.ForEachObjectComponent(
+            first,
+            [&](const Limen::SceneObjectComponent &)
+            {
+                ++storedComponents;
+            });
+        Check("mutating snapshot copy preserves Scene components",
+              storedComponents == 1);
+
+        Check("snapshot middle object can be destroyed",
+              scene.DestroyObject(second));
+
+        Limen::LArray<Limen::SceneObjectID> survivors;
+        scene.ForEachObjectAuthoring(
+            [&](const Limen::SceneObjectAuthoringData &snapshot)
+            {
+                survivors.push_back(snapshot.ID);
+            });
+        Check("destroyed object is absent from authoring traversal",
+              survivors.getSize() == 2);
+        bool survivorFirst = false;
+        bool survivorThird = false;
+        for (const Limen::SceneObjectID id: survivors)
+        {
+            survivorFirst |= id == firstID;
+            survivorThird |= id == thirdID;
+            Check("destroyed ID is not traversed", !(id == secondID));
+        }
+        Check("authoring traversal continues after dead slot",
+              survivorFirst && survivorThird);
+    }
+
+    void TestObjectAuthoringRestore()
+    {
+        Limen::Scene source;
+        auto transform = LocationTransform(3.0f, -2.0f, 1.0f);
+        transform.Rotation = glm::quat{0.0f, 0.0f, 0.0f, 1.0f};
+        transform.Scale = {2.0f, 3.0f, 4.0f};
+        const auto original = source.AddRenderableObject({
+            .MeshResource = MakeMeshToken(),
+            .MaterialResource = MakeMaterialToken()
+        }, transform);
+        Check("restore source label is set", source.SetObjectLabel(original, "原始模型"));
+
+        const Limen::AssetID modelID{0x1234567812344abcULL, 0x8000123456789abcULL};
+        const Limen::SceneObjectComponent model{
+            .ID = {1, 2},
+            .LocalTransform = LocationTransform(0.0f, 2.0f, 0.0f),
+            .Data = Limen::ModelRendererComponent{.ModelAssetID = modelID}
+        };
+        Check("restore source component is attached",
+              source.AddObjectComponent(original, model) == model.ID);
+
+        Limen::SceneObjectAuthoringData saved;
+        source.ForEachObjectAuthoring([&](const auto& snapshot) { saved = snapshot; });
+        Check("restore source snapshot is valid",
+              saved.ID.isValid() && saved.Components.getSize() == 1);
+        if (!saved.ID.isValid() || saved.Components.getSize() != 1)
+            return;
+
+        Limen::Scene target;
+        const auto survivor = target.CreateObject();
+        const auto freeTail = target.CreateObject();
+        const auto freeHead = target.CreateObject();
+        Limen::SceneObjectID survivorID{};
+        Check("restore target existing ID is available", target.TryGetObjectID(survivor, survivorID));
+        Check("restore target existing label is set", target.SetObjectLabel(survivor, "Survivor"));
+        Check("restore target tail slot is freed", target.DestroyObject(freeTail));
+        Check("restore target head slot is freed", target.DestroyObject(freeHead));
+
+        auto invalid = saved;
+        invalid.ID = {};
+        Check("restore rejects zero object ID", !target.Restore(invalid).IsValid());
+        invalid.ID = survivorID;
+        Check("restore rejects duplicate object ID", !target.Restore(invalid).IsValid());
+
+        invalid = saved;
+        invalid.Transform.Location.x = std::numeric_limits<float>::infinity();
+        Check("restore rejects non-finite object TRS", !target.Restore(invalid).IsValid());
+
+        invalid = saved;
+        invalid.Components[0].ID = {};
+        Check("restore rejects zero component ID", !target.Restore(invalid).IsValid());
+        invalid.Components[0].ID = model.ID;
+        invalid.Components[0].Data = Limen::ModelRendererComponent{};
+        Check("restore rejects missing model asset ID", !target.Restore(invalid).IsValid());
+
+        invalid = saved;
+        invalid.Components.push_back(model);
+        Check("restore rejects duplicate component ID", !target.Restore(invalid).IsValid());
+
+        int liveObjects = 0;
+        target.ForEachObject([&](const auto&, const auto&) { ++liveObjects; });
+        Limen::LString survivorLabel;
+        Check("rejected restores leave the target scene intact",
+              liveObjects == 1 && target.TryGetObjectLabel(survivor, survivorLabel) &&
+                  survivorLabel == "Survivor");
+
+        const auto restored = target.Restore(saved);
+        Check("restore reuses the original free head without consuming a generation",
+              target.IsObjectAlive(restored) && restored.Index == freeHead.Index &&
+                  restored.Generation == freeHead.Generation + 1);
+        if (!target.IsObjectAlive(restored))
+            return;
+
+        Check("restored live slot is detached from the free chain",
+              Limen::SceneObjectSlotTestAccess::GetNextFree(target, restored.Index) ==
+                  Limen::SceneObjectHandle::InvalidIndex);
+        Check("old target handle remains invalid", !target.IsObjectAlive(freeHead));
+        Limen::SceneObjectHandle located{};
+        Check("restored persistent ID resolves to the new handle",
+              target.TryFindObject(saved.ID, located) && located == restored);
+
+        // 恢复后修改输入快照，验证目标 Scene 独立持有 Label 与组件。
+        saved.Label = "Changed input";
+        saved.Components.clear();
+        int restoredSnapshots = 0;
+        target.ForEachObjectAuthoring([&](const auto& snapshot)
+        {
+            if (snapshot.ID != saved.ID)
+                return;
+            ++restoredSnapshots;
+            Check("restored snapshot preserves the label", snapshot.Label == "原始模型");
+            CheckAuthoringTransform("restored snapshot preserves root TRS", snapshot.Transform, transform);
+            Check("restored snapshot preserves the component count", snapshot.Components.getSize() == 1);
+            if (snapshot.Components.getSize() != 1)
+                return;
+
+            const auto& component = snapshot.Components[0];
+            const auto* renderer = std::get_if<Limen::ModelRendererComponent>(&component.Data);
+            Check("restored snapshot preserves component and asset IDs",
+                  component.ID == model.ID && renderer && renderer->ModelAssetID == modelID);
+            CheckAuthoringTransform("restored snapshot preserves component TRS",
+                                    component.LocalTransform, model.LocalTransform);
+        });
+        Check("restored object appears exactly once in snapshots", restoredSnapshots == 1);
+
+        glm::mat4 restoredMatrix{1.0f};
+        Check("restored object has a runtime matrix", target.TryGetObjectTransform(restored, restoredMatrix));
+        CheckTransform("restored matrix is derived from TRS", restoredMatrix, transform.ToMatrix());
+
+        int runtimeParts = 0;
+        target.ForEachRenderableObject([&](const auto&, const auto&, const auto&, const auto&, const auto&)
+        {
+            ++runtimeParts;
+        });
+        Check("authoring restore leaves runtime render parts empty", runtimeParts == 0);
+
+        const auto next = target.CreateObject();
+        Check("restore preserves the remainder of the free chain",
+              target.IsObjectAlive(next) && next.Index == freeTail.Index &&
+                  next.Generation == freeTail.Generation + 1);
+    }
 }
 
 int main()
@@ -970,6 +1306,8 @@ int main()
     TestObjectLabels();
     TestAuthoringTransform();
     TestSceneObjectComponents();
+    TestObjectAuthoringSnapshot();
+    TestObjectAuthoringRestore();
 
     if (g_Failures == 0)
         std::cout

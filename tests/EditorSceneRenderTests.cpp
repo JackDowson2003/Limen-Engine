@@ -275,11 +275,25 @@ int main()
             Limen::SceneRenderObject object;
             object.MeshResource = content.GetCubeMesh();
             object.MaterialResource = content.GetCubeMaterial();
-            object.Transform = glm::mat4{1.0f};
+            object.Transform = glm::translate(
+                glm::mat4{1.0f}, glm::vec3{2.0f, 0.0f, 0.0f});
+
+            Limen::SceneTransform objectTransform;
+            objectTransform.Location = {2.0f, 0.0f, 0.0f};
+            // 根绕 Y 轴旋转 180°，将部件的局部偏移旋回原点，保留原来的取样位置。
+            objectTransform.Rotation = glm::quat{0.0f, 0.0f, 1.0f, 0.0f};
             const Limen::SceneObjectHandle objectHandle =
-                scene.AddRenderableObject(object);
+                scene.AddRenderableObject(object, objectTransform);
             success = Check("renderable scene object is created",
                             objectHandle.IsValid()) && success;
+
+            Limen::SceneObjectID objectID{};
+            Limen::SceneObjectID picked{};
+            success = Check("pick uses root TRS times component-local matrix",
+                            scene.TryGetObjectID(objectHandle, objectID) &&
+                            scene.PickObject(
+                                {0.0f, 0.0f, 4.0f}, {0.0f, 0.0f, -1.0f}, picked) &&
+                            picked == objectID) && success;
         }
         else
         {

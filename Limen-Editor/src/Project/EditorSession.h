@@ -93,13 +93,11 @@ namespace LimenEditor
                         {
                             .MeshResource = std::move(mesh),
                             .MaterialResource = std::move(material),
-                            .Transform = glm::mat4{1.0f}
-                        });
-            if (!m_Scene->SetObjectTransform(handle, transform))
-            {
-                static_cast<void>(m_Scene->DestroyObject(handle));
+                        },
+                        transform
+                    );
+            if (!handle.IsValid())
                 return {};
-            }
             if (!m_Scene->SetObjectLabel(handle, label))
             {
                 static_cast<void>(m_Scene->DestroyObject(handle));
@@ -124,12 +122,9 @@ namespace LimenEditor
                 return {};
 
             const Limen::SceneObjectHandle handle =
-                m_Scene->AddRenderableObjectGroup(parts);
-            if (!m_Scene->SetObjectTransform(handle, transform))
-            {
-                static_cast<void>(m_Scene->DestroyObject(handle));
+                    m_Scene->AddRenderableObjectGroup(parts,transform);
+            if (!handle.IsValid())
                 return {};
-            }
             if (!m_Scene->SetObjectLabel(handle, label))
             {
                 static_cast<void>(m_Scene->DestroyObject(handle));
@@ -276,10 +271,10 @@ namespace LimenEditor
             const Limen::LArray<Limen::SceneObjectID> selected = m_SelectedObjectIDs;
 
             bool deleteAny = false;
-            for (const Limen::SceneObjectID id : selected)
+            for (const Limen::SceneObjectID id: selected)
             {
                 Limen::SceneObjectHandle handle{};
-                if (!m_Scene->TryFindObject(id,handle))
+                if (!m_Scene->TryFindObject(id, handle))
                     continue;
                 if (!m_Scene->DestroyObject(handle))
                     continue;
@@ -396,7 +391,7 @@ namespace LimenEditor
                 return {};
 
             const Limen::SceneComponentID componentID =
-                m_Scene->AddObjectComponent(handle, std::move(component));
+                    m_Scene->AddObjectComponent(handle, std::move(component));
             if (componentID.isValid())
                 MarkDirty();
             return componentID;

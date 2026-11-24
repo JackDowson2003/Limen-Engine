@@ -502,7 +502,9 @@ Engine 契约稳定后由 Editor 实现：
 - A2.1 已完成：ID 已迁移到独立的 `SceneIdentity.h/.cpp`；
 - A2.2 已完成：`SceneComponent.h/.cpp` 已定义 ModelRenderer、PrimitiveRenderer、PointLight 和 ComponentID 生成；
 - A2.3 已完成：Scene 持有 Authoring Component，Editor 放置保存 ModelAssetID，并支持 Cube 与 PointLight 内置对象；
-- A2.4：删除过渡矩阵缓存，再进入 SceneSerializer。
+- A2.4.1 已完成：`SceneObjectAuthoringData` 与 `Scene::ForEachObjectAuthoring` 已通过快照、副本隔离和删除槽位测试；
+- A2.4.2 进行中：新增 `Scene::RestoreObject`；
+- A2.4.3 待完成：迁移运行期入口并删除过渡矩阵缓存，再进入 SceneSerializer。
 
 ### A2.4.1 Authoring 快照
 

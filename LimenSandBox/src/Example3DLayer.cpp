@@ -398,7 +398,7 @@ namespace SandBox
         cubeObject.MaterialResource = m_CubeMaterial;
         cubeObject.Transform = glm::mat4(1.0f);
 
-        m_CubeObjectHandle = m_Scene.AddRenderableObject(cubeObject);
+        m_CubeObjectHandle = m_Scene.AddRenderableObject(cubeObject, {});
 
         LM_CORE_ASSERT(
             m_CubeObjectHandle.IsValid(),
@@ -413,22 +413,18 @@ namespace SandBox
          */
         Limen::SceneRenderObject secondCubeObject;
 
+
         secondCubeObject.MeshResource = m_CubeMesh;
         secondCubeObject.MaterialResource = m_CubeMaterial;
-        secondCubeObject.Transform = glm::translate(glm::mat4(1.0f),
-                                                    glm::vec3(1.5f, 0.0f, .0f));
+        const Limen::SceneTransform secondCubeTransform{
+            .Location = {1.5f, 0.f, 0.0f}
+        };
+        const Limen::SceneObjectHandle secondHandle = m_Scene.
+                AddRenderableObject(secondCubeObject, secondCubeTransform);
 
-        /*
-         * 第二个立方体当前不需要每帧修改，
-         * 所以句柄只用于检查添加是否成功，不必保存为成员。
-         */
-        const Limen::SceneObjectHandle secondCubeHandle =
-                m_Scene.AddRenderableObject(secondCubeObject);
+        LM_CORE_ASSERT(secondHandle.IsValid(), "Create Cube:{} Error", secondHandle.Index);
 
-        LM_CORE_ASSERT(
-            secondCubeHandle.IsValid(),
-            "Failed to add second cube object to Scene"
-        );
+        secondCubeObject.Transform = glm::mat4(1.0f);
 
         /*
          * 导入模型整体在世界空间中的变换。
@@ -436,11 +432,10 @@ namespace SandBox
          * TestCube本身以原点为中心；
          * 这里只将它向左移动1.5个单位，与另外两个立方体分开显示。
          */
-        const glm::mat4 importedModelTransform =
-                glm::translate(
-                    glm::mat4(1.0f),
-                    glm::vec3(-1.5f, 0.0f, 0.0f)
-                );
+        constexpr Limen::SceneTransform importedModelTransform =
+        {
+            .Location = {-1.5f, 0.0f, 0.0f}
+        };
 
         // 一个 Model 可以有多个ModelPart
         // 一个 ModelPart 都需要是一个独立的 SceneRenderObject
@@ -505,9 +500,10 @@ namespace SandBox
              * 先执行ModelPart局部变换，
              * 再执行整个Model的世界变换。
              */
-            importedObj.Transform = importedModelTransform * LocalTransform;
+            importedObj.Transform = LocalTransform;
 
-            const Limen::SceneObjectHandle importedObjectHandle = m_Scene.AddRenderableObject(importedObj);
+            const Limen::SceneObjectHandle importedObjectHandle = m_Scene.AddRenderableObject(
+                importedObj, importedModelTransform);
             LM_CORE_ASSERT(
                 importedObjectHandle.IsValid(),
                 "Failed to add imported model part to Scene"
