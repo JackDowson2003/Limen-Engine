@@ -328,6 +328,22 @@ add_test(
         COMMAND $<TARGET_FILE:LimenSceneObjectTests>
 )
 
+add_executable(LimenSceneSerializerTests
+        SceneSerializerTests.cpp
+)
+
+limen_configure_target(LimenSceneSerializerTests)
+
+target_link_libraries(LimenSceneSerializerTests PRIVATE LimenEngine)
+target_include_directories(LimenSceneSerializerTests SYSTEM PRIVATE
+        "${CMAKE_SOURCE_DIR}/LimenEngine/vendor/toml11"
+)
+
+add_test(
+        NAME LimenSceneSerializer
+        COMMAND $<TARGET_FILE:LimenSceneSerializerTests>
+)
+
 add_executable(LimenEditorUILayoutTests
         EditorUILayoutTests.cpp
         "${CMAKE_SOURCE_DIR}/Limen-Editor/src/UI/EditorUILayout.cpp"

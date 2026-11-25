@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Limen/Scene/Scene.h"
+#include "Limen/Scene/SceneDocument.h"
 
 namespace Limen
 {
@@ -1293,6 +1294,87 @@ namespace
               target.IsObjectAlive(next) && next.Index == freeTail.Index &&
                   next.Generation == freeTail.Generation + 1);
     }
+
+    void TestSceneDocumentCapture()
+    {
+        const Limen::AmbientLight ambient{{0.25f, 0.5f, 0.75f}, 0.5f};
+        const Limen::DirectionalLight directional{
+            {-1.0f, -2.0f, 3.0f}, {1.0f, 0.75f, 0.5f}, 2.0f
+        };
+        auto transform = LocationTransform(3.0f, -2.0f, 1.0f);
+        transform.Rotation = glm::quat{0.0f, 0.0f, 1.0f, 0.0f};
+        transform.Scale = {2.0f, 3.0f, 4.0f};
+        const Limen::SceneObjectComponent cube{
+            .ID = {1, 2},
+            .Data = Limen::PrimitiveRendererComponent{}
+        };
+        const Limen::PointLightComponent lightData{{1.0f, 0.5f, 0.25f}, 4.0f};
+        const Limen::SceneObjectComponent light{
+            .ID = {3, 4},
+            .LocalTransform = LocationTransform(0.0f, 2.0f, -1.0f),
+            .Data = lightData
+        };
+
+        Limen::SceneObjectID objectID{};
+        const auto document = [&]
+        {
+            Limen::Scene scene;
+            scene.SetAmbientLight(ambient);
+            scene.SetDirectionalLight(directional);
+            const auto removed = scene.CreateObject();
+            const auto object = scene.CreateObject();
+            Check("document source has a stable object ID", scene.TryGetObjectID(object, objectID));
+            Check("document source label is set", scene.SetObjectLabel(object, "主场景立方体"));
+            Check("document source root TRS is set", scene.SetObjectAuthoringTransform(object, transform));
+            Check("document source has a primitive component", scene.AddObjectComponent(object, cube) == cube.ID);
+            Check("document source has a point light component", scene.AddObjectComponent(object, light) == light.ID);
+            Check("document fixture frees an earlier slot", scene.DestroyObject(removed));
+
+            char displayName[] = "Main Scene";
+            auto snapshot = Limen::CaptureSceneDocument(scene, displayName);
+
+            // 捕获后修改名称缓冲区与原场景，再销毁场景，验证文档持有独立副本。
+            displayName[0] = 'X';
+            scene.SetAmbientLight({});
+            scene.SetDirectionalLight({});
+            Check("source label can change after capture", scene.SetObjectLabel(object, "Changed"));
+            Check("source TRS can change after capture", scene.SetObjectAuthoringTransform(object, {}));
+            Check("source object can be destroyed after capture", scene.DestroyObject(object));
+            return snapshot;
+        }();
+
+        Check("document records schema version 1", document.SchemaVersion == 1);
+        Check("document owns the display name", document.DisplayName == "Main Scene");
+        Check("document preserves ambient light values",
+              document.Ambient.Color == ambient.Color && document.Ambient.Intensity == ambient.Intensity);
+        Check("document preserves directional light values",
+              document.DirectionLight.Direction == directional.Direction &&
+                  document.DirectionLight.Color == directional.Color &&
+                  document.DirectionLight.Intensity == directional.Intensity);
+        Check("document captures only the live object", document.Objects.getSize() == 1);
+        if (document.Objects.getSize() != 1)
+            return;
+
+        const auto &object = document.Objects[0];
+        Check("document preserves object ID and UTF-8 label",
+              objectID.isValid() && object.ID == objectID && object.Label == "主场景立方体");
+        CheckAuthoringTransform("document preserves root TRS", object.Transform, transform);
+        Check("document preserves both components", object.Components.getSize() == 2);
+        if (object.Components.getSize() != 2)
+            return;
+
+        const auto &savedCube = object.Components[0];
+        const auto *primitive = std::get_if<Limen::PrimitiveRendererComponent>(&savedCube.Data);
+        Check("document preserves primitive component ID and type",
+              savedCube.ID == cube.ID && primitive && primitive->Primitive == Limen::PrimitiveType::Cube);
+        const auto &savedLight = object.Components[1];
+        const auto *pointLight = std::get_if<Limen::PointLightComponent>(&savedLight.Data);
+        Check("document preserves point light component ID and values",
+              savedLight.ID == light.ID && pointLight && pointLight->Color == lightData.Color &&
+                  pointLight->Intensity == lightData.Intensity);
+        CheckAuthoringTransform("document preserves point light local TRS",
+                                savedLight.LocalTransform, light.LocalTransform);
+    }
 }
 
 int main()
@@ -1308,10 +1390,11 @@ int main()
     TestSceneObjectComponents();
     TestObjectAuthoringSnapshot();
     TestObjectAuthoringRestore();
+    TestSceneDocumentCapture();
 
     if (g_Failures == 0)
         std::cout
-                << "Scene object identity, generation, retirement, and render views: PASS\n";
+                << "Scene object identity, generation, retirement, render views, and document capture: PASS\n";
 
     return g_Failures == 0 ? 0 : 1;
 }
