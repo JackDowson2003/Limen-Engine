@@ -1,16 +1,24 @@
 #include "Limen/Scene/SceneSerializer.h"
+#include "Limen/Scene/SceneFile.h"
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <iostream>
+#include <iterator>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 #include <toml.hpp>
 
 namespace
 {
+    namespace fs = std::filesystem;
     using Limen::SceneFileErrorCode;
 
     struct TestRunner
@@ -403,6 +411,209 @@ scale = [1, 1, 1]
         check("duplicate component ID preserves previous document", bareObject + model + model,
               SceneFileErrorCode::DuplicateID, "objects[0].components[1].id");
     }
+
+    // 文件用例只清理自己独占创建的目录，与当前工作目录无关。
+    struct TemporarySceneDirectory
+    {
+        fs::path Root;
+
+        TemporarySceneDirectory()
+        {
+            const auto base = fs::temp_directory_path();
+            const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+            for (int attempt = 0; attempt < 100; ++attempt)
+            {
+                const auto candidate = base / ("limen-scene-file-test-" + std::to_string(stamp) +
+                                               "-" + std::to_string(attempt));
+                std::error_code error;
+                if (fs::create_directory(candidate, error))
+                {
+                    Root = candidate;
+                    return;
+                }
+                if (error)
+                    throw fs::filesystem_error("Cannot create scene test directory", candidate, error);
+            }
+            throw std::runtime_error("Cannot reserve a unique scene test directory");
+        }
+
+        ~TemporarySceneDirectory()
+        {
+            std::error_code ignored;
+            fs::remove_all(Root, ignored);
+        }
+
+        TemporarySceneDirectory(const TemporarySceneDirectory &) = delete;
+        TemporarySceneDirectory &operator=(const TemporarySceneDirectory &) = delete;
+    };
+
+    void WriteFile(const fs::path &path, std::string_view text)
+    {
+        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+        if (!file)
+            throw std::runtime_error("Cannot open test scene file");
+        file.write(text.data(), static_cast<std::streamsize>(text.size()));
+        file.close();
+        if (!file)
+            throw std::runtime_error("Cannot write test scene file");
+    }
+
+    std::string ReadFile(const fs::path &path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        if (!file)
+            throw std::runtime_error("Cannot read test scene file");
+        return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    }
+
+    void TestLoadSceneFile(TestRunner &runner)
+    {
+        const TemporarySceneDirectory directory;
+        auto source = MakeDocument();
+        source.DisplayName.append(4096, 'x');
+        Limen::LString text;
+        Limen::SceneFileError error;
+        if (!runner.Check("serialize scene for file loading", Limen::TrySerializeSceneDocument(source, text, error)))
+            return;
+
+        // 第二次读取必须处理小于一个缓冲区的尾部，否则末尾的对象和组件会丢失。
+        if (!runner.Check("scene fixture spans a full and a partial read buffer", text.size() > 4096 && text.size() < 8192))
+            return;
+
+        const auto valid = directory.Root / fs::path(u8"测试场景.lscene");
+        WriteFile(valid, text);
+        Limen::SceneDocument restored;
+        error = {SceneFileErrorCode::FileAccess, "old_key", "old message", valid};
+        if (runner.Check("load a multi-chunk scene from a UTF-8 path", Limen::TryLoadSceneFile(valid, restored, error)))
+        {
+            runner.Check("file load clears previous error and path",
+                         error.Code == SceneFileErrorCode::None && error.Key.empty() && error.Message.empty() && error.File.empty());
+            Limen::LString repeated;
+            runner.Check("file load preserves the full scene across read boundaries",
+                         Limen::TrySerializeSceneDocument(restored, repeated, error) && repeated == text);
+        }
+
+        const auto check = [&](std::string_view name, const fs::path &path,
+                               SceneFileErrorCode expectedCode, std::string_view expectedKey)
+        {
+            auto output = source;
+            Limen::SceneFileError loadError;
+            const bool success = Limen::TryLoadSceneFile(path, output, loadError);
+
+            Limen::LString after;
+            Limen::SceneFileError outputError;
+            const bool unchanged = Limen::TrySerializeSceneDocument(output, after, outputError) && after == text;
+            if (!runner.Check(name, !success && unchanged && loadError.File == path &&
+                                   loadError.Code == expectedCode && std::string_view(loadError.Key) == expectedKey &&
+                                   !loadError.Message.empty()))
+            {
+                std::cerr << "  success=" << success << ", output unchanged=" << unchanged
+                          << ", error code=" << static_cast<int>(loadError.Code) << ", path=" << loadError.File
+                          << ", key=" << loadError.Key << ", message=" << loadError.Message << '\n';
+            }
+        };
+
+        const auto wrongSuffix = directory.Root / "Scene.txt";
+        WriteFile(wrongSuffix, kSceneWithBareObject);
+        check("incorrect suffix preserves previous document", wrongSuffix, SceneFileErrorCode::FileAccess, "");
+        check("missing file preserves previous document", directory.Root / "Missing.lscene", SceneFileErrorCode::FileAccess, "");
+
+        const auto nonFile = directory.Root / "Directory.lscene";
+        fs::create_directory(nonFile);
+        check("directory path preserves previous document", nonFile, SceneFileErrorCode::FileAccess, "");
+
+        const auto empty = directory.Root / "Empty.lscene";
+        WriteFile(empty, "");
+        check("empty scene file reports missing schema", empty, SceneFileErrorCode::InvalidField, "schema_version");
+
+        const auto malformed = directory.Root / "Malformed.lscene";
+        WriteFile(malformed, "schema_version = ]\n");
+        check("malformed scene file reports TOML error", malformed, SceneFileErrorCode::InvalidToml, "");
+    }
+
+    void TestSaveSceneFile(TestRunner &runner)
+    {
+        const TemporarySceneDirectory directory;
+        const auto path = directory.Root / fs::path(u8"保存场景.lscene");
+        auto sidecar = path;
+        sidecar += ".lmmeta";
+        constexpr std::string_view metadata =
+            "schema_version = 1\r\nasset_id = \"00112233-4455-6677-8899-aabbccddeeff\"\r\n";
+        WriteFile(sidecar, metadata);
+
+        const auto metadataUnchanged = [&]
+        {
+            return fs::is_regular_file(sidecar) && ReadFile(sidecar) == metadata;
+        };
+        const auto source = MakeDocument();
+        Limen::SceneFileError error;
+        Limen::LString expected;
+        const auto saveAndLoad = [&](std::string_view name, const Limen::SceneDocument &document)
+        {
+            if (!runner.Check("serialize expected scene text", Limen::TrySerializeSceneDocument(document, expected, error)))
+                return false;
+
+            error = {SceneFileErrorCode::FileAccess, "old_key", "old message", path};
+            if (!runner.Check(name, Limen::TrySaveSceneFile(path, document, error)))
+            {
+                std::cerr << error.File << ": " << error.Message << '\n';
+                return false;
+            }
+
+            runner.Check("saving clears previous error and path",
+                         error.Code == SceneFileErrorCode::None && error.Key.empty() && error.Message.empty() && error.File.empty());
+            runner.Check("saved bytes match the serialized document",
+                         fs::is_regular_file(path) && ReadFile(path) == std::string_view(expected));
+            runner.Check("scene saving leaves sidecar bytes intact", metadataUnchanged());
+
+            Limen::SceneDocument restored;
+            Limen::LString repeated;
+            runner.Check("load the complete saved scene",
+                         Limen::TryLoadSceneFile(path, restored, error) &&
+                         Limen::TrySerializeSceneDocument(restored, repeated, error) && repeated == expected);
+            return true;
+        };
+
+        if (!saveAndLoad("save a new scene file", source))
+            return;
+
+        auto replacement = source;
+        replacement.DisplayName = "Updated";
+        replacement.Objects.pop_back();
+        if (!saveAndLoad("replace an existing scene file", replacement))
+            return;
+
+        auto invalid = replacement;
+        invalid.SchemaVersion = Limen::SceneDocument::CurrentSchemaVersion + 1;
+        runner.Check("invalid scene save returns validation error for destination",
+                     !Limen::TrySaveSceneFile(path, invalid, error) && error.File == path &&
+                     error.Code == SceneFileErrorCode::UnsupportedSchema && error.Key == "schema_version" &&
+                     !error.Message.empty());
+        runner.Check("invalid scene save preserves previous bytes and sidecar",
+                     fs::is_regular_file(path) && ReadFile(path) == std::string_view(expected) && metadataUnchanged());
+
+        const auto blocked = directory.Root / "Blocked.lscene";
+        fs::create_directory(blocked);
+        const auto marker = blocked / "existing.txt";
+        WriteFile(marker, "keep this directory");
+        runner.Check("replacing a directory reports atomic replace failure",
+                     !Limen::TrySaveSceneFile(blocked, replacement, error) && error.File == blocked &&
+                     error.Code == SceneFileErrorCode::AtomicReplaceFailed && !error.Message.empty());
+        runner.Check("replacement failure preserves existing directory contents",
+                     fs::is_directory(blocked) && fs::is_regular_file(marker) && ReadFile(marker) == "keep this directory");
+
+        const auto missing = directory.Root / "MissingParent" / "Missing.lscene";
+        runner.Check("saving into a missing directory reports file access failure",
+                     !Limen::TrySaveSceneFile(missing, replacement, error) && error.File == missing &&
+                     error.Code == SceneFileErrorCode::FileAccess && !error.Message.empty() && !fs::exists(missing.parent_path()));
+
+        // 临时文件名属于保存实现，直接检查目录内容是否仍只有本用例创建的路径。
+        bool noTemporaryEntries = true;
+        for (const auto &entry : fs::directory_iterator(directory.Root))
+            if (entry.path() != path && entry.path() != sidecar && entry.path() != blocked)
+                noTemporaryEntries = false;
+        runner.Check("save leaves no temporary entries after completion or failure", noTemporaryEntries);
+    }
 }
 
 int main()
@@ -414,6 +625,8 @@ int main()
     TestSceneDocumentRoundtrip(runner);
     TestSceneObjectWithoutComponents(runner);
     TestInvalidSceneText(runner);
+    TestLoadSceneFile(runner);
+    TestSaveSceneFile(runner);
 
     if (runner.Failures == 0)
         std::cout << "Scene document TOML serialization: PASS\n";

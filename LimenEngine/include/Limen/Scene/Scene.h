@@ -219,6 +219,13 @@ namespace Limen
             const SceneTransform& objectTransform
         );
 
+        // 替换此 Scene 中指对象的运行期渲染组件，空数组用于清除组件
+        [[nodiscard]]
+        bool SetObjectRenderParts(
+            SceneObjectHandle handle,
+            LArray<SceneRenderObject> parts
+        );
+
         // 只读遍历带渲染组件的存活对象；回调只借用资源与 Transform
         // 由“每个对象回调一次”改为“每个渲染组件回调一次”
         void ForEachRenderableObject(

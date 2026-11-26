@@ -1295,6 +1295,101 @@ namespace
                   next.Generation == freeTail.Generation + 1);
     }
 
+    void TestSetObjectRenderParts()
+    {
+        Limen::SceneObjectAuthoringData saved;
+        saved.ID = {1, 2};
+        saved.Label = "恢复的立方体";
+        saved.Transform = LocationTransform(5.0f, 6.0f, -2.0f);
+        saved.Transform.Scale = {2.0f, 3.0f, 4.0f};
+        const Limen::SceneObjectComponent cube{
+            .ID = {3, 4},
+            .LocalTransform = LocationTransform(1.0f, 2.0f, 0.0f),
+            .Data = Limen::PrimitiveRendererComponent{}
+        };
+        saved.Components.push_back(cube);
+
+        Limen::Scene scene;
+        const auto stale = scene.CreateObject();
+        Check("render parts fixture frees a slot", scene.DestroyObject(stale));
+        const auto restored = scene.Restore(saved);
+        Check("render parts fixture restores into the reused slot",
+              scene.IsObjectAlive(restored) && restored.Index == stale.Index && restored.Generation != stale.Generation);
+        if (!scene.IsObjectAlive(restored))
+            return;
+
+        const auto mesh = MakeMeshToken();
+        const auto material = MakeMaterialToken();
+        const Limen::LArray<Limen::SceneRenderObject> initial{
+            {mesh, material, Translation(1.0f, 0.0f, 2.0f)},
+            {mesh, material, Translation(0.0f, 2.0f, 1.0f)}
+        };
+        const Limen::LArray<Limen::SceneRenderObject> replacement{
+            {mesh, material, Translation(2.0f, 1.0f, -1.0f)}
+        };
+
+        const auto checkParts = [&](const char *name, const Limen::LArray<Limen::SceneRenderObject> &expected)
+        {
+            std::uint32_t index = 0;
+            scene.ForEachRenderableObject(
+                [&](const Limen::SceneObjectHandle &handle, const Limen::SceneObjectID &id,
+                    const Limen::Ref<Limen::Mesh> &meshResource, const Limen::Ref<Limen::Material> &materialResource,
+                    const glm::mat4 &world)
+                {
+                    Check("render part traversal keeps restored handle and ID", handle == restored && id == saved.ID);
+                    if (index < expected.getSize())
+                    {
+                        const auto &part = expected[index];
+                        Check("render part traversal keeps mesh and material",
+                              meshResource == part.MeshResource && materialResource == part.MaterialResource);
+                        CheckTransform("render part world transform is root times local",
+                                       world, saved.Transform.ToMatrix() * part.Transform);
+                    }
+                    ++index;
+                });
+            Check(name, index == expected.getSize());
+        };
+
+        Check("install render parts on an authoring-restored object", scene.SetObjectRenderParts(restored, initial));
+        checkParts("installation exposes both render parts", initial);
+        Check("replace runtime render parts", scene.SetObjectRenderParts(restored, replacement));
+        checkParts("replacement exposes only the new part", replacement);
+
+        // 第二个部件无效时，第一项也不能替换已经安装的列表。
+        auto invalid = initial;
+        invalid[1].MeshResource.reset();
+        Check("replacement rejects a missing mesh", !scene.SetObjectRenderParts(restored, invalid));
+        checkParts("missing mesh preserves previous render parts", replacement);
+        invalid = initial;
+        invalid[1].MaterialResource.reset();
+        Check("replacement rejects a missing material", !scene.SetObjectRenderParts(restored, invalid));
+        checkParts("missing material preserves previous render parts", replacement);
+
+        Check("stale handle cannot replace render parts in its reused slot", !scene.SetObjectRenderParts(stale, initial));
+        checkParts("stale handle preserves the new object's render parts", replacement);
+
+        Check("empty parts clear runtime rendering", scene.SetObjectRenderParts(restored, {}));
+        checkParts("cleared object has no render parts", {});
+        int snapshots = 0;
+        scene.ForEachObjectAuthoring([&](const Limen::SceneObjectAuthoringData &snapshot)
+        {
+            ++snapshots;
+            Check("clearing render parts preserves authoring identity and label",
+                  snapshot.ID == saved.ID && snapshot.Label == saved.Label);
+            CheckAuthoringTransform("clearing render parts preserves root TRS", snapshot.Transform, saved.Transform);
+            Check("clearing render parts preserves the authoring component count", snapshot.Components.getSize() == 1);
+            if (snapshot.Components.getSize() == 1)
+            {
+                const auto &component = snapshot.Components[0];
+                const auto *primitive = std::get_if<Limen::PrimitiveRendererComponent>(&component.Data);
+                Check("clearing render parts preserves the cube component and ID",
+                      component.ID == cube.ID && primitive && primitive->Primitive == Limen::PrimitiveType::Cube);
+                CheckAuthoringTransform("clearing render parts preserves component TRS", component.LocalTransform, cube.LocalTransform);
+            }
+        });
+        Check("clearing render parts preserves exactly one live authoring object", snapshots == 1);
+    }
+
     void TestSceneDocumentCapture()
     {
         const Limen::AmbientLight ambient{{0.25f, 0.5f, 0.75f}, 0.5f};
@@ -1390,6 +1485,7 @@ int main()
     TestSceneObjectComponents();
     TestObjectAuthoringSnapshot();
     TestObjectAuthoringRestore();
+    TestSetObjectRenderParts();
     TestSceneDocumentCapture();
 
     if (g_Failures == 0)

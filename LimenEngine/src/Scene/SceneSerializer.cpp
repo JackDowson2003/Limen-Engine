@@ -166,83 +166,83 @@ namespace Limen
                    std::isfinite(value.y) &&
                    std::isfinite(value.z);
         }
+    }
 
-        bool ValidateSceneDocument(const SceneDocument &document, SceneFileError &error)
+    bool ValidateSceneDocument(const SceneDocument &document, SceneFileError &error)
+    {
+        // 复用对象
+        const LArray<SceneObjectAuthoringData> &objects = document.Objects;
+
+        using Code = SceneFileErrorCode;
+
+        const auto fail = [&error](const Code code, const std::string_view key, const char *message)
         {
-            // 复用对象
-            const LArray<SceneObjectAuthoringData> &objects = document.Objects;
+            error = {.Code = code, .Key = LString(key), .Message = message};
+            return false;
+        };
 
-            using Code = SceneFileErrorCode;
+        if (document.SchemaVersion != SceneDocument::CurrentSchemaVersion)
+            return fail(Code::UnsupportedSchema, "schema_version", "不支持的场景版本");
 
-            const auto fail = [&error](const Code code, const std::string_view key, const char *message)
+        const auto &[aColor, aIntensity] = document.Ambient;
+        const auto &[Direction, dColor, dIntensity] = document.DirectionLight;
+
+        if (!IsFiniteVec3(aColor))
+            return fail(Code::InvalidField, "environment.ambient_color", "环境光颜色无效");
+        if (!std::isfinite(aIntensity) || aIntensity < 0.0f)
+            return fail(Code::InvalidField, "environment.ambient_intensity", "环境光强度无效");
+
+        if (!IsFiniteVec3(dColor))
+            return fail(Code::InvalidField, "environment.directional_color", "平行光颜色无效");
+        if (!std::isfinite(dIntensity) || dIntensity < 0.0f)
+            return fail(Code::InvalidField, "environment.directional_intensity", "平行光强度无效");
+
+        const float lengthSquared = glm::dot(Direction, Direction);
+        if (!std::isfinite(lengthSquared) || lengthSquared <= 0.0f)
+            return fail(Code::InvalidField, "environment.directional_direction", "平行光方向无效");
+
+        // 要求对象ID唯一
+        for (std::uint32_t i = 0; i < objects.getSize(); ++i)
+        {
+            const auto &obj = objects[i];
+            const std::string objectKey = "objects[" + std::to_string(i) + "]";
+            const std::string idKey = objectKey + ".id";
+
+            if (!obj.ID.isValid())
+                return fail(Code::InvalidID, idKey, "对象 ID 无效");
+
+            // 只和前面的对象比较，避免把自身判为重复。
+            for (std::uint32_t j = 0; j < i; ++j)
             {
-                error = {.Code = code, .Key = LString(key), .Message = message};
-                return false;
-            };
+                if (objects[j].ID == obj.ID)
+                    return fail(Code::DuplicateID, idKey, "对象 ID 重复");
+            }
 
-            if (document.SchemaVersion != SceneDocument::CurrentSchemaVersion)
-                return fail(Code::UnsupportedSchema, "schema_version", "不支持的场景版本");
+            if (!IsWritableTransform(obj.Transform))
+                return fail(Code::InvalidField, objectKey, "对象的变换无效");
 
-            const auto &[aColor, aIntensity] = document.Ambient;
-            const auto &[Direction, dColor, dIntensity] = document.DirectionLight;
-
-            if (!IsFiniteVec3(aColor))
-                return fail(Code::InvalidField, "environment.ambient_color", "环境光颜色无效");
-            if (!std::isfinite(aIntensity) || aIntensity < 0.0f)
-                return fail(Code::InvalidField, "environment.ambient_intensity", "环境光强度无效");
-
-            if (!IsFiniteVec3(dColor))
-                return fail(Code::InvalidField, "environment.directional_color", "平行光颜色无效");
-            if (!std::isfinite(dIntensity) || dIntensity < 0.0f)
-                return fail(Code::InvalidField, "environment.directional_intensity", "平行光强度无效");
-
-            const float lengthSquared = glm::dot(Direction, Direction);
-            if (!std::isfinite(lengthSquared) || lengthSquared <= 0.0f)
-                return fail(Code::InvalidField, "environment.directional_direction", "平行光方向无效");
-
-            // 要求对象ID唯一
-            for (std::uint32_t i = 0; i < objects.getSize(); ++i)
+            const auto &components = obj.Components;
+            for (std::uint32_t c = 0; c < components.getSize(); ++c)
             {
-                const auto &obj = objects[i];
-                const std::string objectKey = "objects[" + std::to_string(i) + "]";
-                const std::string idKey = objectKey + ".id";
+                const auto &component = components[c];
+                const std::string key = objectKey + ".components[" + std::to_string(c) + "]";
 
-                if (!obj.ID.isValid())
-                    return fail(Code::InvalidID, idKey, "对象 ID 无效");
+                if (!component.ID.isValid())
+                    return fail(Code::InvalidID, key + ".id", "组件 ID 无效");
 
-                // 只和前面的对象比较，避免把自身判为重复。
-                for (std::uint32_t j = 0; j < i; ++j)
+                if (!IsWritableTransform(component.LocalTransform) ||
+                    !IsSceneObjectComponentValid(component))
+                    return fail(Code::InvalidField, key, "组件数据无效");
+
+                // 只比较当前对象里已经检查过的组件。
+                for (std::uint32_t previous = 0; previous < c; ++previous)
                 {
-                    if (objects[j].ID == obj.ID)
-                        return fail(Code::DuplicateID, idKey, "对象 ID 重复");
-                }
-
-                if (!IsWritableTransform(obj.Transform))
-                    return fail(Code::InvalidField, objectKey, "对象的变换无效");
-
-                const auto &components = obj.Components;
-                for (std::uint32_t c = 0; c < components.getSize(); ++c)
-                {
-                    const auto &component = components[c];
-                    const std::string key = objectKey + ".components[" + std::to_string(c) + "]";
-
-                    if (!component.ID.isValid())
-                        return fail(Code::InvalidID, key + ".id", "组件 ID 无效");
-
-                    if (!IsWritableTransform(component.LocalTransform) ||
-                        !IsSceneObjectComponentValid(component))
-                        return fail(Code::InvalidField, key, "组件数据无效");
-
-                    // 只比较当前对象里已经检查过的组件。
-                    for (std::uint32_t previous = 0; previous < c; ++previous)
-                    {
-                        if (components[previous].ID == component.ID)
-                            return fail(Code::DuplicateID, key + ".id", "同一对象内的组件 ID 重复");
-                    }
+                    if (components[previous].ID == component.ID)
+                        return fail(Code::DuplicateID, key + ".id", "同一对象内的组件 ID 重复");
                 }
             }
-            return true;
         }
+        return true;
     }
 
     bool TrySerializeSceneDocument(const SceneDocument &document, LString &outText, SceneFileError &error)
@@ -391,7 +391,7 @@ namespace Limen
             if (!table.is_table())
                 return fail(Code::InvalidField, path, "对象必须是表");
 
-            for (const auto &field : table.as_table())
+            for (const auto &field: table.as_table())
             {
                 const auto &key = field.first;
                 if (key != "id" && key != "label" && key != "location" &&
@@ -430,7 +430,7 @@ namespace Limen
                 {
                     const auto &entry = components[c];
                     const std::string componentPath =
-                        componentsPath + "[" + std::to_string(c) + "]";
+                            componentsPath + "[" + std::to_string(c) + "]";
 
                     if (!entry.is_table())
                         return fail(Code::InvalidField, componentPath, "组件必须是表");
@@ -453,7 +453,7 @@ namespace Limen
                         !readField(entry, componentPath, "scale", ReadVec3, local.Scale))
                         return false;
 
-                    const auto & type = entry.at("type").as_string();
+                    const auto &type = entry.at("type").as_string();
 
                     if (type == "model_renderer")
                     {
@@ -467,8 +467,7 @@ namespace Limen
                                         "模型资源 ID 格式无效");
 
                         component.Data = model;
-                    }
-                    else if (type == "primitive_renderer")
+                    } else if (type == "primitive_renderer")
                     {
                         if (!entry.contains("primitive") || !entry.at("primitive").is_string() ||
                             entry.at("primitive").as_string() != "cube")
@@ -476,8 +475,7 @@ namespace Limen
                                         "内置几何必须为 cube");
 
                         component.Data = PrimitiveRendererComponent{.Primitive = PrimitiveType::Cube};
-                    }
-                    else if (type == "point_light")
+                    } else if (type == "point_light")
                     {
                         PointLightComponent light;
                         if (!readField(entry, componentPath, "color", ReadVec3, light.Color) ||
@@ -485,8 +483,7 @@ namespace Limen
                             return false;
 
                         component.Data = light;
-                    }
-                    else
+                    } else
                     {
                         return fail(Code::InvalidField, componentPath + ".type", "未知组件类型");
                     }
@@ -496,11 +493,11 @@ namespace Limen
                     {
                         const auto &key = field.first;
                         const bool common = key == "id" || key == "type" ||
-                            key == "location" || key == "rotation" || key == "scale";
+                                            key == "location" || key == "rotation" || key == "scale";
                         const bool typeSpecific =
-                            (type == "model_renderer" && key == "model_asset_id") ||
-                            (type == "primitive_renderer" && key == "primitive") ||
-                            (type == "point_light" && (key == "color" || key == "intensity"));
+                                (type == "model_renderer" && key == "model_asset_id") ||
+                                (type == "primitive_renderer" && key == "primitive") ||
+                                (type == "point_light" && (key == "color" || key == "intensity"));
 
                         if (!common && !typeSpecific)
                             return fail(Code::InvalidField, componentPath + "." + key,

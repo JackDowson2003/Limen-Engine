@@ -214,6 +214,22 @@ namespace Limen
         return handle;
     }
 
+    bool Scene::SetObjectRenderParts(const SceneObjectHandle handle, LArray<SceneRenderObject> parts)
+    {
+        if (!IsObjectAlive(handle))
+            return false;
+
+        for (const auto & part : parts)
+        {
+            if (!part.MaterialResource || !part.MeshResource)
+                return false;
+        }
+
+        // 校验完成后，一次替换组件爱你
+        m_ObjectSlots[handle.Index].RenderComponents = std::move(parts);
+        return true;
+    }
+
     void Scene::ForEachRenderableObject(
         const std::function<void
             (const SceneObjectHandle &, const SceneObjectID &, const Ref<Mesh> &, const Ref<Material> &,
