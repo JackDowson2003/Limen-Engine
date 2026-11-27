@@ -516,8 +516,8 @@ flowchart LR
 
 ### G1：项目、资产与场景
 
-1. 定义 TOML 格式的项目配置：项目描述文件使用 `Game1.lmproject` 一类的 `.lmproject` 单文件，运行设置使用 `.toml`；按[项目配置与跨平台启动设计](docs/ProjectConfiguration.md)确定资源根、起始场景、平台覆盖及启动校验，避免未来 Player 沿用 Sandbox 的工作目录依赖。当前加载器已校验项目文件后缀及核心字段/资源根路径；Editor 的 `--project` 已在创建窗口前解析配置并传入项目资产根，`EditorSession` 已持有完整配置，内置 Shader 从可执行文件旁独立定位。从仓库外工作目录启动临时项目已到达 OpenGL 4.1 初始化；项目资产尚无真实消费者，Player 接线、运行设置合并与配置保存仍未完成。
-2. [Asset Registry 与资产元数据](docs/AssetRegistry.md)的首包已实现：已有源资产可注册并生成 `.lmmeta`，关闭后重开仍保持同一 `AssetID`，源文件缺失时保留身份并标记 `Missing`；纯 CPU 回归测试已通过。下一步让 Editor 项目会话拥有并加载 Registry，再逐步补导入设置、来源/依赖记录、重新导入及 Scene 引用诊断。解析库的结果仍转换为 Limen 自有资源。
+1. Editor 在创建窗口前解析 `.lmproject`、加载 Asset Registry，并按 `Config/DefaultGame.toml` 中的 AssetID 确定启动场景。窗口创建后复用场景打开流程，内置 Shader 从可执行文件旁独立定位。运行设置合并、配置保存和 Player 接线按[项目配置与跨平台启动设计](docs/ProjectConfiguration.md)推进。
+2. Editor 会话已拥有 [Asset Registry](docs/AssetRegistry.md)，资源抽屉与场景模型解析使用其中的项目资源记录。已有源资产可注册并生成 `.lmmeta`，重开后保持同一 `AssetID`，源文件缺失时标记 `Missing`。导入设置、来源和依赖记录、重新导入按后续资源工作流推进。
 3. 为场景对象建立稳定身份、Generation Handle 与安全删除；完成 Transform 层级和最小 Render/Camera/Light 数据组织，不提前引入大型 ECS 或 Job System。
 4. 实现场景 schema/版本、原子保存与加载；资源引用不以临时数组下标或绝对路径充当长期身份。Actor-lite 对象、组件、TRS、`.lscene` schema 与实施顺序见[Scene 对象模型与序列化](docs/SceneSerialization.md)。
 5. 验收：创建项目、导入资源、编辑并保存场景后，重启进程仍能恢复；缺失资源有明确错误，往返加载和安全删除有自动测试。

@@ -22,13 +22,13 @@
 - 有未保存修改时，新建或打开场景会询问保存、放弃或取消。打开失败会保留活动场景、选择和文件路径。
 - 文件选择和确认对话框目前走 macOS 原生实现。
 
-从仓库根目录运行以下命令，把两个 `/path/to/...` 换成磁盘上实际存在的文件路径。Editor 使用该项目的 Asset Registry 加载 `.lscene`。
+在 CLion 的 `LimenEditor` Run Configuration 中，将 `--project` 开始的参数填入 **Program arguments**。Editor 读取项目目录下的 `Config/DefaultGame.toml`，通过 Asset Registry 找到并打开配置指定的场景。未设置启动场景的项目从空场景开始。
+
+要临时打开其他场景，可传入 `--scene` 覆盖此次启动。把两个示例路径换成实际路径。
 
 ```bash
 ./out/LimenEditor --project "/path/to/Game.lmproject" --scene "/path/to/Level.lscene"
 ```
-
-在 CLion 的 `LimenEditor` Run Configuration 中，将 `--project` 开始的参数填入 **Program arguments**。只打开项目时，可省略 `--scene` 和它的路径。
 
 场景资源全部解析成功后，Editor 会切换活动场景并清除对象选择和脏标记。失败时保留活动场景，状态栏提示失败，日志给出场景路径、出错字段和原因。
 
@@ -37,7 +37,7 @@
 仓库附带 [Forest Outpost](../samples/ForestOutpost/README.md)，可用来验证场景打开、OBJ 模型摆放和 Details 变换编辑。从仓库根目录启动后，视口会显示城堡、房屋、树林和地块。
 
 ```bash
-./out/LimenEditor --project samples/ForestOutpost/ForestOutpost.lmproject --scene samples/ForestOutpost/assets/Scenes/ForestOutpost.lscene
+./out/LimenEditor --project samples/ForestOutpost/ForestOutpost.lmproject
 ```
 
 ## 已确认的架构规则
@@ -90,14 +90,14 @@ flowchart TB
 - 目前 [`Application`](../LimenEngine/include/Limen/Application/Application.h) 只持有一个 `Window`，主循环只轮询并呈现这一个窗口；多窗口宿主尚未实现。
 - Sandbox 的 [`ImGUILayer`](../LimenEngine/src/Editor/ImGui/ImGUILayer.cpp) 启用停靠，但关闭了多原生窗口。仅开启 ImGui 的多视口标志不能替代正式 Editor 的窗口、面板和状态所有权设计。
 - [`Example3DLayer`](../LimenSandBox/src/Example3DLayer.h) 将测试场景、`SceneRenderer` 与视口状态放在一个 Layer 中；正式 Editor 需要把跨面板共享的场景/选择状态与每个视口自己的状态分开。
-- 当前 [`SceneObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 已带 Generation，稳定身份由 `SceneObjectID` 承担。场景可通过窗口命令或启动参数打开，项目启动场景设置与关闭窗口时的未保存确认待完成。
+- 当前 [`SceneObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 已带 Generation，稳定身份由 `SceneObjectID` 承担。场景可通过窗口命令、项目启动配置或显式启动参数打开。关闭窗口时的未保存确认待完成。
 
 ## 接下来执行的顺序
 
 Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)，不是单独无限扩张的 UI 技术演示。每个节点都以真实项目数据和可重复操作验收：
 
 1. **G0：收稳最小 UI 路径。**用非对称 RGBA 图验证纹理 UV、颜色、Alpha、缩放与高 DPI；保留已有“松开才调整、区域可接近收起”的分隔条交互，并复验窗口缩放、非全屏最大化、最小化恢复及非零尺寸变化到下一次绘制之间的旧命中区域。让 `LimenEditor` 有显式构建/测试入口。
-2. **G1：接入真实数据契约并完成保存/加载（进行中）。**项目配置、稳定 AssetID、Authoring 快照、场景文件序列化和 Editor 场景命令已接入。接下来补齐项目启动场景设置和关闭窗口时的未保存确认。
+2. **G1 项目、资产与场景（进行中）。**已接入项目启动场景、稳定 AssetID、Authoring 快照、场景文件序列化和 Editor 场景命令。接下来补齐关闭窗口时的未保存确认。
 3. **G2：做出可用的场景编辑器。**只补齐真实面板需要的文字、裁剪、焦点与事件路由；中央 Scene 视口消费 `SceneRenderer` 的最终颜色，按视口尺寸更新离屏目标与相机宽高比，并检查逻辑尺寸、帧缓冲像素尺寸及 GPU Context 生命周期。Hierarchy/Outliner、Inspector/Details、Content Browser 操作同一场景。加入 Picking、Transform 编辑、Undo/Redo、保存反馈；以“修改后关闭重开仍一致”验收。UI 不拥有或释放 Scene。
 4. **G3–G4：接入游戏工作流。**Play/Stop 使用隔离的运行世界，Editor 将构建/发布入口连接到独立 Player、C# 游戏脚本和 Cooker；游戏能力及发布包由引擎主线负责，Editor 不复制一套运行时。
 5. **后续工作区能力。**真实面板、输入焦点和资源生命周期稳定后，再做停靠、浮动原生窗口与独立于场景的布局持久化；多窗口共享同一个 Editor 会话，不是 G2 基本编辑闭环的前置条件。

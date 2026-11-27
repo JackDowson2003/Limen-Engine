@@ -35,6 +35,7 @@ elseif (WIN32)
 endif ()
 
 add_executable(LimenEditor ${LIMEN_EDITOR_SOURCES})
+target_sources(LimenEditor PRIVATE src/Project/EditorStartupScene.cpp)
 
 if (APPLE)
     find_library(LIMEN_EDITOR_APPKIT_FRAMEWORK AppKit REQUIRED)
@@ -64,6 +65,9 @@ target_link_libraries(LimenEditor PRIVATE LimenEngine glad)
 target_include_directories(LimenEditor PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+target_include_directories(LimenEditor SYSTEM PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LimenEngine/vendor/toml11"
 )
 
 if (LIMEN_EDITOR_BACKEND_DEFINITION)

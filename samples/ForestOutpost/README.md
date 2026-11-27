@@ -5,10 +5,10 @@
 从 Limen Engine 仓库根目录启动已构建的编辑器。
 
 ```bash
-./out/LimenEditor --project samples/ForestOutpost/ForestOutpost.lmproject --scene samples/ForestOutpost/assets/Scenes/ForestOutpost.lscene
+./out/LimenEditor --project samples/ForestOutpost/ForestOutpost.lmproject
 ```
 
-项目定义、场景及所需资源都随目录提供。可以选中 `Bluecrest Keep` 查看城堡的对象变换。场景中多棵树共用同一个已登记的模型资源。
+Editor 从 `Config/DefaultGame.toml` 读取启动场景的 AssetID，打开 Forest Outpost。可通过 `--scene <路径>` 临时打开另一个场景。可以选中 `Bluecrest Keep` 查看城堡的对象变换。场景中多棵树共用同一个已登记的模型资源。
 
 ## 素材来源
 

@@ -4,6 +4,7 @@
 #include "Limen.h"
 #include "Limen/Asset/AssetRegistry.h"
 #include "Project/EditorSession.h"
+#include "Project/EditorStartupScene.h"
 #include "UI/EditorUILayer.h"
 #include "UI/EditorNativeMenu.h"
 
@@ -86,6 +87,15 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
     {
         LM_ERROR("加载资产注册表失败: path='{}', reason='{}'",
                  registryError.Path.string(), registryError.Message);
+        return nullptr;
+    }
+
+    // 在创建窗口前解析启动场景 ID；实际场景加载等图形 Context 就绪之后执行。
+    if (!hasSceneArgument &&
+        !LimenEditor::TryResolveEditorStartupScene(pc, *registry, scenePath, error))
+    {
+        LM_ERROR("解析项目启动场景失败: file='{}', key='{}', reason='{}'",
+                 error.File.string(), error.Key, error.Message);
         return nullptr;
     }
 
