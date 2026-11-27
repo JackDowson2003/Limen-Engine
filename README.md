@@ -154,7 +154,8 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 |---------------|---------------------|-------------------------------------------------------|
 | GLAD          | 加载 OpenGL 函数    | 仓库内普通源码                                        |
 | stb_image     | 图片解码            | 仓库内普通源码                                        |
-| toml11        | 项目 TOML 解析     | 仓库内普通源码，仅供项目配置实现私有使用              |
+| toml11        | 项目、资产与场景 TOML 解析 | 初始化脚本下载固定版本 v4.4.0，存放在本地依赖目录 |
+| stb_truetype  | 字体字形栅格化      | 初始化脚本下载固定上游修订，存放在本地依赖目录       |
 | GLFW          | 窗口、输入、Context | 当前由父仓库登记的既有 submodule                      |
 | tinyobjloader | OBJ/MTL 解析        | 当前由父仓库登记的既有 submodule                      |
 | GLM           | 向量与矩阵          | 由 CLion/本地外部依赖目录管理，不整理为父仓库 gitlink |
@@ -165,13 +166,15 @@ SceneRenderer 的 PostProcess：曝光 → Reinhard Tone Mapping → Linear → 
 
 `.gitmodules` 由 CLion 生成和维护，不手动编辑。GLM、ImGui、spdlog 以及后续新增的第三方库保留各自的外部依赖目录或仓库，不要求重新登记为 Limen Engine 父仓库的 gitlink。
 
-因此，准备第三方依赖属于本地开发环境的前置步骤，而不是引擎功能路线中的“仓库修复”任务。全新 clone 后，应先通过既有的 CLion/本地依赖流程准备所需库；仅执行下面的命令不保证恢复所有依赖：
+全新检出后，在仓库根目录运行下方脚本。它会初始化 Git 跟踪的子模块，并按固定上游版本下载缺少的 `toml11` 和 `stb_truetype`（下载后校验 SHA-256）。已安装的本地副本会保留。
 
 ```bash
-git submodule update --init --recursive
+bash scripts/sub_module.sh
 ```
 
-`scripts/sub_module.sh` 和 `scripts/sub_module.cmd` 是历史初始化脚本，不是当前标准入口，也不应在已有仓库中重复执行。
+GLM、ImGui、spdlog 通过已有的 CLion 或本地依赖流程准备。Windows 可用 `scripts\sub_module.cmd` 准备相同的依赖文件，当前可运行构建仍使用 macOS。
+
+网络需要 HTTPS 代理时，在启动脚本的终端设置 `https_proxy`，使 CMake 的下载进程继承该设置。
 
 ### Debug 构建
 
@@ -254,7 +257,7 @@ LimenSandBox/assets   → out/assets
 
 Engine 资源先复制，Sandbox 资源后复制，因此相同相对路径由 Sandbox 版本覆盖。
 
-只修改 Shader、纹理或模型时，无需依赖可执行文件重新链接，也无需手动执行历史 `scripts/POST_BUILD.sh`。从仓库根目录重新构建再运行即可：
+只修改 Shader、纹理或模型时，构建目标会同步资源。从仓库根目录重新构建再运行即可：
 
 ```bash
 cmake --build --preset build-debug
@@ -265,24 +268,24 @@ cmake --build --preset build-debug
 
 ## 开发脚本
 
-正式构建入口是 CMake Preset。`scripts/` 当前包含辅助脚本和历史脚本：
+正式构建入口是 CMake Preset。以下脚本根据自身路径定位仓库，调用时可处于任意工作目录。
 
-| 路径                     | 实际用途                                        | 当前状态                                                               |
-|--------------------------|-------------------------------------------------|------------------------------------------------------------------------|
-| `scripts/RUN_TEST.sh`    | 构建并运行 PostProcess CPU/GPU 数值测试         | GPU 测试需要 macOS 桌面 OpenGL Context；从仓库根目录或 `scripts/` 运行 |
-| `scripts/test-shared.sh` | 配置 Shared Debug、检查 `.dylib` 链接并运行数秒 | macOS 冒烟测试；不是 CTest 或画面回归                                  |
-| `scripts/POST_BUILD.sh`  | 手动复制 Sandbox assets                         | 未被 CMake 调用；依赖调用目录；不复制 Engine assets                    |
-| `scripts/sub_module.sh`  | 历史 submodule 添加命令                         | 非幂等，路径与当前仓库不完全一致，不作为入口                           |
-| `scripts/sub_module.cmd` | 历史 Windows 初始化尝试                         | 当前语法与平台构建均不可用，不作为入口                                 |
-| `scripts/out/`           | 本地生成残留目录                                | 被忽略，不属于源码或正式构建输出                                       |
+| 路径 | 实际用途 |
+| --- | --- |
+| `scripts/RUN_TEST.sh` | 默认运行 3 项 CPU 和 2 项 macOS OpenGL 回归；`--cpu-only` 只运行 CPU 用例。使用独立的 `out/cmake-build-test-clang17`。 |
+| `scripts/test-shared.sh` | 使用 Shared Debug Preset，检查 Sandbox 的动态链接并在 `out/` 启动冒烟测试。 |
+| `scripts/POST_BUILD.sh` | 手动同步 Engine 和 Sandbox 的资源到 `out/assets`；常规构建已自动同步。 |
+| `scripts/sub_module.sh`、`scripts/sub_module.cmd` | 初始化已跟踪的子模块并准备两个仅本地使用的头文件依赖。 |
+| `scripts/prepare-vendor-headers.cmake` | 两个平台的初始化脚本共用固定版本、校验值和下载逻辑。 |
 
-Shared Library 冒烟测试当前应从 `out/` 工作目录启动，以保证运行时能够找到资源：
+从仓库根目录运行选定的测试。
 
 ```bash
-(cd out && LIMEN_SHARED_RUN_SECONDS=2 ../scripts/test-shared.sh)
+bash scripts/RUN_TEST.sh --cpu-only
+LIMEN_SHARED_RUN_SECONDS=2 bash scripts/test-shared.sh
 ```
 
-该脚本要求 `cmake`、`ninja`、`otool` 和图形桌面会话。它验证动态库生成、链接和短时间进程存活，不证明画面、Shader 或渲染数学正确。
+运行 GPU 回归时省略 `--cpu-only`。GPU 回归和 Shared 冒烟都需要 macOS 图形桌面会话。Shared 冒烟还需要 `otool`，并会更新各 Preset 共用的 `out/LimenSandBox`。链接和进程存活由 Shared 冒烟验证，像素数值由 GPU 回归验证。
 
 ## 当前目录结构
 
@@ -299,6 +302,8 @@ Limen-Engine/
 ├── scripts/
 │   ├── test-shared.sh
 │   ├── POST_BUILD.sh
+│   ├── RUN_TEST.sh
+│   ├── prepare-vendor-headers.cmake
 │   ├── sub_module.sh
 │   └── sub_module.cmd
 │
@@ -581,7 +586,7 @@ flowchart LR
 
 以上是手工观察，不等于带容差的截图回归。强度 `10.00` 是当前面板范围内的测试，不代表此前 `100000` 强度情形已被验证。
 
-PostProcess 数值测试从仓库根目录运行 `bash scripts/RUN_TEST.sh`。CPU 测试检查参考公式；macOS GPU 测试将已知 `RGBA16F` 像素送入真实 Shader，在测试用 `RGBA8` 附件读回曝光 `1` 时的 `{225, 188, 0, 255}` 与曝光 `0` 时的 `{0, 0, 0, 255}`；RGB 容差为 ±2 字节，Alpha 必须精确为 `255`。2026-10-10 两项 CTest 均通过。GPU CTest 在全新构建中默认不注册，脚本会显式启用并由 CMake 缓存该开关；它需要桌面图形会话，也不直接读取 Sandbox 的 Scene FBO，不能替代场景或截图回归。
+PostProcess 数值测试可用 `bash scripts/RUN_TEST.sh` 运行。CPU 测试检查参考公式；macOS GPU 测试将已知 `RGBA16F` 像素送入真实 Shader，在测试用 `RGBA8` 附件读回曝光 `1` 时的 `{225, 188, 0, 255}` 与曝光 `0` 时的 `{0, 0, 0, 255}`；RGB 容差为 ±2 字节，Alpha 必须精确为 `255`。2026-10-10 两项 CTest 均通过。脚本在独立构建目录中显式启用 GPU CTest。GPU 测试需要桌面图形会话，只读取测试专用附件。
 2026-10-11：同一 OpenGL 测试还验证了 Renderer2D DisplayEncode：线性 RGBA8 输入 {128, 64, 0, 64}，显示 RGBA8 输出 {188, 137, 0, 64}，测试通过。
 
 ## 暂不阻塞当前主线的功能

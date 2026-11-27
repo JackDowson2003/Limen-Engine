@@ -1,10 +1,15 @@
-git submodule update --init --recursive
+#!/usr/bin/env bash
+set -euo pipefail
 
-# 构建环境：下载 stb_truetype 单头文件，已存在则跳过。
-LIMEN_STB_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/../LimenEngine/vendor/stb_truetype"
-mkdir -p "${LIMEN_STB_DIR}"
-if [ ! -f "${LIMEN_STB_DIR}/stb_truetype.h" ]; then
-    curl -L --fail -o "${LIMEN_STB_DIR}/stb_truetype.h" \
-        https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h \
-        || exit 1
-fi
+script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
+
+for tool in git cmake; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+        echo "错误：找不到 ${tool}，请先准备项目工具链。" >&2
+        exit 1
+    fi
+done
+
+git -C "${repo_root}" submodule update --init --recursive
+cmake -P "${script_dir}/prepare-vendor-headers.cmake"

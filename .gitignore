@@ -2,6 +2,8 @@ out/
 
 /LimenEngine/vendor/spdlog/
 /LimenEngine/vendor/glfw
+/LimenEngine/vendor/stb_truetype/
+/LimenEngine/vendor/toml11/
 .idea/
 
 LimenEngine/vendor/glm
