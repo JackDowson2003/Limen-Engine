@@ -15,6 +15,15 @@
 
 namespace LimenEditor
 {
+    namespace
+    {
+        float GetGlyphAdvance(const Limen::FontAtlas &atlas, const Limen::FontAtlas::Glyph *glyph)
+        {
+            // 未登记的字形也占一段空隙，测量和绘制使用同一个规则。
+            return glyph ? glyph->Advance : atlas.GetFontHeight() * 0.25f;
+        }
+    }
+
     EditorUIRenderer::EditorUIRenderer() = default;
 
     EditorUIRenderer::~EditorUIRenderer()
@@ -78,6 +87,18 @@ namespace LimenEditor
             m_Backend->DrawSolidRect(window, position, size, color);
     }
 
+    void EditorUIRenderer::DrawRoundedRect(
+        const Limen::Window &window,
+        const glm::vec2 &position,
+        const glm::vec2 &size,
+        const glm::vec4 &color,
+        const float radius
+    ) const
+    {
+        if (m_Backend)
+            m_Backend->DrawRoundedRect(window, position, size, color, radius);
+    }
+
     void EditorUIRenderer::DrawTexturedRect(const Limen::Window &window, const glm::vec2 &position,
                                             const glm::vec2 &size, const Limen::Texture2D &texture) const
     {
@@ -124,33 +145,36 @@ namespace LimenEditor
         for (const char32_t codepoint: atlas.DecodeText(text))
         {
             const Limen::FontAtlas::Glyph *glyph = atlas.FindGlyph(codepoint);
-            if (!glyph)
+            if (glyph && glyph->Width > 0.0f && glyph->Height > 0.0f)
             {
-                // 图集没有的字形：只前进一段空隙，避免文字粘连。
-                penX += atlas.GetFontHeight() * 0.25f;
-                continue;
+                const glm::vec2 glyphTopLeft(
+                    penX + glyph->OffsetX,
+                    baselineY + glyph->OffsetY);
+                m_Backend->DrawGlyph(
+                    window,
+                    glyphTopLeft,
+                    {glyph->Width, glyph->Height},
+                    color,
+                    atlas.GetTexture(),
+                    {glyph->U0, glyph->V0},
+                    {glyph->U1, glyph->V1});
             }
 
-            // 空格等无位图字形：只前进笔位，不绘制、不报错。
-            if (glyph->Width <= 0.0f || glyph->Height <= 0.0f)
-            {
-                penX += glyph->Advance;
-                continue;
-            }
-
-            const glm::vec2 glyphTopLeft(
-                penX + glyph->OffsetX,
-                baselineY + glyph->OffsetY);
-            m_Backend->DrawGlyph(
-                window,
-                glyphTopLeft,
-                {glyph->Width, glyph->Height},
-                color,
-                atlas.GetTexture(),
-                {glyph->U0, glyph->V0},
-                {glyph->U1, glyph->V1});
-
-            penX += glyph->Advance;
+            penX += GetGlyphAdvance(atlas, glyph);
         }
+    }
+
+    float EditorUIRenderer::MeasureTextWidth(
+        const Limen::FontAtlas &atlas,
+        const std::string_view text
+    ) const
+    {
+        if (!atlas.IsBuilt())
+            return 0.0f;
+
+        float width = 0.0f;
+        for (const char32_t codepoint: atlas.DecodeText(text))
+            width += GetGlyphAdvance(atlas, atlas.FindGlyph(codepoint));
+        return width;
     }
 }

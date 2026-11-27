@@ -19,6 +19,21 @@ if(NOT "${open_result}" STREQUAL "1" OR
 endif()
 
 execute_process(
+    COMMAND "${LIMEN_EDITOR_EXECUTABLE}" --project missing.invalid --scene test.lscene
+    RESULT_VARIABLE scene_result
+    OUTPUT_VARIABLE scene_output
+    ERROR_VARIABLE scene_error
+    TIMEOUT 5
+)
+
+set(scene_log "${scene_output}${scene_error}")
+if(NOT "${scene_result}" STREQUAL "1" OR
+   NOT scene_log MATCHES "打开项目失败")
+    message(FATAL_ERROR
+        "--project with --scene did not reach project loading (exit=${scene_result}):\n${scene_log}")
+endif()
+
+execute_process(
     COMMAND "${LIMEN_EDITOR_EXECUTABLE}" --create-project . "CLI Test"
     RESULT_VARIABLE create_result
     OUTPUT_VARIABLE create_output

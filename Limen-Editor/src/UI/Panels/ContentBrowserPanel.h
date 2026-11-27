@@ -1,6 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 
 #include "Limen/Asset/AssetRegistry.h"
 #include "Limen/Core/Core.h"
@@ -23,9 +29,69 @@ namespace LimenEditor
     {
         None,
         SelectionChanged,
+        FolderChanged,
         ActivateAsset,
         PlaceAsset
     };
+
+    enum class ContentAssetKind : std::uint8_t
+    {
+        File,
+        Mesh,
+        Scene,
+        Image,
+        Material,
+        Folder
+    };
+
+    struct ContentAssetLabel
+    {
+        std::string_view Name;
+        ContentAssetKind Kind;
+    };
+
+    // Registry 路径使用 / 分隔。只有完整的目录分量匹配时才返回剩余路径。
+    [[nodiscard]] inline std::string_view RelativeContentPath(
+        const std::string_view path, const std::string_view folder) noexcept
+    {
+        if (folder.empty())
+            return path;
+        if (path.size() <= folder.size() || !path.starts_with(folder) || path[folder.size()] != '/')
+            return {};
+        return path.substr(folder.size() + 1);
+    }
+
+    // 文件名用于卡片标注；完整资产路径仍由选中项显示。
+    [[nodiscard]] inline ContentAssetLabel DescribeContentAssetPath(const std::string_view path) noexcept
+    {
+        const auto slash = path.rfind('/');
+        const auto filename = slash == std::string_view::npos ? path : path.substr(slash + 1U);
+        const auto dot = filename.rfind('.');
+        if (dot == 0 || dot == std::string_view::npos)
+            return {filename, ContentAssetKind::File};
+
+        const auto extension = filename.substr(dot);
+        const auto isExtension = [extension](const std::string_view expected)
+        {
+            return std::equal(extension.begin(), extension.end(), expected.begin(), expected.end(),
+                [](const char value, const char lower)
+                {
+                    const char folded = value >= 'A' && value <= 'Z'
+                        ? static_cast<char>(value + ('a' - 'A')) : value;
+                    return folded == lower;
+                });
+        };
+        const auto stem = filename.substr(0, dot);
+        if (isExtension(".obj"))
+            return {stem, ContentAssetKind::Mesh};
+        if (isExtension(".lscene"))
+            return {stem, ContentAssetKind::Scene};
+        if (isExtension(".png") || isExtension(".jpg") || isExtension(".jpeg") || isExtension(".tga"))
+            return {stem, ContentAssetKind::Image};
+        if (isExtension(".mtl"))
+            return {stem, ContentAssetKind::Material};
+        return {filename, ContentAssetKind::File};
+    }
 
     // 手动双击检测：一次激活后清空状态，避免连续按下重复触发。
     class ContentBrowserClickState final
@@ -70,7 +136,7 @@ namespace LimenEditor
         std::chrono::steady_clock::time_point m_LastClickTime{};
     };
 
-    // 资产行拖拽状态：按下后移动超过阈值才进入拖拽。
+    // 资产拖拽状态：按下后移动超过阈值才进入拖拽。
     class ContentBrowserDragState final
     {
     public:
@@ -128,14 +194,77 @@ namespace LimenEditor
         bool m_IsDragging = false;
     };
 
-    // 左侧资产浏览器：只借用 Session 的 Registry 与资产选择。
+    // 绘制和命中共用的平铺布局。位置和滚动距离均为逻辑像素。
+    struct ContentBrowserGrid
+    {
+        static constexpr float TileHeight = 78.0f;
+        static constexpr float Gap = 8.0f;
+        static constexpr float RowPitch = TileHeight + Gap;
+
+        UIRect Viewport{};
+        std::uint32_t AssetCount = 0;
+        std::uint32_t Columns = 0;
+        float TileWidth = 0.0f;
+
+        [[nodiscard]] static ContentBrowserGrid Calculate(
+            const UIRect &viewport, const std::uint32_t assetCount) noexcept
+        {
+            if (viewport.Width <= 0.0f || viewport.Height <= 0.0f)
+                return {};
+
+            constexpr float preferredWidth = 145.0f;
+            const auto availableColumns = static_cast<std::uint32_t>((viewport.Width + Gap) / (preferredWidth + Gap));
+            return {viewport, assetCount, std::max(1U, availableColumns), std::min(preferredWidth, viewport.Width)};
+        }
+
+        [[nodiscard]] float ScrollLimit() const noexcept
+        {
+            if (Columns == 0 || AssetCount == 0)
+                return 0.0f;
+            const auto lastRow = (AssetCount - 1U) / Columns;
+            const float contentHeight = static_cast<float>(lastRow) * RowPitch + TileHeight;
+            return std::max(0.0f, contentHeight - Viewport.Height);
+        }
+
+        [[nodiscard]] UIRect TileAt(const std::uint32_t index, const float scroll) const noexcept
+        {
+            if (Columns == 0 || index >= AssetCount)
+                return {};
+            return {
+                Viewport.X + static_cast<float>(index % Columns) * (TileWidth + Gap),
+                Viewport.Y + static_cast<float>(index / Columns) * RowPitch - scroll,
+                TileWidth,
+                TileHeight
+            };
+        }
+
+        [[nodiscard]] std::optional<std::uint32_t> HitTest(
+            const float x, const float y, const float scroll) const noexcept
+        {
+            if (Columns == 0 || AssetCount == 0 || !Viewport.Contains(x, y))
+                return std::nullopt;
+
+            const auto column = static_cast<std::uint32_t>((x - Viewport.X) / (TileWidth + Gap));
+            const auto row = static_cast<std::uint32_t>((y - Viewport.Y + scroll) / RowPitch);
+            if (column >= Columns || row > (AssetCount - 1U) / Columns)
+                return std::nullopt;
+            const std::uint32_t firstInRow = row * Columns;
+            if (column >= AssetCount - firstInRow)
+                return std::nullopt;
+            const std::uint32_t index = firstInRow + column;
+            return TileAt(index, scroll).Contains(x, y) ? std::optional{index} : std::nullopt;
+        }
+    };
+
+    // 底部资产托盘：只借用 Session 的 Registry 与资产选择。
     class ContentBrowserPanel final
     {
     public:
-        // 每帧从 Registry 重建行数据；不创建 GPU 资源。
-        void Update(const EditorSession &session);
+        // 刷新当前目录的子目录与 Registry 资源；列表或目录变化时返回 true。
+        bool Update(const EditorSession &session);
+        void AppendVisibleLabels(std::string &text) const;
 
-        // 绘制标题与资产行；选中行使用行背景高亮。
+        // 绘制标题和可滚动资产网格。布局记录用于后续点击命中。
         void Draw(
             const EditorSession &session,
             const Limen::Window &window,
@@ -145,7 +274,7 @@ namespace LimenEditor
             const UIRect &rect
         );
 
-        // 左键选择资产；同一行短时间内第二次点击表示激活（双击）。
+        // 左键打开目录或选择资产，同一资源短时间内第二次点击表示激活（双击）。
         ContentBrowserAction OnMousePressed(
             EditorSession &session,
             float x,
@@ -153,6 +282,10 @@ namespace LimenEditor
         );
 
         void OnMouseMoved(float x, float y) noexcept;
+        [[nodiscard]] bool OnMouseScrolled(float x, float y, float yOffset) noexcept;
+
+        // 隐藏或调整尺寸后清空命中区域，保留资源浏览进度。
+        void ResetLayout() noexcept;
 
         // 左键释放时返回本次是否真正发生了拖拽，并清空拖拽状态。
         bool EndDrag() noexcept;
@@ -160,11 +293,22 @@ namespace LimenEditor
         [[nodiscard]] bool IsDraggingAsset() const noexcept;
 
     private:
+        void ChangeFolder(std::string logicalPath);
+
         UIRect m_Rect{};
+        UIRect m_ParentButtonRect{};
         UIRect m_PlaceButtonRect{};
-        Limen::LArray<Limen::AssetRecord> m_Rows;
-        float m_FirstRowY = 0.0f;
-        float m_RowHeight = 0.0f;
+        std::filesystem::path m_AssetRoot;
+        std::string m_CurrentFolder;
+        Limen::LArray<std::string> m_DiskFolders;
+        Limen::LArray<std::string> m_ChildFolders;
+        std::chrono::steady_clock::time_point m_NextDirectoryRefresh{};
+        bool m_FolderChanged = true;
+        Limen::LArray<Limen::AssetRecord> m_Assets;
+        Limen::LArray<std::uint32_t> m_AssetOrder;
+        ContentBrowserGrid m_Grid{};
+        float m_Scroll = 0.0f;
+        float m_PaintedScroll = 0.0f;
         ContentBrowserClickState m_ClickState;
         EditorCommandGuard m_PlaceCommandGuard;
         ContentBrowserDragState m_DragState;

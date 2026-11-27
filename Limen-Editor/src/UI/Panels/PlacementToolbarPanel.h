@@ -44,25 +44,23 @@ namespace LimenEditor
             return layout;
         }
 
-        constexpr float leftPadding = 12.0f;
-        constexpr float labelWidth = 54.0f;
+        constexpr float labelWidth = 34.0f;
         constexpr float gap = 6.0f;
-        constexpr float cubeWidth = 74.0f;
-        constexpr float pointLightWidth = 108.0f;
+        constexpr float cubeWidth = 59.0f;
+        constexpr float pointLightWidth = 91.0f;
 
-        const float rowY = rect.Y + rowHeight + 2.0f;
-        if (rowY + rowHeight > rect.Y + rect.Height)
+        const float rowY = rect.Y;
+        if (rowHeight > rect.Height)
             return layout;
 
         const float totalWidth =
-            leftPadding + labelWidth + gap +
-            cubeWidth + gap + pointLightWidth;
+            labelWidth + gap + cubeWidth + gap + pointLightWidth;
         if (totalWidth > rect.Width)
             return layout;
 
         layout.Label = {
-            rect.X + leftPadding,
-            rowY + 2.0f,
+            rect.X,
+            rowY,
             labelWidth,
             rowHeight
         };

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include "Limen/Core/Core.h"
 #include "Limen/Scene/Light.h"
 #include "Limen/Tool/LArray.h"
@@ -25,4 +26,22 @@ namespace Limen
     LIMEN_API LArray<PointLight> CollectRuntimePointLights(
         const Scene &scene
     );
+
+    struct SceneDocument;
+    struct SceneFileError;
+    struct SceneObjectComponent;
+    struct SceneRenderObject;
+
+    // 返回组件空间中的渲染组件
+    // 失败时可填写错误码、原因和相对于组件的字段路径
+    using SceneRenderPartsResolver = std::function<bool(
+        const SceneObjectComponent &component,
+        LArray<SceneRenderObject> &outParts,
+        SceneFileError &error)>;
+
+    [[nodiscard]] LIMEN_API bool TryInstantiateScene(
+        const SceneDocument &document,
+        const SceneRenderPartsResolver &resolveParts,
+        Scope<Scene> &outScene,
+        SceneFileError &error);
 }

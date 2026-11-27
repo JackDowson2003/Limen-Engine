@@ -12,6 +12,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Project/EditorSession.h"
+#include "UI/Panels/DetailsTransformInput.h"
 
 namespace
 {
@@ -721,6 +722,120 @@ namespace
                         visits == 0);
         return passed;
     }
+
+    bool TestDetailsTransformInput(const Limen::ProjectConfiguration &configuration)
+    {
+        using LimenEditor::DetailsTransformField;
+        using LimenEditor::TryApplyDetailsTransformInput;
+        auto session = MakeSession(configuration);
+        const auto id = session.CreateObject();
+        Limen::SceneTransform transform;
+        bool passed = Check("Details uses the selected object's transform",
+                            id.isValid() && session.TryGetSelectedObjectTransform(transform));
+        passed &= Check("Details accepts three coordinates including decimal and exponent",
+                        TryApplyDetailsTransformInput(DetailsTransformField::Location,
+                                                      "1.5, -2 3e1", transform) &&
+                        transform.Location == glm::vec3{1.5f, -2.0f, 30.0f});
+        passed &= Check("Details rejects missing, surplus, and non-finite coordinates",
+                        !TryApplyDetailsTransformInput(DetailsTransformField::Location, "1,, 2, 3", transform) &&
+                        !TryApplyDetailsTransformInput(DetailsTransformField::Location, "1 2", transform) &&
+                        !TryApplyDetailsTransformInput(DetailsTransformField::Location, "1 2 3 4", transform) &&
+                        !TryApplyDetailsTransformInput(DetailsTransformField::Location, "inf 2 3", transform) &&
+                        transform.Location == glm::vec3{1.5f, -2.0f, 30.0f});
+        passed &= Check("Details converts degree input into a rotation quaternion",
+                        TryApplyDetailsTransformInput(DetailsTransformField::Rotation, "0, 450, 0", transform) &&
+                        std::abs(transform.Rotation.y - 0.70710678f) < 1.0e-5f);
+        passed &= Check("Details applies scale through the normal editor edit path",
+                        TryApplyDetailsTransformInput(DetailsTransformField::Scale, "2, 1, .5", transform) &&
+                        session.SetSelectedObjectTransform(transform));
+        const auto snapshot = Limen::CaptureSceneDocument(session.GetScene(), "Transform edit");
+        passed &= Check("Details edits appear in the document snapshot",
+                        snapshot.Objects.getSize() == 1 && snapshot.Objects[0].ID == id &&
+                        snapshot.Objects[0].Transform.Location == glm::vec3{1.5f, -2.0f, 30.0f} &&
+                        snapshot.Objects[0].Transform.Scale == glm::vec3{2.0f, 1.0f, 0.5f});
+        return passed;
+    }
+
+    bool TestScenePersistenceContract(const Limen::ProjectConfiguration &configuration)
+    {
+        auto session = MakeSession(configuration);
+        const auto objectID = session.CreateObject();
+        Limen::SceneTransform transform;
+        transform.Location = {2.0f, -3.0f, 7.0f};
+        Limen::SceneObjectComponent component;
+        component.LocalTransform.Location = {0.0f, 1.0f, 0.0f};
+        component.Data = Limen::PointLightComponent{.Intensity = 4.0f};
+        const auto componentID = session.AddObjectComponent(objectID, component);
+        bool passed = Check("prepare an edited scene", objectID.isValid() && componentID.isValid() &&
+                            session.SetSelectedObjectTransform(transform) &&
+                            session.SetObjectLabel(objectID, "初始光源"));
+
+        Limen::SceneFileError error;
+        passed &= Check("save requires an associated path",
+                        !session.TrySaveScene(error) && error.Code == Limen::SceneFileErrorCode::FileAccess &&
+                        session.GetScenePath().empty() && session.GetSceneDisplayName().empty() && session.IsDirty());
+
+        const auto projectRoot = configuration.ProjectFile.parent_path();
+        const auto scenePath = projectRoot / fs::path(u8"入口场景.lscene");
+        passed &= Check("first Save As commits path and UTF-8 title",
+                        session.TrySaveSceneAs(scenePath, error) && session.GetScenePath() == scenePath &&
+                        session.GetSceneDisplayName() == "入口场景" && !session.IsDirty() &&
+                        session.GetSelectedObjectID() == objectID &&
+                        session.GetActiveSceneLabel() == "入口场景");
+
+        passed &= Check("save writes later edits to the associated scene",
+                        session.SetObjectLabel(objectID, "已修改光源") && session.IsDirty() &&
+                        session.TrySaveScene(error) && !session.IsDirty());
+
+        auto reopened = MakeSession(configuration);
+        Limen::LString label;
+        Limen::SceneTransform restoredTransform;
+        passed &= Check("save and reopen restore object identity, label, and transform",
+                        reopened.TryOpenScene(scenePath, {}, error) &&
+                        reopened.TryGetObjectLabel(objectID, label) && label == "已修改光源" &&
+                        reopened.TryGetObjectTransform(objectID, restoredTransform) &&
+                        MatchesTransform(restoredTransform.ToMatrix(), transform.ToMatrix()) &&
+                        reopened.GetSelectedObjectCount() == 0 && !reopened.IsDirty());
+        bool restoredComponent = false;
+        reopened.ForEachObjectComponent(objectID, [&](const Limen::SceneObjectComponent &saved)
+        {
+            const auto *light = std::get_if<Limen::PointLightComponent>(&saved.Data);
+            restoredComponent |= saved.ID == componentID && light && light->Intensity == 4.0f &&
+                                 MatchesTransform(saved.LocalTransform.ToMatrix(), component.LocalTransform.ToMatrix());
+        });
+        passed &= Check("save and reopen restore authoring component", restoredComponent);
+
+        const auto copyPath = projectRoot / "Copy.lscene";
+        Limen::SceneDocument copiedDocument;
+        passed &= Check("later Save As preserves the authored title and associates the copy",
+                        session.TrySaveSceneAs(copyPath, error) && session.GetScenePath() == copyPath &&
+                        Limen::TryLoadSceneFile(copyPath, copiedDocument, error) &&
+                        copiedDocument.DisplayName == "入口场景");
+
+        const auto failedPath = projectRoot / "missing-parent" / "Failed.lscene";
+        passed &= Check("failed Save As preserves current association and edits",
+                        session.SetObjectLabel(objectID, "未保存光源") &&
+                        !session.TrySaveSceneAs(failedPath, error) && error.File == failedPath &&
+                        error.Code == Limen::SceneFileErrorCode::FileAccess &&
+                        session.GetScenePath() == copyPath && session.GetSceneDisplayName() == "入口场景" &&
+                        session.IsDirty() && session.GetSelectedObjectID() == objectID &&
+                        session.TryGetObjectLabel(objectID, label) && label == "未保存光源");
+
+        passed &= Check("select a project asset before creating a new scene", session.SelectAsset(kAssetID));
+        session.NewScene();
+        passed &= Check("new scene clears scene state and retains project asset selection",
+                        session.GetScenePath().empty() && session.GetSceneDisplayName().empty() &&
+                        !session.IsDirty() && session.GetSelectedObjectCount() == 0 &&
+                        !session.TryGetObjectLabel(objectID, label) && session.GetSelectedAssetID() == kAssetID &&
+                        session.GetActiveSceneLabel() == "Untitled");
+
+        const auto unnamedPath = projectRoot / fs::path(u8"文件名回退.lscene");
+        passed &= Check("scene tab falls back to the UTF-8 filename when the document has no title",
+                        Limen::TrySaveSceneFile(unnamedPath, Limen::SceneDocument{}, error) &&
+                        session.TryOpenScene(unnamedPath, {}, error) &&
+                        session.GetActiveSceneLabel() == "文件名回退");
+        return passed;
+    }
 }
 
 int main()
@@ -769,6 +884,8 @@ int main()
         passed &= TestRenderableGroupContract(configuration);
         passed &= TestObjectLabelContract(configuration);
         passed &= TestObjectComponentTraversalContract(configuration);
+        passed &= TestDetailsTransformInput(configuration);
+        passed &= TestScenePersistenceContract(configuration);
         passed &= Check("schema version retained", configuration.SchemaVersion == 1);
         passed &= Check("project ID retained",
                         configuration.ProjectID == "d0360f3d-ef2e-41d3-a0b6-9bcc5940a539");

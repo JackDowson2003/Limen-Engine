@@ -1,15 +1,44 @@
 # Limen Editor
 
-> 状态：`LimenEditor` 已有单窗口 C++ 自研 UI：场景视口、Content Browser、Outliner、Details 基础面板，文字图集、矩形裁剪、单选/多选与批量删除已接入；统一 UE 风格暗色主题，视口/Details/Content Browser 已拆为独立面板。资产驱动模型放置、顶栏内置 `Cube`/`Point Light` 放置和 Details 组件摘要已接入 CPU 与 OpenGL GPU 回归；真实 Retina 交互、停靠和多原生窗口仍待完成。C# 用于游戏脚本 1.0，不用于 Editor UI。当前迭代顺序：A（会话数据契约）→ B（真实场景视口）→ C（面板与文字）→ D（资产与内置对象生成），见下文。
+> 状态：`LimenEditor` 已有单窗口 C++ 自研工作区，主视口位于左侧，右列上方为 Outliner，下方为 Details。支持底部资源抽屉、模型放置、变换编辑，以及场景保存和打开。自由停靠和多原生窗口待完成。C# 用于计划中的游戏脚本 1.0。
 
 ## 当前已实现
 
 - `EditorApp` 注册 `EditorUILayer`；引擎在场景更新、窗口清屏之后调用 `OnUIRender()` 绘制正式 Editor UI，不依赖 Sandbox 的 ImGui。
-- `EditorUILayout` 使用逻辑窗口尺寸计算顶部、左侧、中央、右上、分隔条和右下六个区域；常规宽度下三栏保持比例，极窄窗口优先满足中央最小宽度，左右栏可能缩至零。
+- `EditorUILayout` 使用逻辑窗口尺寸计算工具栏、Outliner、Scene 视口、Inspector、资源抽屉和状态栏。窄窗口优先保留场景面积。拖动抽屉上边缘或右列的分隔条，松开后调整高度。
 - `EditorUIRenderer` 通过 OpenGL 后端绘制纯色、纹理与文字，设置矩形裁剪并区分逻辑窗口坐标与帧缓冲像素尺寸；面板输入命中由各自保存的逻辑矩形负责。
-- 右侧分隔条在鼠标按下后记录交互状态，松开时按右侧正文总高（包含分隔条）更新上下比例；不要求分隔条精确贴住松开位置，也不在移动时实时调整。零尺寸帧缓冲事件会取消拖动并清除旧命中区域。
+- 底部 **Content Drawer**、`Cmd/Ctrl+J` 或 `Ctrl+Space` 开关资源抽屉。点击目录卡片进入当前资产根下的目录，用 **Up** 返回上一级。已注册且存在的 OBJ 卡片可拖到视口中放置，双击场景卡片可打开关卡。
+- 视口上方的活动场景标签显示关卡名称和未保存标记 `*`。打开成功后，状态栏短暂显示 `Opened scene <名称>`。
+- 视口 **Frame** 或光标位于视口时按 `F`，按选中对象的世界包围盒取景。**Expand** 临时展开视口，**Restore** 或 `Esc` 恢复工作区。
+- 单选对象后，在 **Details** 点击 Location、Rotation 或 Scale 的数值字段，输入以逗号或空格分隔的三个数。旋转单位是度。`Enter` 应用，`Esc` 取消。
 - `LimenEditorUILayout` CPU 测试覆盖常规与放大窗口的布局比例、右侧总高、极矮窗口和矩形命中边界；它不替代窗口画面与输入验证。
 - `LimenOpenGLEditorUITextureTests` 使用非对称 RGBA 纹理与隐藏 OpenGL 窗口读回像素，验证 UV、sRGB、Alpha 以及逻辑尺寸到 2 倍帧缓冲尺寸的映射；这不是实际 Retina 显示器或可见 Editor 窗口的验收。
+
+### 新建、打开和保存场景
+
+打开项目后，可以通过窗口顶栏的 **File** 工具区或 macOS 菜单栏的 **File** 新建、打开、保存和另存为场景。快捷键分别是 `Cmd/Ctrl+N`、`Cmd/Ctrl+O`、`Cmd/Ctrl+S` 和 `Cmd/Ctrl+Shift+S`。macOS **Edit → Delete Selection** 删除当前选中的场景对象。
+
+- 第一次保存会弹出另存为对话框。保存成功后，Editor 使用该路径继续保存，并清除顶栏的 `*`。
+- 有未保存修改时，新建或打开场景会询问保存、放弃或取消。打开失败会保留活动场景、选择和文件路径。
+- 文件选择和确认对话框目前走 macOS 原生实现。
+
+从仓库根目录运行以下命令，把两个 `/path/to/...` 换成磁盘上实际存在的文件路径。Editor 使用该项目的 Asset Registry 加载 `.lscene`。
+
+```bash
+./out/LimenEditor --project "/path/to/Game.lmproject" --scene "/path/to/Level.lscene"
+```
+
+在 CLion 的 `LimenEditor` Run Configuration 中，将 `--project` 开始的参数填入 **Program arguments**。只打开项目时，可省略 `--scene` 和它的路径。
+
+场景资源全部解析成功后，Editor 会切换活动场景并清除对象选择和脏标记。失败时保留活动场景，状态栏提示失败，日志给出场景路径、出错字段和原因。
+
+### Forest Outpost 示例关卡
+
+仓库附带 [Forest Outpost](../samples/ForestOutpost/README.md)，可用来验证场景打开、OBJ 模型摆放和 Details 变换编辑。从仓库根目录启动后，视口会显示城堡、房屋、树林和地块。
+
+```bash
+./out/LimenEditor --project samples/ForestOutpost/ForestOutpost.lmproject --scene samples/ForestOutpost/assets/Scenes/ForestOutpost.lscene
+```
 
 ## 已确认的架构规则
 
@@ -24,10 +53,10 @@
 7. **技术路线已确定：**正式 Editor 使用 C++ 自研 UI；C# 用于计划中的游戏脚本 1.0，不用于 Editor UI。现有 ImGui 继续作为 Sandbox 调试工具。
 8. **会话独占活动场景：**`EditorSession` 以独占所有权持有活动 `Scene`；窗口与面板只借用 `const Scene&`，不拥有、不释放。一切修改经会话提供的方法完成，选择与脏状态不可能被面板绕过。对应 UE 的 GEditor 拥有编辑世界与选择集、面板不拥有 Actor。
 9. **选择只存稳定身份：**选择状态以 `SceneObjectID` 为键，不保存运行期句柄或数组下标；对象销毁后旧 ID 自动失效并从选择中清除。接口先按单选实现，但形状兼容后续多选。
-10. **脏状态显式转换：**成功的编辑操作置脏，保存（将来接入）清除脏；失败操作不改变脏状态。
+10. **脏状态显式转换：**成功的编辑操作置脏，成功保存或切换场景清除脏；保存失败时保留编辑状态。
 11. **创建即选中：**新建对象自动成为当前选择，对应 UE 中 Spawn 后自动选中。
 
-参考截图对应的初始工作区：顶部菜单与工具栏、左侧 Content Browser、中间 Scene 视口、右上 Outliner、右下 Details。这只是可恢复的默认布局，不限制用户重新停靠或将面板拖到其他显示器。
+默认工作区参考 UE5 Level Editor。场景编辑使用主视口，Outliner 和 Details 集中在右列，资源浏览使用底部抽屉。布局状态由 Editor 界面管理。 [UE 编辑器界面](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface)
 
 ## 逻辑架构
 
@@ -57,18 +86,18 @@ flowchart TB
 
 ## 当前代码与目标之间的差距
 
-- 当前已有单窗口真实 Scene 视口、模型/内置对象放置和同步面板；仍缺停靠、多原生窗口、通用输入焦点、Gizmo、Undo/Redo 与场景保存/加载闭环。
+- 当前已有单窗口真实 Scene 视口、模型/内置对象放置、同步面板与场景文件命令。停靠、多原生窗口、通用输入焦点、Gizmo 和 Undo/Redo 待完成。
 - 目前 [`Application`](../LimenEngine/include/Limen/Application/Application.h) 只持有一个 `Window`，主循环只轮询并呈现这一个窗口；多窗口宿主尚未实现。
 - Sandbox 的 [`ImGUILayer`](../LimenEngine/src/Editor/ImGui/ImGUILayer.cpp) 启用停靠，但关闭了多原生窗口。仅开启 ImGui 的多视口标志不能替代正式 Editor 的窗口、面板和状态所有权设计。
 - [`Example3DLayer`](../LimenSandBox/src/Example3DLayer.h) 将测试场景、`SceneRenderer` 与视口状态放在一个 Layer 中；正式 Editor 需要把跨面板共享的场景/选择状态与每个视口自己的状态分开。
-- 当前 [`SceneObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 已带 Generation，稳定身份由 `SceneObjectID` 承担，渲染组件也已统一到对象槽；剩余差距是场景序列化、撤销/重做和跨面板编辑操作。
+- 当前 [`SceneObjectHandle`](../LimenEngine/include/Limen/Scene/Scene.h) 已带 Generation，稳定身份由 `SceneObjectID` 承担。场景可通过窗口命令或启动参数打开，项目启动场景设置与关闭窗口时的未保存确认待完成。
 
 ## 接下来执行的顺序
 
 Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)，不是单独无限扩张的 UI 技术演示。每个节点都以真实项目数据和可重复操作验收：
 
 1. **G0：收稳最小 UI 路径。**用非对称 RGBA 图验证纹理 UV、颜色、Alpha、缩放与高 DPI；保留已有“松开才调整、区域可接近收起”的分隔条交互，并复验窗口缩放、非全屏最大化、最小化恢复及非零尺寸变化到下一次绘制之间的旧命中区域。让 `LimenEditor` 有显式构建/测试入口。
-2. **G1：接入真实数据契约并完成保存/加载（进行中）。**项目配置、稳定 AssetID、场景对象身份、Authoring Component 和 Editor 会话已接入；剩余 Authoring 快照、SceneSerializer、`RestoreObject` 与保存/加载命令。不能用临时数组下标充当跨面板长期引用。
+2. **G1：接入真实数据契约并完成保存/加载（进行中）。**项目配置、稳定 AssetID、Authoring 快照、场景文件序列化和 Editor 场景命令已接入。接下来补齐项目启动场景设置和关闭窗口时的未保存确认。
 3. **G2：做出可用的场景编辑器。**只补齐真实面板需要的文字、裁剪、焦点与事件路由；中央 Scene 视口消费 `SceneRenderer` 的最终颜色，按视口尺寸更新离屏目标与相机宽高比，并检查逻辑尺寸、帧缓冲像素尺寸及 GPU Context 生命周期。Hierarchy/Outliner、Inspector/Details、Content Browser 操作同一场景。加入 Picking、Transform 编辑、Undo/Redo、保存反馈；以“修改后关闭重开仍一致”验收。UI 不拥有或释放 Scene。
 4. **G3–G4：接入游戏工作流。**Play/Stop 使用隔离的运行世界，Editor 将构建/发布入口连接到独立 Player、C# 游戏脚本和 Cooker；游戏能力及发布包由引擎主线负责，Editor 不复制一套运行时。
 5. **后续工作区能力。**真实面板、输入焦点和资源生命周期稳定后，再做停靠、浮动原生窗口与独立于场景的布局持久化；多窗口共享同一个 Editor 会话，不是 G2 基本编辑闭环的前置条件。
@@ -94,7 +123,7 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 ### C：面板骨架与文字（已完成基础）
 
 - 补齐字体图集、文字渲染与矩形裁剪；Content Browser 列出资产路径并提供显式 Place，Outliner 只列出并管理已有场景对象，优先显示模型 Label，支持单选、Command/Ctrl 多选、Shift 范围选择；Details 显示单选 Label、Transform、Authoring Component 摘要或多选数量。
-- 引入 `EditorTheme` 统一 UE5 风格暗色主题：Editor 自有 18px 字体、96px 紧凑顶栏、30px 面板头部、细分隔线/边框和单一蓝色强调色；Content Browser 使用资产图标与描边 Place 按钮，Outliner 使用紧凑树行，Details 按 Selection/Transform/Components 分组，Scene 视口带 Perspective/Lit 浮动条和近黑清屏色。
+- `EditorTheme` 采用石墨色与琥珀色选中提示。顶栏展示项目、场景和常用命令，窄窗口按可用宽度换行。Details 提供选中对象的变换编辑和组件摘要，视口工具栏提供取景和展开。
 - 视口支持世界空间射线-AABB 拾取：左键点击选择对象，Command/Ctrl 增选，点击空白清空对象选择。
 - 鼠标输入采用 `Scene Viewport → Content Browser → Outliner → Splitter → 快捷键` 的固定优先级；前一个区域消费事件后，后续区域不再重复处理。
 - 引擎侧新增 `Scene::ForEachObject/ForEachRenderableObject` 与 `AssetRegistry::ForEachRecord`，面板只读借用数据。
@@ -105,21 +134,21 @@ Editor 服务于根目录 [README 的 G0–G4 游戏交付主线](../README.md)�
 当前有三个显式 Place 入口：
 
 - Content Browser 的 `Place`：放置当前选中的 OBJ 模型资产；
-- 顶栏 `Place → Cube`：创建一个带 `PrimitiveRendererComponent(PrimitiveType::Cube)` 和共享 Cube Mesh/Material 的可渲染对象；
-- 顶栏 `Place → Point Light`：创建一个不可渲染对象，并挂载 `PointLightComponent`；对象根 TRS 的 Translation 决定灯光世界位置。
+- 顶栏 `Add → Cube`：创建一个带 `PrimitiveRendererComponent(PrimitiveType::Cube)` 和共享 Cube Mesh/Material 的可渲染对象。
+- 顶栏 `Add → Point Light`：创建带 `PointLightComponent` 的光源对象，其根 TRS 的 Translation 决定灯光世界位置。
 
 内置对象使用 `Cube`、`Cube_2`、`PointLight`、`PointLight_2` 这类唯一 Label。按钮使用 350 ms 命令去抖，双击不会重复生成两个对象。Outliner 不拥有创建按钮。
 
 模型资产放置流程参考 UE 的 Content Browser 选中资产 → Place：
 
-1. Content Browser 行点击调用 `EditorSession::SelectAsset(AssetID)`，选中行高亮；单击只改变资产选择，双击保留为后续资产编辑器入口，不实例化对象。资产选择与场景对象选择互相独立。按住资产行拖动超过 5 个逻辑像素后可拖入 Scene 视口，在释放位置生成对象。
+1. Content Browser 的资产卡片单击调用 `EditorSession::SelectAsset(AssetID)` 并高亮。双击场景资产进入同一条场景打开流程，当前场景有未保存修改时先确认。资产选择与场景对象选择互相独立。按住 OBJ 卡片拖动超过 5 个逻辑像素后可进入 Scene 视口，在释放位置生成对象。
 2. `Place` 要求存在选中资产且 `AssetRecordStatus::Present`；资产缺失或加载失败时不修改 Scene，并留下明确诊断。
 3. 通过 `AssetRegistry` 的 `LogicalPath` 调用 `AssetManager::LoadModel` 加载模型；用 `ModelMaterialBuilder::BuildBlinnPhong` 和 `EditorSceneContent` 的 Blinn-Phong Pipeline 构建运行时材质。
 4. 第一版只支持模型资产（OBJ + sidecar）；纹理只作为材质输入，不作为可生成对象。多 Part 模型现在是**一个 SceneObject + 多个渲染组件**，Outliner 只出现一行，Details 显示该实例的 Transform。
 5. 每个 part 的 Transform 使用 `ModelPart::LocalTransform`，渲染时与世界 Transform 组合；同一模型实例的多个 part 共享 Mesh/Material 的 `Ref`。生成后对象加入选择，Outliner/Details 立即刷新。
    放置时以模型文件名生成 Label，例如 `TestCube`；同名对象使用 `TestCube_2`、`TestCube_3`。Label 只用于显示和序列化，对象身份仍由 `SceneObjectID` 承担。
 6. `Place` 按钮把对象放在视口中心；拖拽释放则按鼠标位置生成世界空间射线，默认距离也是相机前方 4 个世界单位。拖拽开始时读取模型局部 AABB，按当前落点投影为半透明屏幕包围框，同时显示资产路径和距离；滚轮按每次 0.5 个单位在 1.0～20.0 范围调整距离。连续放置不依赖硬编码世界原点。GPU 资源由 Editor 渲染层与 AssetManager 持有，Scene 只借用。
-7. Place 成功或失败会在顶栏显示 10 秒状态：缺失资产、OBJ 加载失败、无渲染组件、内置资源不可用、视口未就绪和拖拽落到视口外都有可见反馈。
+7. 底部状态栏会提示放置成功、失败或拖放取消。
 
 文件范围：`EditorSession`、`EditorSceneContent`、`EditorAssetSpawner`、`EditorPrimitiveSpawner`、`PlacementToolbarPanel`、`SceneViewportPanel`、`EditorUILayer`、Content Browser/Outliner 面板、测试与资产样例。已验证：完整构建和 CTest 通过；临时项目 OBJ 的 OpenGL GPU 端到端测试通过；真实窗口验证 `Cube` 出现在视口且 Outliner/Details 同步，`Point Light` 在 Outliner 新增并选中。验收：模型资产、Cube 和 PointLight 都能从显式 Place 入口创建；失败不留下半成品对象。
 

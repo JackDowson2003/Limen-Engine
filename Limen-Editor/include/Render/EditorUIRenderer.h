@@ -35,6 +35,15 @@ namespace LimenEditor
             const glm::vec4 &color
         ) const;
 
+        // radius 使用逻辑窗口单位，范围从 0 到矩形短边的一半。
+        void DrawRoundedRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color,
+            float radius
+        ) const;
+
         // 普通 UI 图片使用逻辑窗口坐标；texture 只在绘制调用期间借用。
         void DrawTexturedRect(
             const Limen::Window &window,
@@ -70,6 +79,9 @@ namespace LimenEditor
             const Limen::FontAtlas &atlas,
             std::string_view text
         ) const;
+
+        // 返回单行文字的总水平笔位移动，包含空格。
+        [[nodiscard]] float MeasureTextWidth(const Limen::FontAtlas &atlas, std::string_view text) const;
 
     private:
         Limen::Scope<EditorUIRenderBackend> m_Backend;

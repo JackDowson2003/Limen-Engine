@@ -3,6 +3,9 @@
 //
 #include "SceneViewportPanel.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/matrix.hpp>
 
@@ -10,6 +13,7 @@
 #include "Limen/Core/DeltaTime.h"
 #include "Limen/Events/MouseEvent.h"
 #include "Limen/Input/Input.h"
+#include "Limen/Renderer/Mesh.h"
 #include "Limen/Renderer/PerspectiveCameraController.h"
 #include "Limen/Scene/SceneRenderer.h"
 #include "Project/EditorSession.h"
@@ -19,6 +23,12 @@
 
 namespace LimenEditor
 {
+    namespace
+    {
+        constexpr float kViewportNearPlane = 0.1f;
+        constexpr float kViewportFarPlane = 100.0f;
+    }
+
     SceneViewportPanel::~SceneViewportPanel() = default;
 
     bool SceneViewportPanel::Init()
@@ -26,12 +36,12 @@ namespace LimenEditor
         Limen::SceneRendererSpecification spec;
         spec.Width = 1;
         spec.Height = 1;
-        spec.ClearColor = {0.018f, 0.020f, 0.024f, 1.0f};
+        spec.ClearColor = {0.0075f, 0.0105f, 0.0145f, 1.0f};
         spec.DebugName = "Editor Scene Viewport";
 
         m_Renderer = Limen::CreateScope<Limen::SceneRenderer>(spec);
         m_CameraController = Limen::CreateScope<
-            Limen::PerspectiveCameraController>(45.0f, 1.0f, 0.1f, 100.f);
+            Limen::PerspectiveCameraController>(45.0f, 1.0f, kViewportNearPlane, kViewportFarPlane);
 
         if (!m_Renderer || !m_CameraController)
         {
@@ -189,6 +199,67 @@ namespace LimenEditor
             session.ClearSelection();
         }
 
+        return true;
+    }
+
+    bool SceneViewportPanel::FrameSelection(const EditorSession &session)
+    {
+        const auto &selected = session.GetSelectedObjectIDs();
+        if (!m_CameraController || m_IsNavigating || selected.empty())
+            return false;
+
+        Limen::LArray<Limen::AxisAlignedBoundingBox> objectBounds(selected.getSize());
+        session.GetScene().ForEachRenderableObject(
+            [&](Limen::SceneObjectHandle, Limen::SceneObjectID id, const Limen::Ref<Limen::Mesh> &mesh,
+                const Limen::Ref<Limen::Material> &, const glm::mat4 &worldTransform)
+            {
+                const auto found = std::find(selected.begin(), selected.end(), id);
+                if (!mesh || found == selected.end())
+                    return;
+
+                const auto &localBounds = mesh->GetLocalBounds();
+                if (!localBounds.IsValid() || !IsFiniteViewportPoint(localBounds.Min) ||
+                    !IsFiniteViewportPoint(localBounds.Max))
+                    return;
+
+                for (int column = 0; column < 4; ++column)
+                {
+                    for (int row = 0; row < 4; ++row)
+                    {
+                        if (!std::isfinite(worldTransform[column][row]))
+                            return;
+                    }
+                }
+
+                const auto partBounds = localBounds.Transformed(worldTransform);
+                if (IsFiniteViewportPoint(partBounds.Min) && IsFiniteViewportPoint(partBounds.Max))
+                    objectBounds[static_cast<uint32_t>(found - selected.begin())].Expand(partBounds);
+            });
+
+        Limen::AxisAlignedBoundingBox worldBounds;
+        for (uint32_t index = 0; index < selected.getSize(); ++index)
+        {
+            const auto &bounds = objectBounds[index];
+            if (bounds.IsValid())
+            {
+                worldBounds.Expand(bounds);
+                continue;
+            }
+
+            // 灯光或空对象没有几何包围盒，仍将对象原点纳入取景范围。
+            Limen::SceneTransform transform;
+            if (session.TryGetObjectTransform(selected[index], transform) &&
+                IsFiniteViewportPoint(transform.Location))
+                worldBounds.Expand(transform.Location);
+        }
+
+        auto &camera = m_CameraController->GetCamera();
+        glm::vec3 position;
+        if (!TryCalculateFramingPosition(camera.GetViewMatrix(), camera.GetProjectionMatrix(),
+                                         worldBounds, kViewportNearPlane, kViewportFarPlane, position))
+            return false;
+
+        camera.SetPosition(position);
         return true;
     }
 

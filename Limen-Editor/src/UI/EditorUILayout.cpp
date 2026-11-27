@@ -8,83 +8,100 @@ namespace LimenEditor
     EditorUILayoutResult CalculateEditorUILayout(
         const float logicalWidth,
         const float logicalHeight,
-        const float rightTopRatio
+        const float contentHeightRatio,
+        const bool showContent,
+        const bool viewportExpanded,
+        const float rightSplitRatio
     )
     {
         EditorUILayoutResult result{};
 
         // 最小化或尺寸无效时，所有区域保持为空，避免沿用上一帧命中范围。
-        if (logicalWidth <= 0.0f || logicalHeight <= 0.0f)
+        if (!std::isfinite(logicalWidth) || !std::isfinite(logicalHeight) ||
+            logicalWidth <= 0.0f || logicalHeight <= 0.0f)
             return result;
 
-        constexpr float kTopHeight = 96.0f;
-        constexpr float kMiddlePreferredPercent = 0.65f;
-        constexpr float kMinMiddleWidth = 240.0f;
-        constexpr float kSplitterHeight = 2.0f;
+        constexpr float kCompactTopHeight = 62.0f;
+        constexpr float kStackedTopHeight = 92.0f;
+        constexpr float kStatusHeight = 30.0f;
+        constexpr float kMinViewportWidth = 400.0f;
+        constexpr float kViewportToolbarHeight = 35.0f;
+        constexpr float kMinViewportHeightWithToolbar = 32.0f;
 
-        const float topHeight = std::min(kTopHeight, logicalHeight);
-        result.Top =
-        {
-            .X = 0.0f,
-            .Y = 0.0f,
-            .Width = logicalWidth,
-            .Height = topHeight
-        };
+        const float preferredTopHeight = logicalWidth >= kEditorWideToolbarWidth
+            ? kCompactTopHeight : kStackedTopHeight;
+        const float statusHeight = std::min(kStatusHeight, logicalHeight);
+        const float statusY = logicalHeight - statusHeight;
+        const float topHeight = std::min(preferredTopHeight, statusY);
+        result.Top = {0.0f, 0.0f, logicalWidth, topHeight};
+        result.Status = {0.0f, statusY, logicalWidth, statusHeight};
 
-        const float bodyHeight = logicalHeight - topHeight;
+        const float bodyHeight = statusY - topHeight;
         if (bodyHeight <= 0.0f)
             return result;
 
-        const float middleWidth = std::min(
-            logicalWidth,
-            std::max(kMinMiddleWidth, logicalWidth * kMiddlePreferredPercent)
-        );
-        const float sideWidth = (logicalWidth - middleWidth) * 0.5f;
-        const float rightX = sideWidth + middleWidth;
+        constexpr float kRightColumnRatio = 0.24f;
+        constexpr float kMinRightWidth = 270.0f;
+        constexpr float kMaxRightWidth = 405.0f;
+        constexpr float kMinUsableRightWidth = 160.0f;
+        constexpr float kMinPanelHeight = 78.0f;
+        constexpr float kDetailsSplitterHeight = 4.0f;
 
-        result.Left =
+        const float availableRightWidth = logicalWidth - kMinViewportWidth;
+        const bool showRightColumn = !viewportExpanded && availableRightWidth >= kMinUsableRightWidth &&
+                                     bodyHeight >= kMinPanelHeight * 2.0f + kDetailsSplitterHeight;
+        const float rightWidth = showRightColumn
+            ? std::min(availableRightWidth, std::clamp(logicalWidth * kRightColumnRatio, kMinRightWidth, kMaxRightWidth))
+            : 0.0f;
+        const float viewportWidth = logicalWidth - rightWidth;
+        if (showRightColumn)
         {
-            .X = 0.0f,
-            .Y = topHeight,
-            .Width = sideWidth,
-            .Height = bodyHeight
-        };
-        result.Center =
-        {
-            .X = sideWidth,
-            .Y = topHeight,
-            .Width = middleWidth,
-            .Height = bodyHeight
-        };
+            const float availableHeight = bodyHeight - kDetailsSplitterHeight;
+            const float ratio = std::isfinite(rightSplitRatio)
+                ? std::clamp(rightSplitRatio, 0.0f, 1.0f) : kDefaultEditorRightSplitRatio;
+            // 右侧纵向分割独立于资源抽屉，任一极端拖动仍给两块面板留下空间。
+            const float outlinerHeight = std::clamp(availableHeight * ratio,
+                                                    kMinPanelHeight, availableHeight - kMinPanelHeight);
+            const float splitterY = topHeight + outlinerHeight;
+            result.Outliner = {viewportWidth, topHeight, rightWidth, outlinerHeight};
+            result.DetailsSplitter = {viewportWidth, splitterY, rightWidth, kDetailsSplitterHeight};
+            result.Inspector = {viewportWidth, splitterY + kDetailsSplitterHeight, rightWidth,
+                                availableHeight - outlinerHeight};
+        }
 
-        // 分隔条先占用高度，剩余高度才按比例分给右上、右下区域。
-        const float splitterHeight = std::min(kSplitterHeight, bodyHeight);
-        const float availableHeight = bodyHeight - splitterHeight;
-        const float rightTopHeight = availableHeight * rightTopRatio;
-        const float rightBottomHeight = availableHeight - rightTopHeight;
-        const float splitterY = topHeight + rightTopHeight;
-
-        result.RightTop =
+        float viewportBottom = statusY;
+        if (showContent && !viewportExpanded)
         {
-            .X = rightX,
-            .Y = topHeight,
-            .Width = sideWidth,
-            .Height = rightTopHeight
-        };
-        result.RightSplitter =
-        {
-            .X = rightX,
-            .Y = splitterY,
-            .Width = sideWidth,
-            .Height = splitterHeight
-        };
-        result.RightBottom = {
-            .X = rightX,
-            .Y = splitterY + splitterHeight,
-            .Width = sideWidth,
-            .Height = rightBottomHeight
-        };
+            constexpr float kContentSplitterHeight = 4.0f;
+            constexpr float kMinOpenContentHeight = 125.0f;
+            constexpr float kMinUsefulContentHeight = 112.0f;
+            constexpr float kMinViewportBodyHeight = 150.0f + kViewportToolbarHeight;
+            constexpr float kMaxContentHeightRatio = 0.55f;
+            constexpr float kDefaultContentHeightRatio = 0.24f;
 
+            // 视口保留导航空间，抽屉至少容得下标题和资源卡片的主要内容。
+            const float availableHeight = bodyHeight - kContentSplitterHeight;
+            const float maxContentHeight = std::min(availableHeight - kMinViewportBodyHeight,
+                                                    availableHeight * kMaxContentHeightRatio);
+            if (maxContentHeight >= kMinUsefulContentHeight)
+            {
+                const float ratio = std::isfinite(contentHeightRatio)
+                    ? std::clamp(contentHeightRatio, 0.0f, 1.0f) : kDefaultContentHeightRatio;
+                const float minContentHeight = std::min(kMinOpenContentHeight, maxContentHeight);
+                const float height = std::clamp(availableHeight * ratio, minContentHeight, maxContentHeight);
+                const float y = statusY - height;
+                viewportBottom = y - kContentSplitterHeight;
+                result.ContentSplitter = {0.0f, viewportBottom, viewportWidth, kContentSplitterHeight};
+                result.Content = {0.0f, y, viewportWidth, height};
+            }
+        }
+
+        const float viewportBodyHeight = viewportBottom - topHeight;
+        const float viewportToolbarHeight = viewportBodyHeight >= kViewportToolbarHeight + kMinViewportHeightWithToolbar
+            ? kViewportToolbarHeight : 0.0f;
+        result.ViewportToolbar = {0.0f, topHeight, viewportWidth, viewportToolbarHeight};
+        result.Center = {0.0f, topHeight + viewportToolbarHeight, viewportWidth,
+                         viewportBodyHeight - viewportToolbarHeight};
 
         return result;
     }

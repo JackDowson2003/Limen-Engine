@@ -3,9 +3,10 @@
 #include <string_view>
 #include <utility>
 
+#include "Limen/Scene/SceneSerializer.h"
 #include "Project/EditorSession.h"
 #include "Render/EditorObjectNaming.h"
-#include "Render/EditorSceneContent.h"
+#include "Render/EditorSceneRenderParts.h"
 
 namespace LimenEditor
 {
@@ -29,24 +30,19 @@ namespace LimenEditor
         if (outError)
             outError->clear();
 
-        const Limen::Ref<Limen::Mesh> &mesh =
-            sceneContent.GetCubeMesh();
-        const Limen::Ref<Limen::Material> &material =
-            sceneContent.GetCubeMaterial();
-        if (!mesh || !material)
+        const Limen::PrimitiveRendererComponent cube{.Primitive = Limen::PrimitiveType::Cube};
+        Limen::LArray<Limen::SceneRenderObject> parts;
+        Limen::SceneFileError error;
+        if (!TryResolveEditorPrimitiveParts(sceneContent, cube, parts, error))
         {
-            SetError(outError, "Editor primitive resources are unavailable.");
+            SetError(outError, error.Message);
             return false;
         }
 
         const std::string label =
             MakeUniqueObjectLabel(session, "Cube");
         const Limen::SceneObjectID id =
-            session.CreateRenderableObject(
-                mesh,
-                material,
-                transform,
-                label);
+            session.CreateRenderableObjectGroup(parts, transform, label);
         if (!id.isValid())
         {
             SetError(outError, "Failed to create primitive object.");
@@ -54,9 +50,7 @@ namespace LimenEditor
         }
 
         Limen::SceneObjectComponent component;
-        component.Data = Limen::PrimitiveRendererComponent{
-            .Primitive = Limen::PrimitiveType::Cube
-        };
+        component.Data = cube;
         if (!session.AddObjectComponent(
                 id,
                 std::move(component)).isValid())

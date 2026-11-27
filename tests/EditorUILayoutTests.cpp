@@ -29,76 +29,134 @@ int main()
 {
     int failures = 0;
 
-    // 布局使用逻辑窗口尺寸；顶部和分隔条占高后，剩余高度才分给两块面板。
-    const auto normal = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.5f);
-    if (!CheckNear("normal top height", normal.Top.Height, 96.0f))
+    // 视口与抽屉共用左区，Outliner 和属性面板共用右区。
+    const auto normal = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, true, false);
+    if (!CheckNear("normal toolbar keeps commands on one row", normal.Top.Height, 62.0f))
         ++failures;
-    if (!CheckNear("normal left width", normal.Left.Width, 280.0f))
+    if (!CheckNear("normal outliner width", normal.Outliner.Width, 384.0f))
         ++failures;
-    if (!CheckNear("normal center width", normal.Center.Width, 1040.0f))
+    if (!CheckNear("normal render viewport width", normal.Center.Width, 1216.0f))
         ++failures;
-    if (!CheckNear("normal right width", normal.RightTop.Width, 280.0f))
+    if (!CheckNear("details shares the outliner width", normal.Inspector.Width, normal.Outliner.Width) ||
+        !CheckNear("details shares the outliner column", normal.Inspector.X, normal.Outliner.X) ||
+        !CheckNear("right column starts after viewport", normal.Outliner.X, normal.Center.X + normal.Center.Width))
         ++failures;
-    if (!CheckNear("normal splitter y", normal.RightSplitter.Y, 497.0f))
+    if (!CheckNear("viewport toolbar ends at the rendered scene",
+                   normal.ViewportToolbar.Y + normal.ViewportToolbar.Height, normal.Center.Y))
         ++failures;
-    if (!CheckNear("normal splitter height", normal.RightSplitter.Height, 2.0f))
+    if (!CheckNear("content splitter touches rendered viewport",
+                   normal.Center.Y + normal.Center.Height, normal.ContentSplitter.Y))
         ++failures;
-    if (!CheckNear("normal bottom y", normal.RightBottom.Y, 499.0f))
+    if (!CheckNear("content spans the viewport", normal.Content.Width, normal.Center.Width) ||
+        !CheckNear("outliner borders the right-side splitter",
+                   normal.Outliner.Y + normal.Outliner.Height, normal.DetailsSplitter.Y) ||
+        !CheckNear("details starts immediately after the right-side splitter",
+                   normal.DetailsSplitter.Y + normal.DetailsSplitter.Height, normal.Inspector.Y) ||
+        !CheckNear("details reaches the status bar",
+                   normal.Inspector.Y + normal.Inspector.Height, normal.Status.Y))
         ++failures;
-    if (!CheckNear("normal right body height",
-                   normal.RightTop.Height + normal.RightSplitter.Height + normal.RightBottom.Height,
-                   804.0f))
+    if (!CheckNear("outliner uses default right-side split ratio",
+                   normal.Outliner.Height, LimenEditor::kDefaultEditorRightSplitRatio *
+                   (normal.Status.Y - normal.Top.Height - normal.DetailsSplitter.Height)))
+        ++failures;
+    if (!CheckNear("content fills its fraction of body after divider",
+                   normal.Content.Height, (normal.Status.Y - normal.Top.Height - normal.ContentSplitter.Height) * 0.24f) ||
+        !CheckNear("drawer ends at the status bar", normal.Content.Y + normal.Content.Height, normal.Status.Y) ||
+        !CheckNear("status bar ends at bottom edge", normal.Status.Y + normal.Status.Height, 900.0f))
         ++failures;
 
-    // 非全屏最大化只改变传入尺寸；三栏仍保持相同的宽度比例。
-    const auto enlarged = LimenEditor::CalculateEditorUILayout(3200.0f, 1800.0f, 0.5f);
-    if (!CheckNear("enlarged left ratio", enlarged.Left.Width / 3200.0f, 0.175f))
+    const auto hidden = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, false, false);
+    if (!Check("closing the drawer clears both geometry and hit area",
+               hidden.Content.Height == 0.0f && hidden.ContentSplitter.Height == 0.0f) ||
+        !CheckNear("the scene takes space returned by the drawer",
+                   hidden.Center.Height, normal.Center.Height + normal.Content.Height + normal.ContentSplitter.Height) ||
+        !CheckNear("closing drawer preserves right-side splitter position",
+                   hidden.DetailsSplitter.Y, normal.DetailsSplitter.Y))
         ++failures;
-    if (!CheckNear("enlarged center ratio", enlarged.Center.Width / 3200.0f, 0.65f))
+
+    const auto expanded = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, true, true);
+    if (!Check("expanded viewport clears other panel hit areas",
+               expanded.Outliner.Width == 0.0f && expanded.Inspector.Width == 0.0f &&
+               expanded.DetailsSplitter.Height == 0.0f &&
+               expanded.Content.Height == 0.0f && expanded.ContentSplitter.Height == 0.0f) ||
+        !CheckNear("expanded scene fills window width", expanded.Center.Width, 1600.0f) ||
+        !CheckNear("expanded mode still provides toolbar and status",
+                   expanded.Center.Y + expanded.Center.Height, expanded.Status.Y) ||
+        !Check("expanded toolbar stays visible", expanded.ViewportToolbar.Height > 0.0f))
         ++failures;
-    if (!CheckNear("enlarged right ratio", enlarged.RightTop.Width / 3200.0f, 0.175f))
+
+    // 更大的窗口优先把额外宽度交给视口。
+    const auto enlarged = LimenEditor::CalculateEditorUILayout(3200.0f, 1800.0f, 0.24f, true, false);
+    if (!CheckNear("enlarged right column respects its maximum width", enlarged.Outliner.Width, 405.0f) ||
+        !CheckNear("enlarged viewport takes remaining width", enlarged.Center.Width, 2795.0f))
         ++failures;
     if (!CheckNear("enlarged bottom edge",
-                   enlarged.RightBottom.Y + enlarged.RightBottom.Height, 1800.0f))
+                   enlarged.Status.Y + enlarged.Status.Height, 1800.0f))
         ++failures;
 
-    // 极矮窗口只容得下顶部与分隔条时，两块面板都不能得到负高度。
-    const auto shortWindow = LimenEditor::CalculateEditorUILayout(800.0f, 130.0f, 0.5f);
-    if (!CheckNear("short window splitter height", shortWindow.RightSplitter.Height, 2.0f))
-        ++failures;
-    if (!CheckNear("short window top panel height", shortWindow.RightTop.Height, 16.0f))
-        ++failures;
-    if (!CheckNear("short window bottom panel height", shortWindow.RightBottom.Height, 16.0f))
-        ++failures;
-    if (!CheckNear("short window bottom edge",
-                   shortWindow.RightBottom.Y + shortWindow.RightBottom.Height,
-                   130.0f))
+    // 拖到两端也会给资源和实际场景留出可用空间。
+    const auto smallDrawer = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, -1.0f, true, false);
+    const auto largeDrawer = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 4.0f, true, false);
+    if (!CheckNear("normal window clamps drawer to its minimum height", smallDrawer.Content.Height, 125.0f) ||
+        !Check("large drawer preserves enough scene height", largeDrawer.Center.Height >= 150.0f))
         ++failures;
 
-    const auto minimized = LimenEditor::CalculateEditorUILayout(800.0f, 0.0f, 0.5f);
-    if (!Check("minimized layout has no splitter",
-               !minimized.RightSplitter.Contains(100.0f, 100.0f)))
+    const auto tallOutliner = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, true, false, 0.72f);
+    const auto smallestOutliner = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, true, false, -1.0f);
+    const auto smallestDetails = LimenEditor::CalculateEditorUILayout(1600.0f, 900.0f, 0.24f, true, false, 4.0f);
+    if (!Check("changing split ratio moves right-side splitter", tallOutliner.DetailsSplitter.Y > normal.DetailsSplitter.Y) ||
+        !CheckNear("resizing right panels preserves viewport height", tallOutliner.Center.Height, normal.Center.Height) ||
+        !CheckNear("resizing right panels preserves drawer height", tallOutliner.Content.Height, normal.Content.Height) ||
+        !CheckNear("outliner keeps a usable height", smallestOutliner.Outliner.Height, 78.0f) ||
+        !CheckNear("details keeps a usable height", smallestDetails.Inspector.Height, 78.0f))
+        ++failures;
+
+    const auto shortWindow = LimenEditor::CalculateEditorUILayout(800.0f, 130.0f, 0.5f, true, false);
+    if (!Check("short window hides drawer and viewport tools before sharing the canvas",
+               shortWindow.Content.Height == 0.0f && shortWindow.ContentSplitter.Height == 0.0f &&
+               shortWindow.DetailsSplitter.Height == 0.0f && shortWindow.Outliner.Width == 0.0f &&
+               shortWindow.ViewportToolbar.Height == 0.0f && shortWindow.Center.Height > 0.0f) ||
+        !CheckNear("short window keeps the viewport within its bounds",
+                   shortWindow.Center.Y + shortWindow.Center.Height, shortWindow.Status.Y))
+        ++failures;
+
+    const auto shallowDrawer = LimenEditor::CalculateEditorUILayout(1600.0f, 390.0f, 0.24f, true, false);
+    if (!Check("drawer is omitted when its asset cards would be unusable",
+               shallowDrawer.Content.Height == 0.0f && shallowDrawer.Center.Height > 150.0f))
+        ++failures;
+
+    const auto narrowWindow = LimenEditor::CalculateEditorUILayout(600.0f, 900.0f, 0.24f, true, false);
+    const auto tinyWindow = LimenEditor::CalculateEditorUILayout(540.0f, 900.0f, 0.24f, true, false);
+    if (!CheckNear("narrow toolbar reserves a second command row", narrowWindow.Top.Height, 92.0f) ||
+        !CheckNear("narrow window protects scene width", narrowWindow.Center.Width, 400.0f) ||
+        !CheckNear("very narrow window lets right panels collapse", tinyWindow.Center.Width, 540.0f) ||
+        !Check("right-hand splitter hides alongside right panels", tinyWindow.DetailsSplitter.Height == 0.0f))
+        ++failures;
+
+    const auto minimized = LimenEditor::CalculateEditorUILayout(800.0f, 0.0f, 0.24f, true, false);
+    if (!Check("minimized layout has no active panel geometry",
+               !minimized.ContentSplitter.Contains(100.0f, 100.0f) && minimized.Status.Height == 0.0f))
         ++failures;
     if (!Check("splitter includes top-left edge",
-               normal.RightSplitter.Contains(normal.RightSplitter.X, normal.RightSplitter.Y)))
+               normal.ContentSplitter.Contains(normal.ContentSplitter.X, normal.ContentSplitter.Y)))
         ++failures;
     if (!Check("splitter excludes bottom edge",
-               !normal.RightSplitter.Contains(normal.RightSplitter.X,
-                                              normal.RightSplitter.Y + normal.RightSplitter.Height)))
+               !normal.ContentSplitter.Contains(normal.ContentSplitter.X,
+                                                normal.ContentSplitter.Y + normal.ContentSplitter.Height)))
         ++failures;
 
     // 视口像素尺寸：逻辑矩形按帧缓冲/逻辑比例换算，且至少 1×1。
     const auto scaled = LimenEditor::CalculateViewportPixelSize(
         1600.0f, 900.0f, normal.Center, 3200, 1800);
-    if (!Check("viewport width maps with 2x framebuffer scale", scaled.Width == 2080))
+    if (!Check("viewport width maps with 2x framebuffer scale", scaled.Width == 2432))
         ++failures;
-    if (!Check("viewport height maps with 2x framebuffer scale", scaled.Height == 1608))
+    if (!Check("viewport height maps with 2x framebuffer scale", scaled.Height == 1152))
         ++failures;
 
     const auto identity = LimenEditor::CalculateViewportPixelSize(
         1600.0f, 900.0f, normal.Center, 1600, 900);
     if (!Check("viewport identity scale keeps logical size",
-               identity.Width == 1040 && identity.Height == 804))
+               identity.Width == 1216 && identity.Height == 576))
         ++failures;
 
     const auto tiny = LimenEditor::CalculateViewportPixelSize(

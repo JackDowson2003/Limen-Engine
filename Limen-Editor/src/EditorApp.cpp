@@ -5,6 +5,7 @@
 #include "Limen/Asset/AssetRegistry.h"
 #include "Project/EditorSession.h"
 #include "UI/EditorUILayer.h"
+#include "UI/EditorNativeMenu.h"
 
 namespace
 {
@@ -12,7 +13,8 @@ namespace
     {
     public:
 
-        explicit EditorApp(Limen::Ref<LimenEditor::EditorSession> session = {})
+        explicit EditorApp(Limen::Ref<LimenEditor::EditorSession> session = {},
+                           const std::filesystem::path &scenePath = {})
             : Application(
                   false,
                   Limen::RendererAPI::API::OPENGL,
@@ -21,7 +23,19 @@ namespace
               ),
               m_Session(std::move(session))
         {
-            PushLayer(new LimenEditor::EditorUILayer(m_Session));
+            auto *uiLayer = new LimenEditor::EditorUILayer(m_Session);
+            PushLayer(uiLayer);
+            LimenEditor::InstallEditorNativeMenu(
+                static_cast<bool>(m_Session),
+                [uiLayer](const LimenEditor::SceneToolbarAction action) { uiLayer->QueueSceneAction(action); },
+                [uiLayer] { static_cast<void>(uiLayer->DeleteSelection()); });
+            if (!scenePath.empty())
+                uiLayer->OpenSceneFromPath(scenePath);
+        }
+
+        ~EditorApp() override
+        {
+            LimenEditor::UninstallEditorNativeMenu();
         }
 
     private:
@@ -36,7 +50,9 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
 
     ProjectConfiguration pc;
     ProjectConfigurationError error;
-    if (argc == 3 && LString(argv[1]) == "--project")
+    std::filesystem::path scenePath;
+    const bool hasSceneArgument = argc == 5 && LString(argv[3]) == "--scene" && argv[4][0] != '\0';
+    if ((argc == 3 || hasSceneArgument) && LString(argv[1]) == "--project")
     {
         if (!TryLoadProjectConfiguration(std::filesystem::path(argv[2]), pc, error))
         {
@@ -46,6 +62,8 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
             );
             return nullptr;
         }
+        if (hasSceneArgument)
+            scenePath = argv[4];
     }
     else if (argc == 4 && LString(argv[1]) == "--create-project"){
         if (!TryCreateProjectConfiguration(std::filesystem::path(argv[2]),LString(argv[3]),pc,error))
@@ -57,7 +75,7 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
     }
     else
     {
-        LM_ERROR("用法: LimenEditor [--project <file.lmproject> | "
+        LM_ERROR("用法: LimenEditor [--project <file.lmproject> [--scene <file.lscene>] | "
                  "--create-project <absolute-directory> <display-name>]");
         return nullptr;
     }
@@ -74,5 +92,5 @@ Limen::Application *Limen::CreateApplication(int argc, char **argv)
     auto session =
         CreateRef<LimenEditor::EditorSession>(std::move(pc), std::move(registry));
 
-    return new EditorApp(std::move(session));
+    return new EditorApp(std::move(session), scenePath);
 }

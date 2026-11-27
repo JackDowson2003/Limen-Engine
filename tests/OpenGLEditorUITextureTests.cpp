@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
 
+#include <cmath>
 #include <cstdint>
 #include <iostream>
 
@@ -260,6 +261,19 @@ int main()
             success = ExpectPixel("sRGB gray roundtrip", ReadPixel(20, 11), {128, 64, 32, 255}) && success;
             success = ExpectPixel("logical-to-framebuffer edge", ReadPixel(6, 16), {0, 0, 0, 0}) && success;
 
+            // 圆角使用逻辑半径。2 倍帧缓冲下，弧线边缘应有部分覆盖。
+            glClear(GL_COLOR_BUFFER_BIT);
+            renderer.DrawRoundedRect(window, {2.0f, 2.0f}, {8.0f, 8.0f}, {1.0f, 0.0f, 0.0f, 1.0f}, 3.0f);
+            success = ExpectPixel("rounded rect leaves corner clear", ReadPixel(4, 27), {0, 0, 0, 0}) && success;
+            success = ExpectPixel("rounded rect fills center", ReadPixel(12, 20), {255, 0, 0, 255}) && success;
+            const Pixel roundedEdge = ReadPixel(6, 26);
+            success = Check("rounded rect edge is antialiased at 2x scale",
+                            roundedEdge.Alpha > 3 && roundedEdge.Alpha < 252) && success;
+
+            renderer.DrawSolidRect(window, {2.0f, 2.0f}, {8.0f, 8.0f}, {0.0f, 1.0f, 0.0f, 1.0f});
+            success = ExpectPixel("solid rect fills corner after rounded draw", ReadPixel(4, 27),
+                                  {0, 255, 0, 255}) && success;
+
             // 直通路径：把已知显示编码颜色写进离屏纹理，再直通绘制到默认帧缓冲。
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
             glClearColor(0.25f, 0.5f, 0.75f, 1.0f);
@@ -295,6 +309,15 @@ int main()
             }
             if (fontReady && textAtlas.IsBuilt())
             {
+                const auto *latinGlyph = textAtlas.FindGlyph(U'L');
+                const auto *spaceGlyph = textAtlas.FindGlyph(U' ');
+                const auto *sceneGlyph = textAtlas.FindGlyph(U'场');
+                success = Check("text measurement includes blank and multibyte glyph advances",
+                                latinGlyph && spaceGlyph && sceneGlyph &&
+                                    std::abs(renderer.MeasureTextWidth(textAtlas, "L 场") -
+                                             (latinGlyph->Advance + spaceGlyph->Advance +
+                                              sceneGlyph->Advance)) < 0.01f) && success;
+
                 glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
                 renderer.DrawText(

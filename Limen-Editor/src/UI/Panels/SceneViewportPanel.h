@@ -67,6 +67,9 @@ namespace LimenEditor
             bool toggle
         );
 
+        // 将选中对象放到画面中央，保留当前相机朝向。
+        [[nodiscard]] bool FrameSelection(const EditorSession &session);
+
         // 在视口前方生成对象；失败时不修改 outTransform。
         [[nodiscard]]
         bool TryGetPlacementTransform(

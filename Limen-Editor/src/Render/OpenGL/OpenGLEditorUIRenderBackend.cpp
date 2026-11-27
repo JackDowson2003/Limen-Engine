@@ -2,6 +2,8 @@
 // Created by chenlong on 2026/10/15.
 //
 #include <glad/gl.h>
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 
@@ -49,12 +51,30 @@ namespace LimenEditor
             })";
 
         constexpr char kFragmentSource[] = R"(#version 410 core
+            in vec2 v_TexCoord;
             uniform vec4 u_Color;
+            uniform vec2 u_RectSize;
+            uniform float u_CornerRadius;
             layout(location = 0) out vec4 o_Color;
 
             void main()
             {
-                o_Color = u_Color;
+                if (u_CornerRadius == 0.0)
+                {
+                    o_Color = u_Color;
+                    return;
+                }
+
+                vec2 halfSize = 0.5 * u_RectSize;
+                vec2 local = abs((v_TexCoord - 0.5) * u_RectSize);
+                vec2 offset = local - halfSize + u_CornerRadius;
+                float distanceToEdge = length(max(offset, 0.0))
+                    + min(max(offset.x, offset.y), 0.0) - u_CornerRadius;
+
+                // 距离以逻辑窗口单位计算，导数将过渡带宽限制在约一个帧缓冲像素。
+                float halfPixel = max(0.5 * fwidth(distanceToEdge), 0.0001);
+                float coverage = 1.0 - smoothstep(-halfPixel, halfPixel, distanceToEdge);
+                o_Color = vec4(u_Color.rgb, u_Color.a * coverage);
             })";
 
         constexpr char kTexturedFragmentSource[] = R"(#version 410 core
@@ -249,8 +269,20 @@ namespace LimenEditor
         const glm::vec4 &color
     )
     {
+        DrawRoundedRect(window, position, size, color, 0.0f);
+    }
+
+    void OpenGLEditorUIRenderBackend::DrawRoundedRect(
+        const Limen::Window &window,
+        const glm::vec2 &position,
+        const glm::vec2 &size,
+        const glm::vec4 &color,
+        const float radius
+    )
+    {
         if (!m_Pipeline || !m_VertexArray ||
-            size.x <= 0.0f || size.y <= 0.0f)
+            size.x <= 0.0f || size.y <= 0.0f ||
+            !std::isfinite(size.x) || !std::isfinite(size.y))
             return;
 
         const uint32_t fboWidth = window.GetWidth();
@@ -277,6 +309,9 @@ namespace LimenEditor
         shader->SetFloat2("u_RectPosition", position);
         shader->SetFloat2("u_RectSize", size);
         shader->SetFloat4("u_Color", color);
+        const float maximumRadius = 0.5f * std::min(size.x, size.y);
+        const float clampedRadius = radius > 0.0f ? std::min(radius, maximumRadius) : 0.0f;
+        shader->SetFloat("u_CornerRadius", clampedRadius);
 
         m_VertexArray->Bind();
         Limen::RendererCommand::DrawIndexed(

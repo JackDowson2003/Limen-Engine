@@ -5,6 +5,11 @@ project(LimenEngine
         LANGUAGES C CXX
 )
 
+if (APPLE)
+    # GLFW 使用 Objective-C，Editor 的原生文件对话框使用 Objective-C++。
+    enable_language(OBJC OBJCXX)
+endif ()
+
 # 启用项目测试入口，具体测试在 tests/ 子目录注册。
 include(CTest)
 

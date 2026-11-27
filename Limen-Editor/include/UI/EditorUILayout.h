@@ -9,6 +9,9 @@
 
 namespace LimenEditor
 {
+    inline constexpr float kEditorWideToolbarWidth = 900.0f;
+    inline constexpr float kDefaultEditorRightSplitRatio = 0.42f;
+
     // 左上角原点的逻辑窗口矩形；只保存数值，不拥有窗口或 GPU 资源。
     struct UIRect
     {
@@ -44,20 +47,26 @@ namespace LimenEditor
     // 一次布局计算的结果；尚未包含绘制命令或面板对象。
     struct EditorUILayoutResult
     {
-        UIRect Top{};           // 顶部占位区
-        UIRect Left{};          // 左侧栏
-        UIRect Center{};        // 中央工作区
-        UIRect RightTop{};      // 右上区域
-        UIRect RightSplitter{}; // 右侧分隔条
-        UIRect RightBottom{};   // 右下区域
+        UIRect Top{};              // 全局顶部工具栏
+        UIRect ViewportToolbar{};  // 视口操作区，位于实际渲染区域之上
+        UIRect Center{};           // 左侧视口渲染区域
+        UIRect Outliner{};         // 右侧上方的场景对象树
+        UIRect DetailsSplitter{}; // 对象树与属性面板之间的横向分隔条
+        UIRect Inspector{};        // 右侧下方的属性面板
+        UIRect ContentSplitter{};  // 资源抽屉上沿的横向分隔条
+        UIRect Content{};          // 视口下方的资源抽屉
+        UIRect Status{};           // 底部状态和抽屉入口
     };
 
-    // 输入均为左上角原点的逻辑窗口尺寸；rightTopRatio 由调用方保持在 [0, 1]。
+    // 尺寸与输出使用左上角原点的逻辑坐标。抽屉与 Outliner 的比例均基于各自扣除分隔条后的高度。
     // 只计算区域，不读取窗口状态或提交绘制命令。
     [[nodiscard]] EditorUILayoutResult CalculateEditorUILayout(
         float logicalWidth,
         float logicalHeight,
-        float rightTopRatio
+        float contentHeightRatio,
+        bool showContent,
+        bool viewportExpanded,
+        float rightSplitRatio = kDefaultEditorRightSplitRatio
     );
 
     // 根据首行 Y、行高和鼠标 Y 求列表行号；不在任何行内返回 -1。

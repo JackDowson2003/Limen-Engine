@@ -3,7 +3,9 @@
 //
 
 #pragma once
+#include <filesystem>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -11,6 +13,8 @@
 #include "Limen/Core/Log.h"
 #include "Limen/Project/ProjectConfiguration.h"
 #include "Limen/Scene/Scene.h"
+#include "Limen/Scene/SceneFile.h"
+#include "Limen/Scene/SceneRuntime.h"
 
 namespace LimenEditor
 {
@@ -145,6 +149,96 @@ namespace LimenEditor
         const Limen::Scene &GetScene() const noexcept
         {
             return *m_Scene;
+        }
+
+        void NewScene()
+        {
+            m_Scene = Limen::CreateScope<Limen::Scene>();
+            m_ScenePath.clear();
+            m_SceneDisplayName.clear();
+            ClearSelection();
+            ClearDirty();
+        }
+
+        // 候选场景的资源全部解出后才切换会话，旧选择和脏状态只在成功时清理。
+        [[nodiscard]] bool TryOpenScene(
+            const std::filesystem::path &path,
+            const Limen::SceneRenderPartsResolver &resolveParts,
+            Limen::SceneFileError &error)
+        {
+            Limen::SceneDocument document;
+            if (!Limen::TryLoadSceneFile(path, document, error))
+                return false;
+
+            Limen::Scope<Limen::Scene> candidate;
+            if (!Limen::TryInstantiateScene(document, resolveParts, candidate, error))
+            {
+                error.File = path;
+                return false;
+            }
+
+            auto scenePath = path;
+            m_Scene = std::move(candidate);
+            m_ScenePath = std::move(scenePath);
+            m_SceneDisplayName = std::move(document.DisplayName);
+            ClearSelection();
+            ClearDirty();
+            return true;
+        }
+
+        [[nodiscard]] bool TrySaveScene(Limen::SceneFileError &error)
+        {
+            if (m_ScenePath.empty())
+            {
+                error = {
+                    .Code = Limen::SceneFileErrorCode::FileAccess,
+                    .Message = "场景还没有保存路径，请先另存为"
+                };
+                return false;
+            }
+            return TrySaveSceneAs(m_ScenePath, error);
+        }
+
+        [[nodiscard]] bool TrySaveSceneAs(
+            const std::filesystem::path &path,
+            Limen::SceneFileError &error)
+        {
+            auto scenePath = path;
+            auto document = Limen::CaptureSceneDocument(*m_Scene, m_SceneDisplayName);
+            if (m_ScenePath.empty() && document.DisplayName.empty())
+            {
+                const auto name = scenePath.stem().u8string();
+                document.DisplayName = Limen::LString(std::string(name.begin(), name.end()));
+            }
+
+            // 文件替换成功后才提交路径和名称，保存失败时仍可继续编辑并重试。
+            if (!Limen::TrySaveSceneFile(scenePath, document, error))
+                return false;
+
+            m_ScenePath = std::move(scenePath);
+            m_SceneDisplayName = std::move(document.DisplayName);
+            ClearDirty();
+            return true;
+        }
+
+        [[nodiscard]] const std::filesystem::path &GetScenePath() const noexcept
+        {
+            return m_ScenePath;
+        }
+
+        [[nodiscard]] const Limen::LString &GetSceneDisplayName() const noexcept
+        {
+            return m_SceneDisplayName;
+        }
+
+        [[nodiscard]] std::string GetActiveSceneLabel() const
+        {
+            if (!m_SceneDisplayName.empty())
+                return {m_SceneDisplayName.data(), m_SceneDisplayName.size()};
+            if (m_ScenePath.empty())
+                return "Untitled";
+            const auto stem = m_ScenePath.stem().u8string();
+            return {stem.begin(), stem.end()};
         }
 
         // 普通点击：以单个对象替换当前选择。
@@ -423,7 +517,7 @@ namespace LimenEditor
             return m_IsDirty;
         }
 
-        // 保存成功后调用；当前保存尚未接入，先留给测试与将来的保存流程。
+        // 成功加载或保存后，活动场景与磁盘内容一致。
         void ClearDirty() noexcept
         {
             m_IsDirty = false;
@@ -436,6 +530,8 @@ namespace LimenEditor
 
         // 会话独占的活动场景，面板只通过GetScene() 借用，不拥有，不释放
         Limen::Scope<Limen::Scene> m_Scene;
+        std::filesystem::path m_ScenePath;
+        Limen::LString m_SceneDisplayName;
         // 当前选中的场景对象集合，顺序不参与语义。
         Limen::LArray<Limen::SceneObjectID> m_SelectedObjectIDs;
         // Content Browser 当前选中的资产；无效 ID 表示未选择。

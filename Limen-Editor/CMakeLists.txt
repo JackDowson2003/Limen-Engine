@@ -36,6 +36,30 @@ endif ()
 
 add_executable(LimenEditor ${LIMEN_EDITOR_SOURCES})
 
+if (APPLE)
+    find_library(LIMEN_EDITOR_APPKIT_FRAMEWORK AppKit REQUIRED)
+    find_library(LIMEN_EDITOR_UTI_FRAMEWORK UniformTypeIdentifiers REQUIRED)
+    target_sources(LimenEditor PRIVATE
+            src/Platform/macOS/EditorNativeMenu.mm
+            src/Platform/macOS/EditorSceneDialogs.mm
+    )
+    target_link_libraries(LimenEditor PRIVATE
+            "${LIMEN_EDITOR_APPKIT_FRAMEWORK}"
+            "${LIMEN_EDITOR_UTI_FRAMEWORK}"
+    )
+    set_target_properties(LimenEditor PROPERTIES
+            OBJCXX_STANDARD 20
+            OBJCXX_STANDARD_REQUIRED ON
+            OBJCXX_EXTENSIONS OFF
+    )
+    target_compile_options(LimenEditor PRIVATE $<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>)
+else ()
+    target_sources(LimenEditor PRIVATE
+            src/Platform/EditorNativeMenuUnavailable.cpp
+            src/Platform/EditorSceneDialogsUnavailable.cpp
+    )
+endif ()
+
 target_link_libraries(LimenEditor PRIVATE LimenEngine glad)
 target_include_directories(LimenEditor PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"

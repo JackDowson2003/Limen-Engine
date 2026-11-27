@@ -1,0 +1,306 @@
+schema_version = 1
+display_name = "Forest Outpost"
+
+[environment]
+ambient_color = [0.75999999046325684, 0.8399999737739563, 1.0]
+ambient_intensity = 0.56000000238418579
+directional_direction = [0.64999997615814209, -1.0, -0.75]
+directional_color = [1.0, 0.9100000262260437, 0.76999998092651367]
+directional_intensity = 1.8500000238418579
+
+[[objects]]
+id = "50f0ad19-f396-5ba2-becf-ffe9f404faa3"
+label = "Forest Clearing"
+location = [0.0, -0.68000000715255737, -0.11999999731779099]
+rotation = [0.0, 0.11320319771766663, 0.0, 0.99357187747955322]
+scale = [1.5299999713897705, 0.37999999523162842, 1.0199999809265137]
+
+[[objects.components]]
+id = "23416029-24f2-5e4c-862d-a03c3c666128"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "0a7a6f7b-4ebb-512e-b88b-5676e826429a"
+
+[[objects]]
+id = "31252b59-0979-5dba-93b3-62f00bb7cb1c"
+label = "Bluecrest Keep"
+location = [
+    -0.25999999046325684,
+    -0.68000000715255737,
+    -0.44999998807907104,
+]
+rotation = [0.0, -0.17364819347858429, 0.0, 0.98480772972106934]
+scale = [
+    0.38999998569488525,
+    0.38999998569488525,
+    0.38999998569488525,
+]
+
+[[objects.components]]
+id = "9c4dfaac-5fe2-52b3-a570-8bc73fc2371a"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "d8dbcebe-2992-5ff6-9616-f651459120d8"
+
+[[objects]]
+id = "5b6e8486-e0e1-541b-a700-6b37565f75e7"
+label = "Watch Cottage"
+location = [
+    0.55000001192092896,
+    -0.68000000715255737,
+    0.2199999988079071,
+]
+rotation = [0.0, 0.1908089816570282, 0.0, 0.98162716627120972]
+scale = [
+    0.49000000953674316,
+    0.49000000953674316,
+    0.49000000953674316,
+]
+
+[[objects.components]]
+id = "cf32dcd6-018e-5af0-b550-c6b01bfb9d1a"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "07e03639-001d-5125-bb5f-92b9e00132be"
+
+[[objects]]
+id = "c06696ea-0539-555c-8994-4e588266c73e"
+label = "East Grove"
+location = [
+    0.9100000262260437,
+    -0.67000001668930054,
+    -0.40000000596046448,
+]
+rotation = [0.0, -0.23344540596008301, 0.0, 0.97236990928649902]
+scale = [
+    0.60000002384185791,
+    0.60000002384185791,
+    0.60000002384185791,
+]
+
+[[objects.components]]
+id = "684660a2-7488-5150-8143-68740ba69d45"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "f551d3af-a44a-51bb-b8ca-e46c5dbbbb66"
+
+[[objects]]
+id = "44bcf612-cd27-5104-9132-fcb203d8eff5"
+label = "West Pine"
+location = [
+    -1.0199999809265137,
+    -0.63999998569488525,
+    -0.11999999731779099,
+]
+rotation = [0.0, 0.16504760086536407, 0.0, 0.98628562688827515]
+scale = [
+    0.81000000238418579,
+    0.81000000238418579,
+    0.81000000238418579,
+]
+
+[[objects.components]]
+id = "ecfbb108-660b-5ac1-a9de-682b6f83659e"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "891d0634-b7f0-5292-9533-e8e01629ea5b"
+
+[[objects]]
+id = "64af493f-77e6-5adf-8c62-bd72b51fddca"
+label = "Ridge Pine"
+location = [
+    0.51999998092651367,
+    -0.63999998569488525,
+    -0.86000001430511475,
+]
+rotation = [0.0, -0.34202009439468384, 0.0, 0.93969261646270752]
+scale = [0.75, 0.75, 0.75]
+
+[[objects.components]]
+id = "fc73f570-2518-5e25-ae2e-656e915c8d68"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "891d0634-b7f0-5292-9533-e8e01629ea5b"
+
+[[objects]]
+id = "08677d5d-ccaa-5b7c-9dbe-61c370d04dd4"
+label = "Trail Pine"
+location = [
+    -0.69999998807907104,
+    -0.63999998569488525,
+    0.49000000953674316,
+]
+rotation = [0.0, -0.20791170001029968, 0.0, 0.97814762592315674]
+scale = [
+    0.61000001430511475,
+    0.61000001430511475,
+    0.61000001430511475,
+]
+
+[[objects.components]]
+id = "89c25cb8-773c-5349-8310-a68f4cbab525"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "891d0634-b7f0-5292-9533-e8e01629ea5b"
+
+[[objects]]
+id = "97271e85-f72d-58cb-9796-7c2176ed5426"
+label = "Shelter Pine"
+location = [
+    1.0900000333786011,
+    -0.64999997615814209,
+    0.10000000149011612,
+]
+rotation = [0.0, 0.31730467081069946, 0.0, 0.94832366704940796]
+scale = [
+    0.51999998092651367,
+    0.51999998092651367,
+    0.51999998092651367,
+]
+
+[[objects.components]]
+id = "b94f5462-8883-5132-af63-3991a0e4b104"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "891d0634-b7f0-5292-9533-e8e01629ea5b"
+
+[[objects]]
+id = "5b69fd5d-6160-5a62-9623-0a82b728d0b0"
+label = "Boulder by the Trail"
+location = [
+    -0.41999998688697815,
+    -0.68000000715255737,
+    0.49000000953674316,
+]
+rotation = [0.0, 0.13917310535907745, 0.0, 0.9902680516242981]
+scale = [1.0499999523162842, 1.0499999523162842, 1.0499999523162842]
+
+[[objects.components]]
+id = "cfca0ab5-9566-52f3-b007-2b4be4a201f8"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "22689979-c028-57dd-b36e-c9e5cb63cccb"
+
+[[objects]]
+id = "16876250-6076-551b-a1cb-ed92c212139e"
+label = "Cottage Boulder"
+location = [
+    0.86000001430511475,
+    -0.68000000715255737,
+    0.52999997138977051,
+]
+rotation = [0.0, -0.50753837823867798, 0.0, 0.8616291880607605]
+scale = [
+    0.82999998331069946,
+    0.82999998331069946,
+    0.82999998331069946,
+]
+
+[[objects.components]]
+id = "c117c297-bc23-5139-ac22-76406076986a"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "22689979-c028-57dd-b36e-c9e5cb63cccb"
+
+[[objects]]
+id = "9947f7d0-4d97-59e6-9ab6-e8332e105912"
+label = "Trail Stone"
+location = [
+    0.11999999731779099,
+    -0.68000000715255737,
+    0.68000000715255737,
+]
+rotation = [0.0, 0.043619405478239059, 0.0, 0.99904823303222656]
+scale = [
+    0.44999998807907104,
+    0.44999998807907104,
+    0.44999998807907104,
+]
+
+[[objects.components]]
+id = "7ebcbedf-66ea-564f-aea3-06496d8edf93"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "22689979-c028-57dd-b36e-c9e5cb63cccb"
+
+[[objects]]
+id = "8d2812b4-0ce3-541c-8534-38a332c1e9b2"
+label = "Ridge Stone"
+location = [
+    -1.0499999523162842,
+    -0.68000000715255737,
+    -0.51999998092651367,
+]
+rotation = [0.0, 0.68199837207794189, 0.0, 0.73135370016098022]
+scale = [
+    0.76999998092651367,
+    0.76999998092651367,
+    0.76999998092651367,
+]
+
+[[objects.components]]
+id = "08b45aa1-8553-55b9-b838-1226834ba8f3"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "model_renderer"
+model_asset_id = "22689979-c028-57dd-b36e-c9e5cb63cccb"
+
+[[objects]]
+id = "9b39d9e3-ed1c-50b6-8303-1830b06730c9"
+label = "Warm Gate Light"
+location = [
+    -0.62000000476837158,
+    -0.10999999940395355,
+    0.44999998807907104,
+]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+
+[[objects.components]]
+id = "8350e0f2-36ab-5da6-969f-470e505c8bde"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "point_light"
+color = [1.0, 0.64999997615814209, 0.28999999165534973]
+intensity = 0.62000000476837158
+
+[[objects]]
+id = "c4385fd4-5d86-5808-9ecd-ed1a4d25d939"
+label = "Cool East Fill"
+location = [1.1299999952316284, 0.34000000357627869, 0.4699999988079071]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+
+[[objects.components]]
+id = "2e8202f7-80f8-59dd-8233-69b31ccb40a9"
+location = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = [1.0, 1.0, 1.0]
+type = "point_light"
+color = [0.54000002145767212, 0.69999998807907104, 1.0]
+intensity = 0.30000001192092896
+

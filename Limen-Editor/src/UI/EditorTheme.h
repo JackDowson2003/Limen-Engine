@@ -4,39 +4,36 @@
 
 namespace LimenEditor
 {
-    // UE5 暗色编辑器视觉基线：近黑工作区、分层灰色面板和单一蓝色强调色。
+    // 中性石墨色区分工作区，琥珀色标记当前面板与选中项。
     struct EditorTheme
     {
-        glm::vec4 WindowBackground{0.055f, 0.055f, 0.060f, 1.0f};
-        glm::vec4 TopBarBackground{0.078f, 0.078f, 0.084f, 1.0f};
-        glm::vec4 PanelBackground{0.105f, 0.105f, 0.112f, 1.0f};
-        glm::vec4 PanelHeaderBackground{0.138f, 0.138f, 0.145f, 1.0f};
-        glm::vec4 SectionBackground{0.122f, 0.122f, 0.130f, 1.0f};
-        glm::vec4 ViewportBackground{0.066f, 0.066f, 0.072f, 1.0f};
-        glm::vec4 Splitter{0.045f, 0.045f, 0.050f, 1.0f};
-        glm::vec4 PanelBorder{0.205f, 0.205f, 0.218f, 1.0f};
-        glm::vec4 ViewportOverlayBackground{0.025f, 0.025f, 0.030f, 0.88f};
+        glm::vec4 WindowBackground{0.073f, 0.073f, 0.076f, 1.0f};
+        glm::vec4 TopBarBackground{0.105f, 0.107f, 0.110f, 1.0f};
+        glm::vec4 PanelBackground{0.129f, 0.132f, 0.137f, 1.0f};
+        glm::vec4 ViewportBackground{0.095f, 0.103f, 0.112f, 1.0f};
+        glm::vec4 Splitter{0.103f, 0.105f, 0.108f, 1.0f};
+        glm::vec4 PanelBorder{0.202f, 0.206f, 0.212f, 1.0f};
+        glm::vec4 ViewportOverlayBackground{0.071f, 0.077f, 0.084f, 0.94f};
 
-        glm::vec4 TextPrimary{0.90f, 0.90f, 0.92f, 1.0f};
-        glm::vec4 TextSecondary{0.68f, 0.68f, 0.72f, 1.0f};
-        glm::vec4 TextMuted{0.45f, 0.45f, 0.49f, 1.0f};
+        glm::vec4 TextPrimary{0.94f, 0.94f, 0.93f, 1.0f};
+        glm::vec4 TextSecondary{0.76f, 0.77f, 0.79f, 1.0f};
+        glm::vec4 TextMuted{0.58f, 0.60f, 0.63f, 1.0f};
 
-        glm::vec4 Accent{0.0f, 0.47f, 0.84f, 1.0f};
-        glm::vec4 SelectionBackground{0.0f, 0.31f, 0.58f, 1.0f};
-        glm::vec4 SelectionAccent{0.10f, 0.56f, 0.96f, 1.0f};
-        glm::vec4 SelectionText{1.0f, 1.0f, 1.0f, 1.0f};
-        glm::vec4 MissingText{0.85f, 0.34f, 0.34f, 1.0f};
+        glm::vec4 Accent{0.94f, 0.70f, 0.42f, 1.0f};
+        glm::vec4 SelectionBackground{0.29f, 0.23f, 0.17f, 1.0f};
+        glm::vec4 SelectionAccent{0.97f, 0.76f, 0.50f, 1.0f};
+        glm::vec4 SelectionText{0.98f, 0.93f, 0.85f, 1.0f};
+        glm::vec4 RowHoverBackground{0.18f, 0.19f, 0.20f, 1.0f};
+        glm::vec4 MissingText{0.98f, 0.60f, 0.54f, 1.0f};
 
-        glm::vec4 ButtonBackground{0.155f, 0.155f, 0.165f, 1.0f};
-        glm::vec4 ButtonHoverBackground{0.235f, 0.235f, 0.250f, 1.0f};
-        glm::vec4 ButtonBorder{0.275f, 0.275f, 0.295f, 1.0f};
-        glm::vec4 ButtonText{0.92f, 0.92f, 0.94f, 1.0f};
+        glm::vec4 ButtonBackground{0.162f, 0.165f, 0.171f, 1.0f};
+        glm::vec4 ButtonHoverBackground{0.225f, 0.227f, 0.232f, 1.0f};
+        glm::vec4 ButtonText{0.89f, 0.90f, 0.91f, 1.0f};
 
-        float FontPixelHeight = 18.0f;
-        float PanelPadding = 10.0f;
-        float PanelHeaderHeight = 30.0f;
-        float HeaderOffset = 4.0f;
-        float RowSpacing = 2.0f;
-        float SectionSpacing = 8.0f;
+        float FontPixelHeight = 19.0f;
+        float PanelPadding = 14.0f;
+        float PanelHeaderHeight = 40.0f;
+        float RowSpacing = 8.0f;
+        float SectionSpacing = 12.0f;
     };
 }

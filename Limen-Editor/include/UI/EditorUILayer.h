@@ -4,6 +4,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 #include <utility>
 
@@ -11,7 +12,6 @@
 #include "Render/EditorAssetSpawner.h"
 #include "Render/EditorPrimitiveSpawner.h"
 #include "Render/EditorSceneContent.h"
-#include "Limen/Platform/PlatformPaths.h"
 #include "Limen/Renderer/FontAtlas.h"
 #include "Limen/Application/Layer.h"
 #include "Limen/Core/Log.h"
@@ -32,6 +32,7 @@
 #include "UI/Panels/OutlinerPanel.h"
 #include "UI/Panels/PlacementToolbarPanel.h"
 #include "UI/Panels/SceneViewportPanel.h"
+#include "UI/Panels/SceneToolbarPanel.h"
 
 namespace LimenEditor
 {
@@ -52,49 +53,33 @@ namespace LimenEditor
             if (!m_ViewportPanel.Init())
                 LM_ERROR("Editor viewport initialization failed");
 
-            // 引擎默认字体：从内置资产根解析路径，失败只记日志、不阻断启动。
-            Limen::LString fontError;
-            std::filesystem::path fontPath;
-            if (Limen::TryGetBuiltInAssetRoot(fontPath, fontError))
-            {
-                fontPath /= "fonts/NotoSansCJKsc-Regular.otf";
-                m_FontAtlas = Limen::CreateScope<Limen::FontAtlas>(
-                    1024,
-                    m_Theme.FontPixelHeight);
-                if (m_FontAtlas->LoadFontFile(fontPath))
-                {
-                    std::string uiCharacters;
-                    for (char c = 32; c < 127; ++c)
-                        uiCharacters.push_back(c);
-                    uiCharacters += "场景视图对象选择内容浏览器创建详情无";
-                    m_FontAtlas->AddText(uiCharacters);
-                    if (!m_FontAtlas->Build())
-                        LM_ERROR("Editor UI: font atlas build failed");
-                } else
-                {
-                    LM_ERROR("Editor UI: default font load failed: {}",
-                             fontPath.string());
-                }
-            } else
-            {
-                LM_ERROR("Editor UI: built-in asset root unavailable: {}",
-                         fontError);
-            }
+            LoadWorkspaceFont();
             if (!m_SceneContent.Initialize())
                 LM_ERROR("Editor scene content initialization failed");
+        }
+
+        // 应用在 OnAttach 返回后调用，此时模型和内置几何可以使用当前图形 Context。
+        void OpenSceneFromPath(const std::filesystem::path &path);
+        void QueueSceneAction(SceneToolbarAction action, Limen::AssetID sceneAsset = {}) noexcept;
+
+        bool DeleteSelection()
+        {
+            return m_Session && !m_RunningSceneAction && m_Session->DeleteSelectedObjects();
         }
 
         // 每帧把会话场景渲染到与中央区域像素尺寸一致的离屏目标
         void OnUpdate(Limen::DeltaTime &deltaTime) override
         {
+            const auto action = std::exchange(m_PendingSceneAction, SceneToolbarAction::None);
+            const auto sceneAsset = std::exchange(m_PendingSceneAsset, Limen::AssetID{});
+            if (action != SceneToolbarAction::None && m_Session)
+                RunSceneAction(action, sceneAsset);
+
             if (!m_Session || !m_ViewportPanel.IsReady())
                 return;
 
             const Limen::Window &window = Limen::Application::GetApp().GetWindow();
-            const EditorUILayoutResult layout = CalculateEditorUILayout(
-                static_cast<float>(window.GetWindowWidth()),
-                static_cast<float>(window.GetWindowHeight()),
-                m_RightTopRatio);
+            const auto layout = CalculateWorkspaceLayout(window);
 
             m_ViewportPanel.Update(*m_Session, window, deltaTime, layout.Center);
         }
@@ -108,324 +93,33 @@ namespace LimenEditor
         }
 
         // window 是本次绘制目标的非拥有引用；窗口及其图形 Context 由 Application 管理。
-        void OnUIRender(Limen::Window &window) override
-        {
-            // 每次都当前窗口的逻辑尺寸，普通缩放，普通缩放和非全屏最大化走同一套布局
-            const float width = static_cast<float>(window.GetWindowWidth());
-            const float height = static_cast<float>(window.GetWindowHeight());
-            const EditorUILayoutResult &layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
-            // 输入命中区域必须与本次实际绘制的分隔条一致。
-            m_RightSplitterRect = layout.RightSplitter;
-
-            if (layout.Top.Width <= 0.0f || layout.Top.Height <= 0.0f)
-                return;
-
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.Top.X, layout.Top.Y},
-                {layout.Top.Width, layout.Top.Height},
-                m_Theme.TopBarBackground);
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.Top.X, layout.Top.Y + layout.Top.Height - 1.0f},
-                {layout.Top.Width, 1.0f},
-                m_Theme.PanelBorder);
-
-            if (m_FontAtlas && m_FontAtlas->IsBuilt())
-            {
-                const auto now = std::chrono::steady_clock::now();
-                const std::string_view status = m_StatusMessage.GetText(now);
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Top.X + 9.0f, layout.Top.Y + 7.0f},
-                    {3.0f, 18.0f},
-                    m_Theme.Accent);
-
-                m_UIRenderer.DrawText(
-                    window,
-                    {layout.Top.X + 18.0f, layout.Top.Y + 4.0f},
-                    m_Theme.TextPrimary,
-                    *m_FontAtlas,
-                    "LIMEN EDITOR");
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Top.X + 158.0f, layout.Top.Y + 6.0f},
-                    {1.0f, 18.0f},
-                    m_Theme.PanelBorder);
-                m_UIRenderer.DrawText(
-                    window,
-                    {layout.Top.X + 172.0f, layout.Top.Y + 4.0f},
-                    status.empty()
-                        ? m_Theme.TextMuted
-                        : (m_StatusMessage.GetKind(now) ==
-                                   EditorStatusKind::Error
-                               ? m_Theme.MissingText
-                               : m_Theme.TextSecondary),
-                    *m_FontAtlas,
-                    status.empty() ? "Ready" : status);
-
-                if (m_Session && layout.Top.Width > 900.0f)
-                {
-                    const Limen::LString &projectName =
-                        m_Session->GetConfiguration().DisplayName;
-                    const float projectLabelWidth =
-                        static_cast<float>(projectName.size()) * 8.0f;
-                    const float projectX =
-                        layout.Top.X + layout.Top.Width -
-                        projectLabelWidth - 72.0f;
-                    m_UIRenderer.DrawText(
-                        window,
-                        {projectX, layout.Top.Y + 4.0f},
-                        m_Theme.TextMuted,
-                        *m_FontAtlas,
-                        "PROJECT");
-                    m_UIRenderer.DrawText(
-                        window,
-                        {projectX + 58.0f, layout.Top.Y + 4.0f},
-                        m_Theme.TextSecondary,
-                        *m_FontAtlas,
-                        std::string_view(
-                            projectName.data(),
-                            projectName.size()));
-                }
-
-                m_PlacementToolbar.Draw(
-                    window,
-                    m_UIRenderer,
-                    *m_FontAtlas,
-                    m_Theme,
-                    layout.Top);
-            }
-
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.Left.X, layout.Left.Y},
-                {layout.Left.Width, layout.Left.Height},
-                m_Theme.PanelBackground);
-            // Content Browser 的行数据、绘制和点击由面板自己管理。
-            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
-            {
-                m_ContentBrowser.Update(*m_Session);
-                m_ContentBrowser.Draw(
-                    *m_Session,
-                    window,
-                    m_UIRenderer,
-                    *m_FontAtlas,
-                    m_Theme,
-                    layout.Left);
-            }
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.Center.X, layout.Center.Y},
-                {layout.Center.Width, layout.Center.Height},
-                m_Theme.ViewportBackground);
-
-            m_ViewportPanel.Draw(window,m_UIRenderer,layout.Center);
-            if (layout.Center.Width > 0.0f && layout.Center.Height > 0.0f)
-            {
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Center.X, layout.Center.Y},
-                    {layout.Center.Width, 1.0f},
-                    m_Theme.PanelBorder);
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Center.X,
-                     layout.Center.Y + layout.Center.Height - 1.0f},
-                    {layout.Center.Width, 1.0f},
-                    m_Theme.PanelBorder);
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Center.X, layout.Center.Y},
-                    {1.0f, layout.Center.Height},
-                    m_Theme.PanelBorder);
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Center.X + layout.Center.Width - 1.0f,
-                     layout.Center.Y},
-                    {1.0f, layout.Center.Height},
-                    m_Theme.PanelBorder);
-
-                if (m_FontAtlas && m_FontAtlas->IsBuilt())
-                {
-                    const float overlayHeight =
-                        m_FontAtlas->GetLineHeight() + 4.0f;
-                    m_UIRenderer.DrawSolidRect(
-                        window,
-                        {layout.Center.X + 10.0f,
-                         layout.Center.Y + 10.0f},
-                        {224.0f, overlayHeight},
-                        m_Theme.ViewportOverlayBackground);
-                    m_UIRenderer.DrawSolidRect(
-                        window,
-                        {layout.Center.X + 10.0f,
-                         layout.Center.Y + 10.0f},
-                        {3.0f, overlayHeight},
-                        m_Theme.Accent);
-                    m_UIRenderer.DrawText(
-                        window,
-                        {layout.Center.X + 20.0f,
-                         layout.Center.Y + 12.0f},
-                        m_Theme.TextSecondary,
-                        *m_FontAtlas,
-                        "PERSPECTIVE     LIT");
-                }
-            }
-
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.RightTop.X, layout.RightTop.Y},
-                {layout.RightTop.Width, layout.RightTop.Height},
-                m_Theme.PanelBackground);
-
-            // Outliner 的行数据、多选和绘制由面板自己管理。
-            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
-            {
-                m_Outliner.Update(*m_Session);
-                m_Outliner.Draw(
-                    *m_Session,
-                    window,
-                    m_UIRenderer,
-                    *m_FontAtlas,
-                    m_Theme,
-                    layout.RightTop);
-            }
-
-
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.RightSplitter.X, layout.RightSplitter.Y},
-                {layout.RightSplitter.Width, layout.RightSplitter.Height},
-                m_Theme.Splitter
-            );
-            m_UIRenderer.DrawSolidRect(
-                window,
-                {layout.RightBottom.X, layout.RightBottom.Y},
-                {layout.RightBottom.Width, layout.RightBottom.Height},
-                m_Theme.PanelBackground);
-
-            // 面板边界使用细线，避免相邻大色块粘连。
-            if (layout.Left.Width > 0.0f)
-            {
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.Left.X + layout.Left.Width - 1.0f,
-                     layout.Left.Y},
-                    {1.0f, layout.Left.Height},
-                    m_Theme.PanelBorder);
-            }
-            if (layout.RightTop.Width > 0.0f)
-            {
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {layout.RightTop.X, layout.RightTop.Y},
-                    {1.0f,
-                     layout.RightTop.Height +
-                         layout.RightSplitter.Height +
-                         layout.RightBottom.Height},
-                    m_Theme.PanelBorder);
-            }
-
-            // Details 面板只借用绘画状态选择状态，绘制细节由面板自身负责
-            if (m_Session && m_FontAtlas && m_FontAtlas->IsBuilt())
-            {
-                m_DetailsPanel.Draw(
-                    *m_Session,
-                    window,
-                    m_UIRenderer,
-                    *m_FontAtlas,
-                    m_Theme,
-                    layout.RightBottom
-                );
-            }
-
-            if (m_ContentBrowser.IsDraggingAsset() &&
-                m_FontAtlas &&
-                m_FontAtlas->IsBuilt())
-            {
-                const auto [x, y] = Limen::Input::GetMousePos();
-                m_UIRenderer.DrawSolidRect(
-                    window,
-                    {x - 3.0f, y - 3.0f},
-                    {6.0f, 6.0f},
-                    m_Theme.SelectionBackground);
-
-                if (m_HasDragPreviewBounds)
-                {
-                    Limen::SceneTransform placementTransform;
-                    if (m_ViewportPanel.TryGetPlacementTransformAt(
-                            x,
-                            y,
-                            placementTransform,
-                            m_PlacementDistance))
-                    {
-                        const Limen::AxisAlignedBoundingBox worldBounds =
-                            m_DragPreviewBounds.Transformed(
-                                placementTransform.ToMatrix());
-                        glm::vec2 screenMin{};
-                        glm::vec2 screenMax{};
-                        if (m_ViewportPanel.TryProjectWorldBounds(
-                                worldBounds,
-                                screenMin,
-                                screenMax))
-                        {
-                            glm::vec4 outlineColor =
-                                m_Theme.SelectionBackground;
-                            outlineColor.a = 0.7f;
-                            constexpr float thickness = 2.0f;
-                            const float previewWidth =
-                                screenMax.x - screenMin.x;
-                            const float previewHeight =
-                                screenMax.y - screenMin.y;
-
-                            m_UIRenderer.DrawSolidRect(
-                                window,
-                                screenMin,
-                                {previewWidth, thickness},
-                                outlineColor);
-                            m_UIRenderer.DrawSolidRect(
-                                window,
-                                {screenMin.x, screenMax.y - thickness},
-                                {previewWidth, thickness},
-                                outlineColor);
-                            m_UIRenderer.DrawSolidRect(
-                                window,
-                                screenMin,
-                                {thickness, previewHeight},
-                                outlineColor);
-                            m_UIRenderer.DrawSolidRect(
-                                window,
-                                {screenMax.x - thickness, screenMin.y},
-                                {thickness, previewHeight},
-                                outlineColor);
-                        }
-                    }
-                }
-
-                char distanceLabel[64]{};
-                std::snprintf(
-                    distanceLabel,
-                    sizeof(distanceLabel),
-                    "  Distance: %.1f",
-                    static_cast<double>(m_PlacementDistance));
-                std::string label = m_DragPreviewLabel.empty()
-                                        ? "Place asset"
-                                        : m_DragPreviewLabel;
-                label += distanceLabel;
-                m_UIRenderer.DrawText(
-                    window,
-                    {x + 12.0f, y + 12.0f},
-                    m_Theme.SelectionText,
-                    *m_FontAtlas,
-                    label);
-            }
-        }
+        void OnUIRender(Limen::Window &window) override;
 
         // event 是 Application 转发给本 Layer 的非拥有事件引用。
         void OnEvent(Limen::Event &event) override
         {
+            if (m_RunningSceneAction)
+                return;
+
             // dispatcher 只在本次事件调用期间存在，用于按事件类型调用对应回调。
             Limen::EventDispatcher dispatcher(event);
+
+            dispatcher.Dispatch<Limen::KeyTypedEvent>(
+                [this](const Limen::KeyTypedEvent &key)
+                {
+                    return m_DetailsPanel.OnKeyTyped(key.GetCodepoint());
+                });
+            dispatcher.Dispatch<Limen::KeyPressedEvent>(
+                [this](const Limen::KeyPressedEvent &key)
+                {
+                    if (!m_Session)
+                        return false;
+                    if (HandleSceneShortcut(key))
+                        return true;
+                    return m_DetailsPanel.OnKeyPressed(*m_Session, key.GetKeyCode()) || HandleWorkspaceShortcut(key);
+                });
+            if (event.IsHandled())
+                return;
 
             // Place 工具区位于顶栏；按下后立即生成本帧唯一的放置命令。
             dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
@@ -438,6 +132,17 @@ namespace LimenEditor
                     }
 
                     const auto [x, y] = Limen::Input::GetMousePos();
+                    if (m_DetailsPanel.OnMousePressed(*m_Session, x, y))
+                        return true;
+                    if (HandleWorkspaceClick(x, y))
+                        return true;
+                    const auto sceneAction = m_SceneToolbar.HitTest(x, y);
+                    if (sceneAction != SceneToolbarAction::None)
+                    {
+                        QueueSceneAction(sceneAction);
+                        return true;
+                    }
+
                     const PlacementToolbarAction action =
                         m_PlacementToolbar.OnMousePressed(
                             x,
@@ -458,9 +163,19 @@ namespace LimenEditor
             if (event.IsHandled())
                 return;
 
-            // 输入路由优先级：Viewport → Content Browser → Outliner →
-            // Splitter → 快捷键。被高优先级区域消费后不再进入后续区域。
-            if (m_ViewportPanel.OnEvent(event) || event.IsHandled())
+            dispatcher.Dispatch<Limen::MouseScrolledEvent>(
+                [this](const Limen::MouseScrolledEvent &scroll)
+                {
+                    if (!m_Session || m_ContentBrowser.IsDraggingAsset())
+                        return false;
+                    const auto [x, y] = Limen::Input::GetMousePos();
+                    return m_ContentBrowser.OnMouseScrolled(x, y, scroll.GetYOffset());
+                });
+            if (event.IsHandled())
+                return;
+
+            // 工具栏与资源抽屉先消费自己的输入，随后才进入场景视口。
+            if ((m_WorkspaceLayout.Center.Width > 0.0f && m_ViewportPanel.OnEvent(event)) || event.IsHandled())
                 return;
 
             // 视口左键：射线拾取对象；Cmd/Ctrl 支持增选。
@@ -472,6 +187,8 @@ namespace LimenEditor
                         return false;
 
                     const auto [x, y] = Limen::Input::GetMousePos();
+                    if (!m_WorkspaceLayout.Center.Contains(x, y))
+                        return false;
                     const bool toggle =
                         Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
                         Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
@@ -484,7 +201,7 @@ namespace LimenEditor
             if (event.IsHandled())
                 return;
 
-            // Content Browser 左键：按行号找到资产记录并切换资产选择。
+            // 抽屉左键命中资源卡片或 Place 操作。
             dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
                 [this](const Limen::MouseButtonPressedEvent &press)
                 {
@@ -496,19 +213,16 @@ namespace LimenEditor
                     const ContentBrowserAction action =
                         m_ContentBrowser.OnMousePressed(*m_Session, x, y);
 
-                    // 单击选择资产；双击留给资产编辑器；放置必须走显式 Place。
                     if (action == ContentBrowserAction::ActivateAsset)
                     {
-                        LM_INFO("Editor asset editor is not implemented yet");
-                        ShowStatus(
-                            "Asset editor is not implemented yet.",
-                            EditorStatusKind::Info);
+                        ActivateSelectedAsset();
                         return true;
                     }
                     if (action == ContentBrowserAction::PlaceAsset)
                         return PlaceSelectedAsset();
 
-                    return action == ContentBrowserAction::SelectionChanged;
+                    return action == ContentBrowserAction::SelectionChanged ||
+                           action == ContentBrowserAction::FolderChanged;
                 });
             if (event.IsHandled())
                 return;
@@ -524,6 +238,8 @@ namespace LimenEditor
                     const auto [x, y] = Limen::Input::GetMousePos();
 
                     // macOS 使用 Command，Windows/Linux 使用 Ctrl；统一接受两者。
+                    if (!m_WorkspaceLayout.Outliner.Contains(x, y))
+                        return false;
                     const bool toggleDown =
                         Limen::Input::IsKeyPressed(Limen::KeyCode::LeftSuper) ||
                         Limen::Input::IsKeyPressed(Limen::KeyCode::RightSuper) ||
@@ -605,80 +321,40 @@ namespace LimenEditor
             if (event.IsHandled())
                 return;
 
-            // press 仅提供鼠标按钮；按下位置需从当前单窗口的 Input 查询。
-            dispatcher.Dispatch<Limen::MouseButtonPressedEvent>(
-                [this](const Limen::MouseButtonPressedEvent &press)
-                {
-                    if (press.GetButton() != Limen::MouseButton::Left)
-                        return false;
-                    // x、y 分别是鼠标的逻辑横、纵坐标，用于命中最近一次绘制的分隔条。
-                    if (
-                        const auto [x, y] = Limen::Input::GetMousePos();
-                        !m_RightSplitterRect.Contains(x, y)
-                    )
-                        return false;
-                    m_IsDraggingRightSplitter = true;
-                    LM_INFO("Editor right splitter grabbed");
-                    return true;
-                });
-            if (event.IsHandled())
-                return;
-
-            // release 仅提供鼠标按钮；这里只处理从分隔条开始的左键操作。
             dispatcher.Dispatch<Limen::MouseButtonReleasedEvent>(
                 [this](const Limen::MouseButtonReleasedEvent &release)
                 {
-                    if (release.GetButton() != Limen::MouseButton::Left || !m_IsDraggingRightSplitter)
+                    if (release.GetButton() != Limen::MouseButton::Left)
                         return false;
-                    // mouseY 是松开时光标的逻辑 Y；ReleasedEvent 本身不携带坐标。
-                    const float mouseY = Limen::Input::GetMouseY();
-                    // window 是 Application 当前拥有的主窗口，此处只借用它读取最新逻辑高度。
-                    const auto &window = Limen::Application::GetApp().GetWindow();
-                    // height 是松开时窗口内容区的逻辑高度，不是帧缓冲像素高度。
-                    const float width = static_cast<float>(window.GetWindowWidth());
-                    const float height = static_cast<float>(window.GetWindowHeight());
-                    const EditorUILayoutResult layout = CalculateEditorUILayout(width, height, m_RightTopRatio);
 
-                    // 右侧正文总高：右上区域、分隔条和右下区域都包含在内。
-                    const float rightBodyHeight =
-                            layout.RightTop.Height
-                            + layout.RightSplitter.Height
-                            + layout.RightBottom.Height;
-
-                    if (rightBodyHeight > 0.0f)
+                    if (m_IsDraggingContentSplitter)
                     {
-                        // 鼠标相对右侧正文顶部的位置，用于决定下一帧的上下比例。
-                        const float mouseOffset = mouseY - layout.RightTop.Y;
-                        m_RightTopRatio = std::clamp(
-                            mouseOffset / rightBodyHeight,
-                            0.000001f,
-                            0.999999f
-                        );
+                        ResizeContentDrawer(Limen::Input::GetMouseY());
+                        m_IsDraggingContentSplitter = false;
+                        return true;
                     }
-                    LM_INFO("m_RightTopRatio = {} ", m_RightTopRatio);
-
-                    m_IsDraggingRightSplitter = false;
-                    LM_INFO("Editor right splitter released");
-                    return true;
+                    if (m_IsDraggingDetailsSplitter)
+                    {
+                        ResizeDetailsDock(Limen::Input::GetMouseY());
+                        m_IsDraggingDetailsSplitter = false;
+                        return true;
+                    }
+                    return false;
                 });
             if (event.IsHandled())
                 return;
 
-            // 尺寸变化后，上一次绘制的逻辑坐标命中区域立即失效；下次 OnUIRender 会重建。
             dispatcher.Dispatch<Limen::WindowResizeEvent>(
-                [this](const Limen::WindowResizeEvent &resize)
+                [this](const Limen::WindowResizeEvent &)
                 {
-                    m_RightSplitterRect = {};
-                    if (resize.GetWidth() != 0 && resize.GetHeight() != 0)
-                        return false;
-
-                    if (m_IsDraggingRightSplitter)
-                        LM_INFO("Editor right splitter drag cancelled: framebuffer size is zero");
-
+                    ResetWorkspaceHitAreas();
+                    m_SceneToolbar.Reset();
+                    m_PlacementToolbar.UpdateLayout({}, 0.0f);
+                    m_IsDraggingContentSplitter = false;
+                    m_IsDraggingDetailsSplitter = false;
                     m_ViewportPanel.CancelNavigation();
                     return false;
-                }
-            );
+                });
 
             // Delete/Backspace：删除当前全部选中对象
             dispatcher.Dispatch<Limen::KeyPressedEvent>(
@@ -690,12 +366,33 @@ namespace LimenEditor
                     const Limen::KeyCode key = keyEvent.GetKeyCode();
                     if (key != Limen::KeyCode::Delete && key != Limen::KeyCode::Backspace)
                         return false;
-                    return m_Session->DeleteSelectedObjects();
+                    return DeleteSelection();
                 }
             );
         }
 
     private:
+        bool HandleSceneShortcut(const Limen::KeyPressedEvent &key);
+        bool HandleWorkspaceShortcut(const Limen::KeyPressedEvent &key);
+        bool HandleWorkspaceClick(float x, float y);
+        [[nodiscard]] EditorUILayoutResult CalculateWorkspaceLayout(const Limen::Window &window) const;
+        void ResetWorkspaceHitAreas();
+        void ToggleContentDrawer();
+        void ToggleExpandedViewport();
+        void ResizeContentDrawer(float mouseY);
+        void ResizeDetailsDock(float mouseY);
+        void DrawWorkspaceHeader(const Limen::Window &window, const UIRect &top);
+        void DrawViewportToolbar(const Limen::Window &window, const UIRect &rect);
+        void DrawWorkspaceStatusBar(const Limen::Window &window, const UIRect &rect);
+        void DrawAssetDragPreview(const Limen::Window &window) const;
+        void LoadWorkspaceFont(std::string_view sceneLabel = {});
+        void ActivateSelectedAsset();
+        void RunSceneAction(SceneToolbarAction action, Limen::AssetID sceneAsset);
+        [[nodiscard]] std::filesystem::path PickSceneToOpen(Limen::AssetID sceneAsset);
+        [[nodiscard]] std::filesystem::path GetSceneDialogDirectory() const;
+        [[nodiscard]] bool SaveActiveScene(bool saveAs);
+        [[nodiscard]] bool ConfirmSceneReplacement();
+
         bool PlaceCube()
         {
             Limen::SceneTransform placementTransform;
@@ -918,13 +615,17 @@ namespace LimenEditor
 
         // 本 Layer 按值拥有 UI 绘制器；OnAttach 初始化，OnDetach 在 Context 销毁前关闭。
         EditorUIRenderer m_UIRenderer;
-        // 右上面板的绘制比例；绘制时乘以扣除分隔条后的 availableHeight。
-        float m_RightTopRatio = 0.5f;
-        // 最近一次 OnUIRender 实际绘制的分隔条命中区域；每次绘制前清空并重建，用于鼠标事件的判断
-        UIRect m_RightSplitterRect{};
-
-        // 左键是否从分隔条开始按下，等待松开时更新比例；当前并非实时拖动。
-        bool m_IsDraggingRightSplitter = false;
+        float m_ContentHeightRatio = 0.24f;
+        float m_DetailsSplitRatio = kDefaultEditorRightSplitRatio;
+        bool m_ContentDrawerOpen = true;
+        bool m_ViewportExpanded = false;
+        bool m_IsDraggingContentSplitter = false;
+        bool m_IsDraggingDetailsSplitter = false;
+        // 命中使用最近一次完成绘制的区域。
+        EditorUILayoutResult m_WorkspaceLayout{};
+        UIRect m_ContentToggleRect{};
+        UIRect m_FrameSelectionRect{};
+        UIRect m_ExpandViewportRect{};
 
         Limen::Ref<EditorSession> m_Session;
 
@@ -932,7 +633,7 @@ namespace LimenEditor
 
         // Editor 统一主题色；后续所有面板只从这里取颜色和间距。
         EditorTheme m_Theme;
-        // 左侧资产浏览器面板：持有行布局与资产选择交互。
+        // 底部资源抽屉拥有卡片布局与资产选择交互。
         ContentBrowserPanel m_ContentBrowser;
         // 拖拽放置沿相机视线的距离，滚轮可调。
         float m_PlacementDistance = 4.0f;
@@ -940,7 +641,7 @@ namespace LimenEditor
         std::string m_DragPreviewLabel;
         bool m_HasDragPreviewBounds = false;
 
-        // 右上 Outliner：持有行布局与 Shift 锚点。
+        // Outliner 位于右侧上方，持有行布局与 Shift 锚点。
         OutlinerPanel m_Outliner;
 
         // 引擎默认字体的图集；面板文字只借用，生命周期由本 Layer 管理。
@@ -954,8 +655,12 @@ namespace LimenEditor
         EditorPrimitiveSpawner m_PrimitiveSpawner;
         // 顶栏 Place 工具区的按钮布局与输入命中。
         PlacementToolbarPanel m_PlacementToolbar;
+        SceneToolbarPanel m_SceneToolbar;
+        SceneToolbarAction m_PendingSceneAction = SceneToolbarAction::None;
+        Limen::AssetID m_PendingSceneAsset{};
+        bool m_RunningSceneAction = false;
 
-        // 右侧 Details 面板：无状态，只读取会话选择。
+        // 右侧 Details 借用会话，数字输入存在面板草稿中。
         DetailsPanel m_DetailsPanel;
         EditorStatusMessage m_StatusMessage;
         //endregion

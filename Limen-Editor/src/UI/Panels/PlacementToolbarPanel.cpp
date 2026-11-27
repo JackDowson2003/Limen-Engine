@@ -20,21 +20,17 @@ namespace LimenEditor
         {
             const auto [mouseX, mouseY] = Limen::Input::GetMousePos();
             const bool hovered = rect.Contains(mouseX, mouseY);
-            renderer.DrawSolidRect(
+            renderer.DrawRoundedRect(
                 window,
                 {rect.X, rect.Y},
                 {rect.Width, rect.Height},
-                theme.ButtonBorder);
-            renderer.DrawSolidRect(
-                window,
-                {rect.X + 1.0f, rect.Y + 1.0f},
-                {rect.Width - 2.0f, rect.Height - 2.0f},
-                hovered
-                    ? theme.ButtonHoverBackground
-                    : theme.ButtonBackground);
+                hovered ? theme.ButtonHoverBackground : theme.ButtonBackground,
+                6.0f);
+            const float textWidth = renderer.MeasureTextWidth(fontAtlas, label);
             renderer.DrawText(
                 window,
-                {rect.X + 9.0f, rect.Y + 1.0f},
+                {rect.X + (rect.Width - textWidth) * 0.5f,
+                 rect.Y + (rect.Height - fontAtlas.GetLineHeight()) * 0.5f},
                 theme.ButtonText,
                 fontAtlas,
                 label);
@@ -48,9 +44,10 @@ namespace LimenEditor
         const EditorTheme &theme,
         const UIRect &rect)
     {
-        const float rowHeight =
-            fontAtlas.GetLineHeight() + theme.RowSpacing;
+        const float rowHeight = rect.Height;
         UpdateLayout(rect, rowHeight);
+        if (m_Layout.CubeButton.Width <= 0.0f)
+            return;
 
         renderer.SetClipRect(
             window,
@@ -61,10 +58,10 @@ namespace LimenEditor
         {
             renderer.DrawText(
                 window,
-                {m_Layout.Label.X, m_Layout.Label.Y},
-                theme.TextSecondary,
+                {m_Layout.Label.X, m_Layout.Label.Y + (rowHeight - fontAtlas.GetLineHeight()) * 0.5f},
+                theme.TextMuted,
                 fontAtlas,
-                "PLACE");
+                "Add");
         }
         if (m_Layout.CubeButton.Width > 0.0f)
         {
@@ -74,7 +71,7 @@ namespace LimenEditor
                 fontAtlas,
                 theme,
                 m_Layout.CubeButton,
-                "CUBE");
+                "Cube");
         }
         if (m_Layout.PointLightButton.Width > 0.0f)
         {
@@ -84,7 +81,7 @@ namespace LimenEditor
                 fontAtlas,
                 theme,
                 m_Layout.PointLightButton,
-                "POINT LIGHT");
+                "Point Light");
         }
 
         renderer.SetClipRect(window, {0.0f, 0.0f}, {0.0f, 0.0f});

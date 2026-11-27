@@ -29,6 +29,14 @@ namespace LimenEditor
             const glm::vec4 &color
         ) = 0;
 
+        virtual void DrawRoundedRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color,
+            float radius
+        ) = 0;
+
         virtual void DrawTexturedRect(
             const Limen::Window &window,
             const glm::vec2 &position,

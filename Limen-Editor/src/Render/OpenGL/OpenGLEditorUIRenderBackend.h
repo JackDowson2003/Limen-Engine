@@ -28,6 +28,14 @@ namespace LimenEditor
             const glm::vec4 &color
         ) override;
 
+        void DrawRoundedRect(
+            const Limen::Window &window,
+            const glm::vec2 &position,
+            const glm::vec2 &size,
+            const glm::vec4 &color,
+            float radius
+        ) override;
+
         void DrawTexturedRect(
             const Limen::Window &window,
             const glm::vec2 &position,

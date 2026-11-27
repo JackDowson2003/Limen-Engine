@@ -20,11 +20,14 @@
 #include "Limen/Renderer/PerspectiveCamera.h"
 #include "Limen/Renderer/Renderer.h"
 #include "Limen/Scene/Scene.h"
+#include "Limen/Scene/SceneFile.h"
 #include "Limen/Scene/SceneRenderer.h"
+#include "Limen/Scene/SceneRuntime.h"
 #include "Project/EditorSession.h"
 #include "Render/EditorAssetSpawner.h"
 #include "Render/EditorPrimitiveSpawner.h"
 #include "Render/EditorSceneContent.h"
+#include "Render/EditorSceneRenderParts.h"
 
 namespace
 {
@@ -75,6 +78,132 @@ namespace
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDeleteFramebuffers(1, &framebuffer);
         return complete;
+    }
+
+    constexpr Limen::AssetID TwoMaterialAssetID{0x20, 0x21};
+
+    bool TestOpenScene(
+        LimenEditor::EditorSession &session,
+        const LimenEditor::EditorSceneContent &content,
+        const fs::path &projectRoot,
+        const fs::path &modelPath)
+    {
+        constexpr Limen::SceneObjectID modelID{0x30, 0x31};
+        constexpr Limen::SceneObjectID cubeID{0x30, 0x32};
+        Limen::SceneDocument document;
+        document.DisplayName = "Two materials and a cube";
+        document.DirectionLight.Intensity = 0.0f;
+        document.Objects.push_back({
+            .ID = modelID,
+            .Label = "Two material model",
+            .Components = {{
+                .ID = {0x40, 0x41},
+                .Data = Limen::ModelRendererComponent{.ModelAssetID = TwoMaterialAssetID}
+            }}
+        });
+        document.Objects.push_back({
+            .ID = cubeID,
+            .Label = "Restored cube",
+            .Transform = {.Location = {2.0f, 0.0f, 0.0f}},
+            .Components = {{
+                .ID = {0x40, 0x42},
+                .Data = Limen::PrimitiveRendererComponent{}
+            }}
+        });
+
+        const fs::path scenePath = projectRoot / "valid.lscene";
+        const fs::path missingModelScenePath = projectRoot / "missing-model.lscene";
+        Limen::SceneFileError error;
+        if (!Check("write valid Editor scene fixture",
+                   Limen::TrySaveSceneFile(scenePath, document, error)))
+            return false;
+        document.DisplayName = "Missing model";
+        if (!Check("write missing-model Editor scene fixture",
+                   Limen::TrySaveSceneFile(missingModelScenePath, document, error)))
+            return false;
+
+        const Limen::SceneRenderPartsResolver resolveParts =
+            [&](const Limen::SceneObjectComponent &component,
+                Limen::LArray<Limen::SceneRenderObject> &parts,
+                Limen::SceneFileError &componentError)
+            {
+                return LimenEditor::TryResolveEditorSceneRenderParts(
+                    session.GetAssetRegistry(), content, component, parts, componentError);
+            };
+
+        if (!Check("Editor opens scene with model and Cube",
+                   session.TryOpenScene(scenePath, resolveParts, error)))
+        {
+            std::cerr << error.Key.c_str() << ": " << error.Message.c_str() << '\n';
+            return false;
+        }
+
+        bool passed = Check("open commits scene path and name, clears selection and dirty state",
+                            session.GetScenePath() == scenePath &&
+                            session.GetSceneDisplayName() == "Two materials and a cube" &&
+                            session.GetSelectedObjectCount() == 0 && !session.IsDirty());
+        Limen::LString label;
+        passed &= Check("loaded model keeps its object ID and label",
+                        session.TryGetObjectLabel(modelID, label) && label == "Two material model");
+        passed &= Check("loaded Cube keeps its object ID and label",
+                        session.TryGetObjectLabel(cubeID, label) && label == "Restored cube");
+
+        int modelPartCount = 0;
+        int cubePartCount = 0;
+        session.GetScene().ForEachRenderableObject(
+            [&](const Limen::SceneObjectHandle &, const Limen::SceneObjectID &id,
+                const Limen::Ref<Limen::Mesh> &mesh, const Limen::Ref<Limen::Material> &material,
+                const glm::mat4 &world)
+            {
+                if (id == modelID && mesh && material)
+                    ++modelPartCount;
+                if (id == cubeID && mesh == content.GetCubeMesh() && material == content.GetCubeMaterial() &&
+                    std::abs(world[3].x - 2.0f) <= 1.0e-5f)
+                    ++cubePartCount;
+            });
+        passed &= Check("one model object restores both draw parts and Cube uses built-in resources",
+                        modelPartCount == 2 && cubePartCount == 1);
+
+        Limen::PerspectiveCamera camera(45.0f, 1.0f, 0.1f, 100.0f);
+        camera.SetPosition({0.0f, 0.0f, 4.0f});
+        Limen::SceneRendererSpecification spec;
+        spec.Width = 64;
+        spec.Height = 64;
+        spec.Samples = 1;
+        spec.ShadowMapResolution = 64;
+        spec.DebugName = "Editor Scene Open Test";
+        Limen::SceneRenderer renderer(spec);
+        Limen::Renderer::BeginFrame();
+        renderer.Render(session.GetScene(), camera);
+        Limen::Renderer::EndFrame();
+
+        // 只开环境光，三角形颜色由各自 MTL 的 Ka 决定。避开对角线采样。
+        GLubyte red[4]{};
+        GLubyte blue[4]{};
+        const auto color = renderer.GetFinalColorAttachmentHandle();
+        const bool readable = ReadPixel(color, 64, 64, 37, 28, red) &&
+                              ReadPixel(color, 64, 64, 27, 36, blue);
+        passed &= Check("opened model renders both material colors",
+                        readable && red[0] > red[2] + 8 && blue[2] > blue[0] + 8);
+
+        const auto *openedScene = &session.GetScene();
+        passed &= Check("active scene has an unsaved edit before failed open",
+                        session.SelectObject(modelID) && session.SetObjectLabel(modelID, "Unsaved label") &&
+                        session.IsDirty());
+        // 第一次打开已经填充模型缓存。这里只删除临时项目复制出的源 OBJ。
+        if (!Check("remove source model after it was cached", fs::remove(modelPath)))
+            return false;
+        const bool rejected = !session.TryOpenScene(missingModelScenePath, resolveParts, error);
+        passed &= Check("cached model with missing source reports structured scene error",
+                        rejected && error.Code == Limen::SceneFileErrorCode::FileAccess &&
+                        error.File == missingModelScenePath && error.Key == "objects[0].components[0].model_asset_id" &&
+                        !error.Message.empty());
+        passed &= Check("failed open preserves active scene, edit state and path",
+                        rejected && &session.GetScene() == openedScene && session.GetScenePath() == scenePath &&
+                        session.GetSceneDisplayName() == "Two materials and a cube" &&
+                        session.GetSelectedObjectID() == modelID && session.IsDirty() &&
+                        session.TryGetObjectLabel(modelID, label) && label == "Unsaved label");
+        return passed;
     }
 }
 
@@ -356,15 +485,27 @@ int main()
         const fs::path modelDirectory = assetRoot / "models";
         fs::create_directories(modelDirectory);
 
+        const fs::path fixtureRoot = LIMEN_TEST_SANDBOX_ASSET_ROOT;
         fs::copy_file(
-            LIMEN_TEST_MODEL_PATH,
+            fixtureRoot / "models/TestCube.obj",
             modelDirectory / "TestCube.obj",
             fs::copy_options::overwrite_existing);
+        const fs::path twoMaterialModelPath = modelDirectory / "TestTwoMaterials.obj";
+        fs::copy_file(fixtureRoot / "models/TestTwoMaterials.obj", twoMaterialModelPath);
+        fs::copy_file(fixtureRoot / "models/TestTwoMaterials.mtl", modelDirectory / "TestTwoMaterials.mtl");
+        fs::create_directory(assetRoot / "textures");
+        fs::copy_file(fixtureRoot / "textures/checkerboard.png", assetRoot / "textures/checkerboard.png");
+        fs::copy_file(fixtureRoot / "textures/test-tilted-normal.png", assetRoot / "textures/test-tilted-normal.png");
 
         {
             std::ofstream sidecar(modelDirectory / "TestCube.obj.lmmeta");
             sidecar << "schema_version = 1\n"
                     << "asset_id = \"00112233-4455-6677-8899-aabbccddeeff\"\n";
+        }
+        {
+            std::ofstream sidecar(modelDirectory / "TestTwoMaterials.obj.lmmeta");
+            sidecar << "schema_version = 1\n"
+                    << "asset_id = \"" << Limen::AssetIDToString(TwoMaterialAssetID).c_str() << "\"\n";
         }
 
         // 重新指向临时项目，确保 AssetManager 从 Registry 的相对路径加载模型。
@@ -540,6 +681,7 @@ int main()
                             secondLabel) &&
                         secondLabel == "TestCube_2") && success;
 
+        success = TestOpenScene(session, spawnContent, projectRoot, twoMaterialModelPath) && success;
         fs::remove_all(projectRoot);
     }
 

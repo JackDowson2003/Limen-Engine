@@ -182,6 +182,7 @@ add_test(
 add_executable(LimenEditorPrimitiveSpawnerTests
         EditorPrimitiveSpawnerTests.cpp
         "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorPrimitiveSpawner.cpp"
+        "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneRenderParts.cpp"
 )
 
 limen_configure_target(LimenEditorPrimitiveSpawnerTests)
@@ -576,6 +577,7 @@ if (APPLE)
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorAssetSpawner.cpp"
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorPrimitiveSpawner.cpp"
             "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneContent.cpp"
+            "${CMAKE_SOURCE_DIR}/Limen-Editor/src/Render/EditorSceneRenderParts.cpp"
     )
 
     limen_configure_target(LimenEditorSceneRenderTests)
@@ -586,7 +588,7 @@ if (APPLE)
 
     target_compile_definitions(LimenEditorSceneRenderTests PRIVATE
             LIMEN_TEST_ASSET_ROOT="${CMAKE_SOURCE_DIR}/LimenEngine/assets"
-            LIMEN_TEST_MODEL_PATH="${CMAKE_SOURCE_DIR}/LimenSandBox/assets/models/TestCube.obj"
+            LIMEN_TEST_SANDBOX_ASSET_ROOT="${CMAKE_SOURCE_DIR}/LimenSandBox/assets"
     )
 
     target_link_libraries(LimenEditorSceneRenderTests PRIVATE
